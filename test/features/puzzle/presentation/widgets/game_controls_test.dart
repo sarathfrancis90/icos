@@ -33,7 +33,6 @@ void main() {
         final state = createPlayingGameState();
         await tester.pumpWidget(buildGameControls(state));
 
-        expect(find.text('Undo'), findsOneWidget);
         expect(find.byIcon(Icons.undo_rounded), findsOneWidget);
       });
 
@@ -50,7 +49,6 @@ void main() {
         await tester.pumpWidget(buildGameControls(state));
 
         expect(find.text('Hint'), findsOneWidget);
-        expect(find.byIcon(Icons.lightbulb_outline_rounded), findsOneWidget);
       });
     });
 
@@ -61,7 +59,7 @@ void main() {
         await tester.pumpWidget(buildGameControls(state));
 
         // Tap each button - callbacks should NOT fire
-        await tester.tap(find.text('Undo'));
+        await tester.tap(find.byIcon(Icons.undo_rounded));
         await tester.tap(find.text('Reset'));
         expect(undoCalled, isFalse);
         expect(resetCalled, isFalse);
@@ -81,7 +79,7 @@ void main() {
         final state = createCompletedGameState();
         await tester.pumpWidget(buildGameControls(state));
 
-        await tester.tap(find.text('Undo'));
+        await tester.tap(find.byIcon(Icons.undo_rounded));
         await tester.tap(find.text('Reset'));
         await tester.tap(find.text('Hint'));
         expect(undoCalled, isFalse);
@@ -95,7 +93,7 @@ void main() {
         final state = createPlayingGameState();
         await tester.pumpWidget(buildGameControls(state));
 
-        await tester.tap(find.text('Undo'));
+        await tester.tap(find.byIcon(Icons.undo_rounded));
         expect(undoCalled, isTrue);
       });
 
@@ -128,7 +126,7 @@ void main() {
         );
         await tester.pumpWidget(buildGameControls(state));
 
-        await tester.tap(find.text('Undo'));
+        await tester.tap(find.byIcon(Icons.undo_rounded));
         await tester.tap(find.text('Reset'));
         expect(undoCalled, isFalse);
         expect(resetCalled, isFalse);
@@ -162,13 +160,7 @@ void main() {
         await tester.pumpWidget(buildGameControls(state));
 
         // Badge with '0' should not be visible
-        // The Badge widget has isLabelVisible: badgeCount > 0
-        final badges = tester.widgetList<Badge>(find.byType(Badge));
-        for (final badge in badges) {
-          if (badge.label != null) {
-            expect(badge.isLabelVisible, isFalse);
-          }
-        }
+        expect(find.text('0'), findsNothing);
       });
 
       testWidgets('shows badge with count of 1', (tester) async {

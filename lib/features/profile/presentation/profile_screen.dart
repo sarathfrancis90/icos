@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_service.dart';
@@ -52,12 +53,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeNotifierProvider);
     final profileState = ref.watch(profileNotifierProvider);
-    // Watch auth state to rebuild when auth changes
     ref.watch(authNotifierProvider);
     final user = SupabaseService.auth.currentUser;
     final isAnonymous = user?.isAnonymous ?? true;
 
-    // Initialize local settings state from profile or storage
     profileState.whenData((profile) {
       _initSettingsFromProfile(profile);
     });
@@ -78,18 +77,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               style: Theme.of(context).textTheme.displayMedium,
             ),
             const SizedBox(height: AppSizes.lg),
-
-            // Avatar section
             _buildAvatarSection(context, profile, isAnonymous),
             const SizedBox(height: AppSizes.xl),
-
-            // Account info section
             if (!isAnonymous) ...[
               _buildAccountSection(context, user, profile),
               const SizedBox(height: AppSizes.md),
             ],
-
-            // Settings section
             Text(
               'Settings',
               style: Theme.of(context).textTheme.titleLarge,
@@ -97,8 +90,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: AppSizes.md),
             _buildSettingsCard(context, themeMode, profile),
             const SizedBox(height: AppSizes.md),
-
-            // App section
             Text(
               'App',
               style: Theme.of(context).textTheme.titleLarge,
@@ -106,23 +97,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: AppSizes.md),
             _buildAppCard(context),
             const SizedBox(height: AppSizes.lg),
-
-            // Sign out button
             if (!isAnonymous)
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () => _signOut(context),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error),
                   ),
                   child: const Text('Sign Out'),
                 ),
               ),
-
             const SizedBox(height: AppSizes.lg),
           ],
         ),
@@ -141,22 +127,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Center(
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 40,
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            backgroundImage: profile?.avatarUrl != null
-                ? NetworkImage(profile!.avatarUrl!)
-                : null,
-            child: profile?.avatarUrl == null
-                ? Text(
-                    initials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  )
-                : null,
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [AppColors.purpleGradientStart, AppColors.purpleGradientEnd],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.purpleGlow,
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: 40,
+              backgroundColor: Colors.transparent,
+              backgroundImage: profile?.avatarUrl != null
+                  ? NetworkImage(profile!.avatarUrl!)
+                  : null,
+              child: profile?.avatarUrl == null
+                  ? Text(
+                      initials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                  : null,
+            ),
           ),
           const SizedBox(height: AppSizes.sm),
           GestureDetector(
@@ -173,17 +174,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   Icon(
                     Icons.edit_rounded,
                     size: 18,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: AppColors.purpleLight,
                   ),
                 ],
               ],
             ),
           ),
           if (isAnonymous) ...[
-            const SizedBox(height: AppSizes.xs),
-            OutlinedButton(
-              onPressed: () => context.push('/auth'),
-              child: const Text('Create Account'),
+            const SizedBox(height: AppSizes.sm),
+            SizedBox(
+              width: 180,
+              child: OutlinedButton(
+                onPressed: () => context.push('/auth'),
+                child: const Text('Create Account'),
+              ),
             ),
           ],
         ],
@@ -211,7 +215,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: AppSizes.md),
-        Card(
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardSurface,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            border: Border.all(
+              color: AppColors.cellBorder.withValues(alpha: 0.3),
+            ),
+          ),
           child: Column(
             children: [
               ListTile(
@@ -219,13 +230,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 title: const Text('Email'),
                 subtitle: Text(email),
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
               ListTile(
                 leading: const Icon(Icons.person_rounded),
                 title: const Text('Account Type'),
                 subtitle: Text(accountType),
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
               ListTile(
                 leading: const Icon(Icons.calendar_today_rounded),
                 title: const Text('Member Since'),
@@ -243,16 +254,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ThemeMode themeMode,
     UserProfile? profile,
   ) {
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(
+          color: AppColors.cellBorder.withValues(alpha: 0.3),
+        ),
+      ),
       child: Column(
         children: [
-          // Theme selector
           ListTile(
             leading: const Icon(Icons.palette_rounded),
             title: const Text('Theme'),
             trailing: DropdownButton<ThemeMode>(
               value: themeMode,
               underline: const SizedBox.shrink(),
+              dropdownColor: AppColors.elevatedSurface,
               onChanged: (mode) {
                 if (mode != null) {
                   ref
@@ -276,9 +294,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ],
             ),
           ),
-          const Divider(height: 1),
-
-          // Haptic feedback
+          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
           SwitchListTile(
             secondary: const Icon(Icons.vibration_rounded),
             title: const Text('Haptic Feedback'),
@@ -290,9 +306,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   .updateHaptic(value);
             },
           ),
-          const Divider(height: 1),
-
-          // Sound effects
+          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
           SwitchListTile(
             secondary: const Icon(Icons.volume_up_rounded),
             title: const Text('Sound Effects'),
@@ -304,19 +318,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   .updateSound(value);
             },
           ),
-          const Divider(height: 1),
-
-          // Colorblind mode
+          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
           ListTile(
             leading: const Icon(Icons.accessibility_new_rounded),
             title: const Text('Colorblind Mode'),
             subtitle: Text(_colorblindModeLabel(_colorblindMode)),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiaryDark),
             onTap: () => _showColorblindSelector(context),
           ),
-          const Divider(height: 1),
-
-          // Notification toggle
+          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
           SwitchListTile(
             secondary: const Icon(Icons.notifications_rounded),
             title: const Text('Notifications'),
@@ -334,49 +344,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildAppCard(BuildContext context) {
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(
+          color: AppColors.cellBorder.withValues(alpha: 0.3),
+        ),
+      ),
       child: Column(
         children: [
           ListTile(
             leading: const Icon(Icons.info_outline_rounded),
             title: const Text('About'),
             subtitle: const Text('Version 1.0.0 (1)'),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiaryDark),
             onTap: () => _showAboutDialog(context),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('Privacy Policy'),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiaryDark),
             onTap: () {
               // TODO: Open privacy policy URL
             },
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Terms of Service'),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiaryDark),
             onTap: () {
               // TODO: Open terms of service URL
             },
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
           ListTile(
-            leading: Icon(
+            leading: const Icon(
               Icons.delete_forever_rounded,
-              color: Theme.of(context).colorScheme.error,
+              color: AppColors.error,
             ),
             title: Text(
               'Delete Account',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-              ),
+              style: TextStyle(color: AppColors.error),
             ),
-            trailing: Icon(
+            trailing: const Icon(
               Icons.chevron_right_rounded,
-              color: Theme.of(context).colorScheme.error,
+              color: AppColors.error,
             ),
             onTap: () => _showDeleteAccountDialog(context),
           ),
@@ -411,7 +426,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
 
     if (result == true) {
-      // Profile was updated by the dialog, refresh UI
       ref.invalidate(profileNotifierProvider);
       _settingsInitialized = false;
     }
@@ -424,7 +438,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         currentMode: _colorblindMode,
       ),
     ).then((_) {
-      // Refresh local state after bottom sheet closes
       final profile = ref.read(profileNotifierProvider).valueOrNull;
       if (profile != null) {
         setState(() {
@@ -440,10 +453,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       applicationName: 'Icos',
       applicationVersion: '1.0.0',
       applicationLegalese: 'Copyright 2024 Icos. All rights reserved.',
-      applicationIcon: Icon(
-        Icons.route_rounded,
-        size: 48,
-        color: Theme.of(context).colorScheme.primary,
+      applicationIcon: Container(
+        width: 48,
+        height: 48,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppColors.purpleGradientStart, AppColors.purpleGradientEnd],
+          ),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          Icons.route_rounded,
+          size: 28,
+          color: Colors.white,
+        ),
       ),
     );
   }
@@ -467,7 +490,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: AppColors.error,
             ),
             child: const Text('Delete Account'),
           ),

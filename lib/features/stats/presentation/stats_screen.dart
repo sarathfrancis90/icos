@@ -20,10 +20,11 @@ class StatsScreen extends ConsumerWidget {
 
     return SafeArea(
       child: RefreshIndicator(
+        color: AppColors.purpleLight,
+        backgroundColor: AppColors.cardSurface,
         onRefresh: () async {
           ref.invalidate(statsOverviewProvider);
           ref.invalidate(solveHistoryProvider);
-          // Wait for the refreshed data to load.
           await Future.wait([
             ref.read(statsOverviewProvider.future),
             ref.read(solveHistoryProvider.future),
@@ -42,7 +43,6 @@ class StatsScreen extends ConsumerWidget {
             _buildCalendarSection(context, overviewAsync, historyAsync),
             const SizedBox(height: AppSizes.lg),
             _buildTimeDistribution(context, historyAsync),
-            // Extra space at bottom for comfortable scrolling.
             const SizedBox(height: AppSizes.xxl),
           ],
         ),
@@ -56,9 +56,7 @@ class StatsScreen extends ConsumerWidget {
   ) {
     return switch (overviewAsync) {
       AsyncData(:final value) => _StatsOverviewCards(overview: value),
-      AsyncError(:final error) => _ErrorCard(
-          message: error.toString(),
-        ),
+      AsyncError(:final error) => _ErrorCard(message: error.toString()),
       _ => const _LoadingCards(),
     };
   }
@@ -74,24 +72,31 @@ class StatsScreen extends ConsumerWidget {
     };
 
     return switch (historyAsync) {
-      AsyncData(:final value) => Card(
-          child: Padding(
-            padding: const EdgeInsetsDirectional.all(AppSizes.md),
-            child: StreakCalendar(
-              solveHistory: value,
-              currentStreak: currentStreak,
+      AsyncData(:final value) => Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardSurface,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            border: Border.all(
+              color: AppColors.cellBorder.withValues(alpha: 0.3),
             ),
           ),
+          padding: const EdgeInsetsDirectional.all(AppSizes.md),
+          child: StreakCalendar(
+            solveHistory: value,
+            currentStreak: currentStreak,
+          ),
         ),
-      AsyncError(:final error) => _ErrorCard(
-          message: error.toString(),
-        ),
-      _ => const Card(
-          child: Padding(
-            padding: EdgeInsetsDirectional.all(AppSizes.md),
-            child: SizedBox(
-              height: 200,
-              child: Center(child: CircularProgressIndicator()),
+      AsyncError(:final error) => _ErrorCard(message: error.toString()),
+      _ => Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardSurface,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          ),
+          padding: const EdgeInsetsDirectional.all(AppSizes.md),
+          child: const SizedBox(
+            height: 200,
+            child: Center(
+              child: CircularProgressIndicator(color: AppColors.purpleLight),
             ),
           ),
         ),
@@ -117,14 +122,10 @@ class _StatsOverviewCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    // Determine freeze status text.
     final freezeStatus = _freezeStatusText(overview);
 
     return Column(
       children: [
-        // Prominent streak display.
         _StreakHero(
           currentStreak: overview.currentStreak,
           longestStreak: overview.longestStreak,
@@ -137,7 +138,7 @@ class _StatsOverviewCards extends StatelessWidget {
                 label: 'Puzzles Solved',
                 value: '${overview.totalSolved}',
                 icon: Icons.check_circle_rounded,
-                color: AppColors.success,
+                gradientColors: [AppColors.success, AppColors.successDim],
               ),
             ),
             const SizedBox(width: AppSizes.sm),
@@ -148,7 +149,7 @@ class _StatsOverviewCards extends StatelessWidget {
                     ? AppDateUtils.formatTime(overview.averageTimeSeconds)
                     : '--:--',
                 icon: Icons.timer_rounded,
-                color: theme.colorScheme.primary,
+                gradientColors: [AppColors.purpleLight, AppColors.purpleDeep],
               ),
             ),
           ],
@@ -158,21 +159,15 @@ class _StatsOverviewCards extends StatelessWidget {
           label: 'Streak Freeze',
           value: freezeStatus,
           icon: Icons.ac_unit_rounded,
-          color: AppColors.electricBlue,
+          gradientColors: [AppColors.electricBlue, AppColors.electricBlueDim],
         ),
       ],
     );
   }
 
   String _freezeStatusText(StatsOverview overview) {
-    if (overview.freezeCount > 0) {
-      return '${overview.freezeCount} available';
-    }
-
-    if (overview.lastFreezeUsedAt != null) {
-      return 'Used this week';
-    }
-
+    if (overview.freezeCount > 0) return '${overview.freezeCount} available';
+    if (overview.lastFreezeUsedAt != null) return 'Used this week';
     return '0 available';
   }
 }
@@ -190,80 +185,87 @@ class _StreakHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSizes.md),
-        child: Row(
-          children: [
-            // Current streak - prominent display.
-            Expanded(
-              child: Column(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: AppColors.coralOrange.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-                    ),
-                    child: const Icon(
-                      Icons.local_fire_department_rounded,
-                      color: AppColors.coralOrange,
-                      size: 36,
-                    ),
-                  ),
-                  const SizedBox(height: AppSizes.sm),
-                  Text(
-                    '$currentStreak',
-                    style: theme.textTheme.displayLarge?.copyWith(
-                      fontFeatures: [const FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  Text(
-                    'Current Streak',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 1,
-              height: 80,
-              color: theme.dividerTheme.color,
-            ),
-            // Longest streak.
-            Expanded(
-              child: Column(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: AppColors.streakGold.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-                    ),
-                    child: const Icon(
-                      Icons.emoji_events_rounded,
-                      color: AppColors.streakGold,
-                      size: 36,
-                    ),
-                  ),
-                  const SizedBox(height: AppSizes.sm),
-                  Text(
-                    '$longestStreak',
-                    style: theme.textTheme.displayLarge?.copyWith(
-                      fontFeatures: [const FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  Text(
-                    'Longest Streak',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ],
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(
+          color: AppColors.cellBorder.withValues(alpha: 0.3),
         ),
+      ),
+      padding: const EdgeInsetsDirectional.all(AppSizes.md),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.pathOrange.withValues(alpha: 0.25),
+                        AppColors.pathOrangeDeep.withValues(alpha: 0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+                  ),
+                  child: const Icon(
+                    Icons.local_fire_department_rounded,
+                    color: AppColors.pathOrange,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: AppSizes.sm),
+                Text(
+                  '$currentStreak',
+                  style: theme.textTheme.displayLarge?.copyWith(
+                    fontFeatures: [const FontFeature.tabularFigures()],
+                  ),
+                ),
+                Text('Current Streak', style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 80,
+            color: AppColors.cellBorder,
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.streakGold.withValues(alpha: 0.25),
+                        AppColors.streakGold.withValues(alpha: 0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+                  ),
+                  child: const Icon(
+                    Icons.emoji_events_rounded,
+                    color: AppColors.streakGold,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: AppSizes.sm),
+                Text(
+                  '$longestStreak',
+                  style: theme.textTheme.displayLarge?.copyWith(
+                    fontFeatures: [const FontFeature.tabularFigures()],
+                  ),
+                ),
+                Text('Longest Streak', style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -274,52 +276,59 @@ class _StatCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
-    required this.color,
+    required this.gradientColors,
   });
 
   final String label;
   final String value;
   final IconData icon;
-  final Color color;
+  final List<Color> gradientColors;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSizes.md),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-              ),
-              child: Icon(icon, color: color),
-            ),
-            const SizedBox(width: AppSizes.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  Text(
-                    value,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontFeatures: [const FontFeature.tabularFigures()],
-                    ),
-                  ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(
+          color: AppColors.cellBorder.withValues(alpha: 0.3),
+        ),
+      ),
+      padding: const EdgeInsetsDirectional.all(AppSizes.md),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  gradientColors.first.withValues(alpha: 0.2),
+                  gradientColors.last.withValues(alpha: 0.05),
                 ],
               ),
+              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
             ),
-          ],
-        ),
+            child: Icon(icon, color: gradientColors.first),
+          ),
+          const SizedBox(width: AppSizes.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.bodySmall),
+                Text(
+                  value,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontFeatures: [const FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -332,7 +341,9 @@ class _LoadingCards extends StatelessWidget {
   Widget build(BuildContext context) {
     return const SizedBox(
       height: 300,
-      child: Center(child: CircularProgressIndicator()),
+      child: Center(
+        child: CircularProgressIndicator(color: AppColors.purpleLight),
+      ),
     );
   }
 }
@@ -344,32 +355,29 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSizes.md),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              color: AppColors.error,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
+      ),
+      padding: const EdgeInsetsDirectional.all(AppSizes.md),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: AppColors.error),
+          const SizedBox(width: AppSizes.sm),
+          Expanded(
+            child: Text(
+              'Failed to load stats. Pull down to retry.',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(width: AppSizes.sm),
-            Expanded(
-              child: Text(
-                'Failed to load stats. Pull down to retry.',
-                style: theme.textTheme.bodyMedium,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Distribution chart showing solve time ranges.
 class _SolveTimeDistribution extends StatelessWidget {
   const _SolveTimeDistribution({required this.history});
 
@@ -378,12 +386,9 @@ class _SolveTimeDistribution extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // Only show completed solves.
     final completed = history.where((h) => h.completed).toList();
     if (completed.isEmpty) return const SizedBox.shrink();
 
-    // Build time buckets: <1m, 1-2m, 2-3m, 3-5m, 5m+
     final buckets = <String, int>{
       '<1m': 0,
       '1-2m': 0,
@@ -410,32 +415,33 @@ class _SolveTimeDistribution extends StatelessWidget {
     final maxCount = buckets.values.fold(0, max);
     if (maxCount == 0) return const SizedBox.shrink();
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSizes.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Solve Time Distribution',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: AppSizes.md),
-            ...buckets.entries.map((entry) {
-              final ratio = entry.value / maxCount;
-              return Padding(
-                padding: const EdgeInsetsDirectional.only(
-                  bottom: AppSizes.sm,
-                ),
-                child: _DistributionBar(
-                  label: entry.key,
-                  count: entry.value,
-                  ratio: ratio,
-                ),
-              );
-            }),
-          ],
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
+      ),
+      padding: const EdgeInsetsDirectional.all(AppSizes.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Solve Time Distribution',
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: AppSizes.md),
+          ...buckets.entries.map((entry) {
+            final ratio = entry.value / maxCount;
+            return Padding(
+              padding: const EdgeInsetsDirectional.only(bottom: AppSizes.sm),
+              child: _DistributionBar(
+                label: entry.key,
+                count: entry.value,
+                ratio: ratio,
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
@@ -478,8 +484,15 @@ class _DistributionBar extends StatelessWidget {
                   width: barWidth.clamp(4.0, constraints.maxWidth),
                   height: 24,
                   decoration: BoxDecoration(
-                    color: AppColors.electricBlue.withValues(
-                      alpha: 0.3 + (ratio * 0.7),
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.purpleGradientStart.withValues(
+                          alpha: 0.3 + (ratio * 0.7),
+                        ),
+                        AppColors.purpleGradientEnd.withValues(
+                          alpha: 0.3 + (ratio * 0.7),
+                        ),
+                      ],
                     ),
                     borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                   ),

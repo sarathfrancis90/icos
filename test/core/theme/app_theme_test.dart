@@ -29,7 +29,7 @@ void main() {
       expect(capturedTheme.brightness, Brightness.dark);
     });
 
-    testWidgets('uses electricBlue as primary color', (tester) async {
+    testWidgets('uses purpleLight as primary color', (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
         MaterialApp(
@@ -43,10 +43,10 @@ void main() {
         ),
       );
 
-      expect(capturedTheme.colorScheme.primary, AppColors.electricBlue);
+      expect(capturedTheme.colorScheme.primary, AppColors.purpleLight);
     });
 
-    testWidgets('uses coralOrange as secondary color', (tester) async {
+    testWidgets('uses pathOrange as secondary color', (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
         MaterialApp(
@@ -60,7 +60,7 @@ void main() {
         ),
       );
 
-      expect(capturedTheme.colorScheme.secondary, AppColors.coralOrange);
+      expect(capturedTheme.colorScheme.secondary, AppColors.pathOrange);
     });
 
     testWidgets('uses darkNavy as surface color', (tester) async {
@@ -114,7 +114,7 @@ void main() {
       expect(capturedTheme.useMaterial3, isTrue);
     });
 
-    testWidgets('AppBar has deepNavy background', (tester) async {
+    testWidgets('AppBar has transparent background', (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
         MaterialApp(
@@ -128,7 +128,7 @@ void main() {
         ),
       );
 
-      expect(capturedTheme.appBarTheme.backgroundColor, AppColors.deepNavy);
+      expect(capturedTheme.appBarTheme.backgroundColor, Colors.transparent);
     });
 
     testWidgets('AppBar has no elevation', (tester) async {
@@ -165,7 +165,7 @@ void main() {
       expect(capturedTheme.appBarTheme.centerTitle, isTrue);
     });
 
-    testWidgets('bottom nav bar uses electricBlue for selected items',
+    testWidgets('bottom nav bar uses navBarSelected for selected items',
         (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
@@ -182,7 +182,7 @@ void main() {
 
       expect(
         capturedTheme.bottomNavigationBarTheme.selectedItemColor,
-        AppColors.electricBlue,
+        AppColors.navBarSelected,
       );
     });
 
@@ -206,7 +206,7 @@ void main() {
       );
     });
 
-    testWidgets('ElevatedButton uses electricBlue background', (tester) async {
+    testWidgets('ElevatedButton uses purpleDeep background', (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
         MaterialApp(
@@ -222,7 +222,7 @@ void main() {
 
       final style = capturedTheme.elevatedButtonTheme.style;
       final bgColor = style?.backgroundColor?.resolve({});
-      expect(bgColor, AppColors.electricBlue);
+      expect(bgColor, AppColors.purpleDeep);
     });
 
     testWidgets('ElevatedButton uses white foreground', (tester) async {
@@ -382,11 +382,11 @@ void main() {
       expect(capturedTheme.inputDecorationTheme.filled, isTrue);
       expect(
         capturedTheme.inputDecorationTheme.fillColor,
-        AppColors.mediumNavy,
+        AppColors.cardSurface,
       );
     });
 
-    testWidgets('outlined button uses electricBlue', (tester) async {
+    testWidgets('outlined button uses textPrimaryDark', (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
         MaterialApp(
@@ -402,7 +402,7 @@ void main() {
 
       final style = capturedTheme.outlinedButtonTheme.style;
       final fgColor = style?.foregroundColor?.resolve({});
-      expect(fgColor, AppColors.electricBlue);
+      expect(fgColor, AppColors.textPrimaryDark);
     });
   });
 
@@ -424,7 +424,7 @@ void main() {
       expect(capturedTheme.brightness, Brightness.light);
     });
 
-    testWidgets('uses electricBlueDim as primary color', (tester) async {
+    testWidgets('uses purpleDeep as primary color', (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
         MaterialApp(
@@ -438,7 +438,7 @@ void main() {
         ),
       );
 
-      expect(capturedTheme.colorScheme.primary, AppColors.electricBlueDim);
+      expect(capturedTheme.colorScheme.primary, AppColors.purpleDeep);
     });
 
     testWidgets('uses coralOrange as secondary color', (tester) async {
@@ -563,7 +563,7 @@ void main() {
       expect(capturedTheme.appBarTheme.centerTitle, isTrue);
     });
 
-    testWidgets('bottom nav bar uses electricBlueDim for selected items',
+    testWidgets('bottom nav bar uses purpleDeep for selected items',
         (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
@@ -580,7 +580,7 @@ void main() {
 
       expect(
         capturedTheme.bottomNavigationBarTheme.selectedItemColor,
-        AppColors.electricBlueDim,
+        AppColors.purpleDeep,
       );
     });
 
@@ -604,7 +604,7 @@ void main() {
       );
     });
 
-    testWidgets('ElevatedButton uses electricBlueDim background',
+    testWidgets('ElevatedButton uses purpleDeep background',
         (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
@@ -621,7 +621,7 @@ void main() {
 
       final style = capturedTheme.elevatedButtonTheme.style;
       final bgColor = style?.backgroundColor?.resolve({});
-      expect(bgColor, AppColors.electricBlueDim);
+      expect(bgColor, AppColors.purpleDeep);
     });
 
     testWidgets('ElevatedButton uses white foreground', (tester) async {
@@ -749,7 +749,7 @@ void main() {
       );
     });
 
-    testWidgets('outlined button uses electricBlueDim', (tester) async {
+    testWidgets('outlined button uses purpleDeep', (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
         MaterialApp(
@@ -765,7 +765,7 @@ void main() {
 
       final style = capturedTheme.outlinedButtonTheme.style;
       final fgColor = style?.foregroundColor?.resolve({});
-      expect(fgColor, AppColors.electricBlueDim);
+      expect(fgColor, AppColors.purpleDeep);
     });
   });
 
@@ -842,15 +842,15 @@ void main() {
         ),
       );
 
-      expect(darkTheme.colorScheme.primary, AppColors.electricBlue);
-      expect(lightTheme.colorScheme.primary, AppColors.electricBlueDim);
+      expect(darkTheme.colorScheme.primary, AppColors.purpleLight);
+      expect(lightTheme.colorScheme.primary, AppColors.purpleDeep);
       expect(
         darkTheme.colorScheme.primary,
         isNot(lightTheme.colorScheme.primary),
       );
     });
 
-    testWidgets('both themes share same error and secondary colors',
+    testWidgets('both themes share same error color',
         (tester) async {
       late ThemeData darkTheme;
       late ThemeData lightTheme;
@@ -884,10 +884,6 @@ void main() {
       );
 
       expect(darkTheme.colorScheme.error, lightTheme.colorScheme.error);
-      expect(
-        darkTheme.colorScheme.secondary,
-        lightTheme.colorScheme.secondary,
-      );
     });
 
     testWidgets(

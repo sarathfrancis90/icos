@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -54,34 +56,16 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Puzzle',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        actions: [
-          if (gameState != null)
-            Padding(
-              padding: const EdgeInsetsDirectional.only(end: AppSizes.md),
-              child: Center(
-                child: Text(
-                  AppDateUtils.formatTime(gameState.elapsedSeconds),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontFeatures: [const FontFeature.tabularFigures()],
-                      ),
-                ),
-              ),
-            ),
-        ],
-      ),
+      backgroundColor: AppColors.deepBlack,
       body: puzzleAsync.when(
         data: (puzzle) {
           if (gameState == null) {
-            // Initialize game if not yet started
             WidgetsBinding.instance.addPostFrameCallback((_) {
               ref.read(gameNotifierProvider.notifier).startGame(puzzle);
             });
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.purpleLight),
+            );
           }
 
           return Stack(
@@ -89,30 +73,36 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
               SafeArea(
                 child: Column(
                   children: [
-                    // Puzzle info
+                    const SizedBox(height: AppSizes.sm),
+
+                    // Top bar: Back button + Info bar
                     Padding(
                       padding: const EdgeInsetsDirectional.symmetric(
-                        horizontal: AppSizes.lg,
+                        horizontal: AppSizes.md,
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _InfoChip(
-                            icon: Icons.grid_4x4_rounded,
-                            label:
-                                '${puzzle.gridSize}x${puzzle.gridSize}',
+                          // Home button
+                          _GlassCircleButton(
+                            icon: Icons.home_rounded,
+                            onPressed: () => Navigator.of(context).pop(),
                           ),
-                          _InfoChip(
-                            icon: Icons.speed_rounded,
-                            label: puzzle.difficulty[0].toUpperCase() +
-                                puzzle.difficulty.substring(1),
-                          ),
-                          _InfoChip(
-                            icon: Icons.timer_outlined,
-                            label:
-                                'Par ${AppDateUtils.formatTimeHuman(puzzle.parTimeSeconds)}',
-                          ),
+                          const Spacer(),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSizes.sm),
+
+                    // Glass info bar
+                    Padding(
+                      padding: const EdgeInsetsDirectional.symmetric(
+                        horizontal: AppSizes.md,
+                      ),
+                      child: _GlassInfoBar(
+                        timer: AppDateUtils.formatTime(gameState.elapsedSeconds),
+                        gridSize: puzzle.gridSize,
+                        difficulty: puzzle.difficulty,
+                        parTimeSeconds: puzzle.parTimeSeconds,
                       ),
                     ),
                     const SizedBox(height: AppSizes.md),
@@ -154,7 +144,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                         ref.read(gameNotifierProvider.notifier).useHint();
                       },
                     ),
-                    const SizedBox(height: AppSizes.lg),
+                    const SizedBox(height: AppSizes.md),
                   ],
                 ),
               ),
@@ -169,21 +159,30 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.purpleLight),
+        ),
         error: (error, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 48),
+              Icon(
+                Icons.error_outline,
+                size: 48,
+                color: AppColors.error.withValues(alpha: 0.7),
+              ),
               const SizedBox(height: AppSizes.md),
               Text(
                 'Could not load puzzle',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: AppSizes.md),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(dailyPuzzleProvider),
-                child: const Text('Retry'),
+              SizedBox(
+                width: 160,
+                child: ElevatedButton(
+                  onPressed: () => ref.invalidate(dailyPuzzleProvider),
+                  child: const Text('Retry'),
+                ),
               ),
             ],
           ),
@@ -193,33 +192,108 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.label});
+/// Frosted glass info bar showing timer, level, and share.
+class _GlassInfoBar extends StatelessWidget {
+  const _GlassInfoBar({
+    required this.timer,
+    required this.gridSize,
+    required this.difficulty,
+    required this.parTimeSeconds,
+  });
 
-  final IconData icon;
-  final String label;
+  final String timer;
+  final int gridSize;
+  final String difficulty;
+  final int parTimeSeconds;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsetsDirectional.symmetric(
-        horizontal: AppSizes.sm + 4,
-        vertical: AppSizes.xs + 2,
-      ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: AppColors.electricBlue),
-          const SizedBox(width: AppSizes.xs),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSizes.md,
+            vertical: AppSizes.sm + 4,
           ),
-        ],
+          decoration: BoxDecoration(
+            color: AppColors.glassFill,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            border: Border.all(
+              color: AppColors.glassBorder,
+              width: 0.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Timer
+              Text(
+                timer,
+                style: const TextStyle(
+                  color: AppColors.textPrimaryDark,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+              const Spacer(),
+              // Level info
+              Text(
+                '${gridSize}x$gridSize · ${difficulty[0].toUpperCase()}${difficulty.substring(1)}',
+                style: const TextStyle(
+                  color: AppColors.glassText,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              // Par time
+              Text(
+                'Par ${AppDateUtils.formatTimeHuman(parTimeSeconds)}',
+                style: TextStyle(
+                  color: AppColors.glassText.withValues(alpha: 0.7),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small frosted glass circle button.
+class _GlassCircleButton extends StatelessWidget {
+  const _GlassCircleButton({
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.elevatedSurface.withValues(alpha: 0.7),
+          border: Border.all(
+            color: AppColors.cellBorder.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Icon(
+          icon,
+          color: AppColors.textSecondaryDark,
+          size: 22,
+        ),
       ),
     );
   }

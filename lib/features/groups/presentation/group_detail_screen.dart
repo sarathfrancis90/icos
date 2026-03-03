@@ -53,7 +53,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
       },
       loading: () => Scaffold(
         appBar: AppBar(),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.purpleLight)),
       ),
       error: (error, _) => Scaffold(
         appBar: AppBar(),
@@ -87,6 +87,9 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
           _GroupHeader(group: group),
           TabBar(
             controller: _tabController,
+            indicatorColor: AppColors.purpleLight,
+            labelColor: AppColors.purpleLight,
+            unselectedLabelColor: AppColors.textSecondaryDark,
             tabs: const [
               Tab(text: 'Daily'),
               Tab(text: 'Weekly'),

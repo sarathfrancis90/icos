@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 
 class AppShell extends StatelessWidget {
@@ -30,29 +31,46 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = _currentIndex(context);
+
     return Scaffold(
       body: child,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex(context),
-        onTap: (index) => _onTap(context, index),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded),
-            label: AppStrings.navHome,
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.navBarBackground,
+          border: Border(
+            top: BorderSide(
+              color: AppColors.cellBorder,
+              width: 0.5,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.group_rounded),
-            label: AppStrings.navGroups,
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_rounded),
-            label: AppStrings.navStats,
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_rounded),
-            label: AppStrings.navProfile,
-          ),
-        ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: currentIndex,
+          onTap: (index) => _onTap(context, index),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded),
+              activeIcon: Icon(Icons.home_rounded),
+              label: AppStrings.navHome,
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.group_rounded),
+              activeIcon: Icon(Icons.group_rounded),
+              label: AppStrings.navGroups,
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.bar_chart_rounded),
+              activeIcon: Icon(Icons.bar_chart_rounded),
+              label: AppStrings.navStats,
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_rounded),
+              activeIcon: Icon(Icons.person_rounded),
+              label: AppStrings.navProfile,
+            ),
+          ],
+        ),
       ),
     );
   }

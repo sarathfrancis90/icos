@@ -15,6 +15,7 @@ class AuthScreen extends ConsumerWidget {
     final authState = ref.watch(authNotifierProvider);
 
     return Scaffold(
+      backgroundColor: AppColors.deepBlack,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsetsDirectional.all(AppSizes.lg),
@@ -22,46 +23,94 @@ class AuthScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
-              // Logo/Title
-              const Icon(
-                Icons.route_rounded,
-                size: 80,
-                color: AppColors.electricBlue,
+              // Logo with gradient
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.purpleGradientStart, AppColors.purpleGradientEnd],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.purpleGlow,
+                      blurRadius: 24,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.route_rounded,
+                  size: 50,
+                  color: Colors.white,
+                ),
               ),
-              const SizedBox(height: AppSizes.md),
-              Text(
-                AppStrings.appName,
-                style: Theme.of(context).textTheme.displayLarge,
+              const SizedBox(height: AppSizes.lg),
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [AppColors.purpleLight, AppColors.pathYellowBright],
+                ).createShader(bounds),
+                child: Text(
+                  AppStrings.appName,
+                  style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                        color: Colors.white,
+                      ),
+                ),
               ),
               const SizedBox(height: AppSizes.xs),
               Text(
                 AppStrings.appTagline,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.6),
+                      color: AppColors.textSecondaryDark,
                     ),
               ),
               const Spacer(),
 
               if (authState.isLoading)
-                const CircularProgressIndicator()
+                const CircularProgressIndicator(color: AppColors.purpleLight)
               else ...[
-                // Sign in options
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      ref
-                          .read(authNotifierProvider.notifier)
-                          .signInWithGoogle();
-                    },
-                    icon: const Icon(Icons.g_mobiledata_rounded),
-                    label: const Text(AppStrings.signInWithGoogle),
+                // Google sign in
+                GestureDetector(
+                  onTap: () {
+                    ref
+                        .read(authNotifierProvider.notifier)
+                        .signInWithGoogle();
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.purpleButtonGradient,
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.purpleGlow,
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.g_mobiledata_rounded, color: Colors.white, size: 24),
+                        SizedBox(width: 8),
+                        Text(
+                          AppStrings.signInWithGoogle,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSizes.sm),
+
+                // Apple sign in
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -73,18 +122,14 @@ class AuthScreen extends ConsumerWidget {
                     icon: const Icon(Icons.apple_rounded),
                     label: const Text(AppStrings.signInWithApple),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          Theme.of(context).brightness == Brightness.dark
-                              ? Colors.white
-                              : Colors.black,
-                      foregroundColor:
-                          Theme.of(context).brightness == Brightness.dark
-                              ? Colors.black
-                              : Colors.white,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
                     ),
                   ),
                 ),
                 const SizedBox(height: AppSizes.sm),
+
+                // Email sign in
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -96,6 +141,7 @@ class AuthScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: AppSizes.lg),
+
                 TextButton(
                   onPressed: () {
                     ref
@@ -106,10 +152,7 @@ class AuthScreen extends ConsumerWidget {
                   child: Text(
                     AppStrings.continueAsGuest,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.6),
+                          color: AppColors.textSecondaryDark,
                         ),
                   ),
                 ),

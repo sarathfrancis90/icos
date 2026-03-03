@@ -6,13 +6,6 @@ import '../../../../core/utils/date_utils.dart';
 import '../../domain/models/streak.dart';
 
 /// A grid showing the last 30 days of solve history.
-///
-/// Each day is a small square with the day-of-month number.
-/// Color coding:
-/// - Green fill: solved (completed)
-/// - Gray fill: missed (no attempt)
-/// - Gold border: completed under par time
-/// - Today highlighted with primary color border
 class StreakCalendar extends StatelessWidget {
   const StreakCalendar({
     super.key,
@@ -31,13 +24,11 @@ class StreakCalendar extends StatelessWidget {
     final today = DateTime.now().toUtc();
     final todayStr = AppDateUtils.formatDate(today);
 
-    // Build a lookup map: date string -> SolveHistory
     final historyMap = <String, SolveHistory>{};
     for (final entry in solveHistory) {
       historyMap[entry.date] = entry;
     }
 
-    // Generate the last 30 days (most recent first, displayed left-to-right)
     final days = List.generate(30, (i) {
       return today.subtract(Duration(days: 29 - i));
     });
@@ -52,12 +43,10 @@ class StreakCalendar extends StatelessWidget {
         const SizedBox(height: AppSizes.sm),
         LayoutBuilder(
           builder: (context, constraints) {
-            // 7 columns per row to match a week layout
             const columns = 7;
             const spacing = AppSizes.xs;
             final cellSize =
                 (constraints.maxWidth - (spacing * (columns - 1))) / columns;
-            // Ensure minimum touch target
             final effectiveCellSize = cellSize.clamp(
               AppSizes.minTouchTarget,
               double.infinity,
@@ -75,9 +64,7 @@ class StreakCalendar extends StatelessWidget {
                     parTimeSeconds != null &&
                     history.timeSeconds < parTimeSeconds!;
 
-                // Determine if this day is part of the current streak
-                final daysSinceToday =
-                    today.difference(day).inDays;
+                final daysSinceToday = today.difference(day).inDays;
                 final isInStreak =
                     isSolved && daysSinceToday < currentStreak;
 
@@ -123,7 +110,6 @@ class _CalendarDay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     Color backgroundColor;
     Color textColor;
@@ -131,26 +117,19 @@ class _CalendarDay extends StatelessWidget {
 
     if (isFuture) {
       backgroundColor = Colors.transparent;
-      textColor = (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)
-          .withValues(alpha: 0.3);
+      textColor = AppColors.textTertiaryDark;
     } else if (isSolved) {
       backgroundColor = AppColors.success.withValues(alpha: 0.8);
       textColor = Colors.white;
     } else {
-      backgroundColor = isDark
-          ? AppColors.mediumNavy
-          : AppColors.lightGridLine.withValues(alpha: 0.5);
-      textColor =
-          isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+      backgroundColor = AppColors.cellBackground;
+      textColor = AppColors.textSecondaryDark;
     }
 
     if (isUnderPar) {
       border = Border.all(color: AppColors.streakGold, width: 2);
     } else if (isToday) {
-      border = Border.all(
-        color: theme.colorScheme.primary,
-        width: 2,
-      );
+      border = Border.all(color: AppColors.purpleLight, width: 2);
     }
 
     return SizedBox(
@@ -190,9 +169,7 @@ class _CalendarLegend extends StatelessWidget {
         ),
         const SizedBox(width: AppSizes.md),
         _LegendItem(
-          color: theme.brightness == Brightness.dark
-              ? AppColors.mediumNavy
-              : AppColors.lightGridLine.withValues(alpha: 0.5),
+          color: AppColors.cellBackground,
           label: 'Missed',
           textStyle: theme.textTheme.bodySmall,
         ),

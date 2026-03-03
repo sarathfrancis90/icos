@@ -45,6 +45,7 @@ dependencies:
 
   # Splash
   flutter_native_splash: ^2.4.6
+  confetti: ^0.8.0
 
 dev_dependencies:
   flutter_test:
