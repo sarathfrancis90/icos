@@ -1,0 +1,104 @@
+[
+  {
+    "id": "fallback-001",
+    "puzzle_date": "2026-01-01",
+    "grid_size": 5,
+    "waypoints": [
+      {"order": 1, "row": 0, "col": 0},
+      {"order": 2, "row": 2, "col": 2},
+      {"order": 3, "row": 4, "col": 4}
+    ],
+    "walls": [],
+    "solution_hash": "fb001_hash",
+    "difficulty": "easy",
+    "par_time_seconds": 60
+  },
+  {
+    "id": "fallback-002",
+    "puzzle_date": "2026-01-02",
+    "grid_size": 5,
+    "waypoints": [
+      {"order": 1, "row": 0, "col": 4},
+      {"order": 2, "row": 2, "col": 1},
+      {"order": 3, "row": 4, "col": 3}
+    ],
+    "walls": [],
+    "solution_hash": "fb002_hash",
+    "difficulty": "easy",
+    "par_time_seconds": 60
+  },
+  {
+    "id": "fallback-003",
+    "puzzle_date": "2026-01-03",
+    "grid_size": 5,
+    "waypoints": [
+      {"order": 1, "row": 1, "col": 0},
+      {"order": 2, "row": 3, "col": 2},
+      {"order": 3, "row": 0, "col": 4}
+    ],
+    "walls": [{"row": 2, "col": 3}],
+    "solution_hash": "fb003_hash",
+    "difficulty": "medium",
+    "par_time_seconds": 90
+  },
+  {
+    "id": "fallback-004",
+    "puzzle_date": "2026-01-04",
+    "grid_size": 6,
+    "waypoints": [
+      {"order": 1, "row": 0, "col": 0},
+      {"order": 2, "row": 3, "col": 3},
+      {"order": 3, "row": 5, "col": 5}
+    ],
+    "walls": [{"row": 1, "col": 2}],
+    "solution_hash": "fb004_hash",
+    "difficulty": "medium",
+    "par_time_seconds": 120
+  },
+  {
+    "id": "fallback-005",
+    "puzzle_date": "2026-01-05",
+    "grid_size": 6,
+    "waypoints": [
+      {"order": 1, "row": 0, "col": 5},
+      {"order": 2, "row": 2, "col": 2},
+      {"order": 3, "row": 5, "col": 0},
+      {"order": 4, "row": 4, "col": 4}
+    ],
+    "walls": [{"row": 3, "col": 1}],
+    "solution_hash": "fb005_hash",
+    "difficulty": "hard",
+    "par_time_seconds": 150
+  },
+  {
+    "id": "fallback-006",
+    "puzzle_date": "2026-01-06",
+    "grid_size": 7,
+    "waypoints": [
+      {"order": 1, "row": 0, "col": 0},
+      {"order": 2, "row": 3, "col": 4},
+      {"order": 3, "row": 6, "col": 6},
+      {"order": 4, "row": 6, "col": 0}
+    ],
+    "walls": [{"row": 2, "col": 3}, {"row": 4, "col": 1}],
+    "solution_hash": "fb006_hash",
+    "difficulty": "hard",
+    "par_time_seconds": 180
+  },
+  {
+    "id": "fallback-007",
+    "puzzle_date": "2026-01-07",
+    "grid_size": 8,
+    "waypoints": [
+      {"order": 1, "row": 0, "col": 0},
+      {"order": 2, "row": 4, "col": 4},
+      {"order": 3, "row": 7, "col": 7},
+      {"order": 4, "row": 7, "col": 0},
+      {"order": 5, "row": 0, "col": 7}
+    ],
+    "walls": [{"row": 2, "col": 5}, {"row": 5, "col": 2}, {"row": 3, "col": 6}],
+    "solution_hash": "fb007_hash",
+    "difficulty": "expert",
+    "par_time_seconds": 240
+  }
+]

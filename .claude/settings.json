@@ -1,0 +1,78 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew install*)",
+      "Bash(flutter *)",
+      "Bash(dart *)",
+      "Bash(fvm *)",
+      "Bash(supabase *)",
+      "Bash(npx supabase *)",
+      "Bash(npm *)",
+      "Bash(git *)",
+      "Bash(chmod *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(rm *)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(cd *)",
+      "Bash(which *)",
+      "Bash(curl *)",
+      "Bash(find *)",
+      "Bash(echo *)",
+      "Bash(export *)",
+      "Bash(source *)",
+      "Bash(touch *)",
+      "Bash(wc *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(grep *)",
+      "Bash(sed *)",
+      "Bash(awk *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(xargs *)",
+      "Bash(open *)",
+      "Bash(pod *)",
+      "Bash(ruby *)",
+      "Bash(gem *)",
+      "Bash(fastlane *)",
+      "Bash(firebase *)",
+      "Bash(flutterfire *)",
+      "Bash(xcodebuild *)",
+      "Bash(xcrun *)",
+      "Bash(plutil *)",
+      "Bash(python3 *)",
+      "Bash(pip3 *)",
+      "Bash(sh *)",
+      "Bash(bash *)",
+      "Bash(eval *)",
+      "Bash(test *)",
+      "Bash(.*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/visual-validate.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/visual-gate.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

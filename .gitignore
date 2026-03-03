@@ -1,0 +1,69 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+*.lock
+!pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+*.xcworkspace/
+*.xcuserdata/
+
+# Android
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/release/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+ios/Flutter/App.framework
+ios/Flutter/Generated.xcconfig
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Supabase local
+supabase/.temp/
+supabase/.branches/
+
+# Firebase
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Coverage
+coverage/
+*.lcov
+
+# Golden test failures
+test/goldens/failures/
+
+# Generated files
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+
+# Claude Code
+.claude/projects/
