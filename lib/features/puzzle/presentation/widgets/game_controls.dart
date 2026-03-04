@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../shared/widgets/spring_button.dart';
 import '../../domain/models/game_state.dart';
 
 class GameControls extends StatelessWidget {
@@ -21,6 +22,8 @@ class GameControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPlaying = gameState.status == GameStatus.playing;
+    final canUseHint = gameState.status == GameStatus.playing ||
+        gameState.status == GameStatus.notStarted;
     final hasPath = gameState.path.isNotEmpty;
 
     return Padding(
@@ -50,7 +53,7 @@ class GameControls extends StatelessWidget {
             child: _OutlinedPillButton(
               label: 'Hint',
               badgeCount: gameState.hintsUsed,
-              onPressed: isPlaying ? onHint : null,
+              onPressed: canUseHint ? onHint : null,
             ),
           ),
           const SizedBox(width: AppSizes.sm),
@@ -87,8 +90,9 @@ class _GradientPillButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
-      child: GestureDetector(
-        onTap: onPressed,
+      child: SpringButton(
+        onPressed: onPressed,
+        enabled: isEnabled,
         child: AnimatedOpacity(
           opacity: isEnabled ? 1.0 : 0.4,
           duration: const Duration(milliseconds: 200),
@@ -99,11 +103,11 @@ class _GradientPillButton extends StatelessWidget {
               color: isEnabled ? null : AppColors.cellBackground,
               borderRadius: BorderRadius.circular(26),
               boxShadow: isEnabled
-                  ? [
+                  ? const [
                       BoxShadow(
                         color: AppColors.purpleGlow,
                         blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        offset: Offset(0, 4),
                       ),
                     ]
                   : null,
@@ -153,8 +157,9 @@ class _OutlinedPillButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
-      child: GestureDetector(
-        onTap: onPressed,
+      child: SpringButton(
+        onPressed: onPressed,
+        enabled: isEnabled,
         child: AnimatedOpacity(
           opacity: isEnabled ? 1.0 : 0.4,
           duration: const Duration(milliseconds: 200),
@@ -228,8 +233,9 @@ class _CircleIconButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Undo',
-      child: GestureDetector(
-        onTap: onPressed,
+      child: SpringButton(
+        onPressed: onPressed,
+        enabled: isEnabled,
         child: AnimatedOpacity(
           opacity: isEnabled ? 1.0 : 0.3,
           duration: const Duration(milliseconds: 200),

@@ -280,21 +280,25 @@ class _GlassIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: onPressed,
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.elevatedSurface,
-            borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-            border: Border.all(
-              color: AppColors.cellBorder.withValues(alpha: 0.5),
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Tooltip(
+        message: tooltip,
+        child: GestureDetector(
+          onTap: onPressed,
+          child: Container(
+            width: AppSizes.minTouchTarget,
+            height: AppSizes.minTouchTarget,
+            decoration: BoxDecoration(
+              color: AppColors.elevatedSurface,
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+              border: Border.all(
+                color: AppColors.cellBorder.withValues(alpha: 0.5),
+              ),
             ),
+            child: Icon(icon, size: 20, color: AppColors.textSecondaryDark),
           ),
-          child: Icon(icon, size: 20, color: AppColors.textSecondaryDark),
         ),
       ),
     );
@@ -345,32 +349,9 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: AppSizes.lg),
           SizedBox(
             width: 200,
-            child: GestureDetector(
-              onTap: onCreateGroup,
-              child: Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: AppColors.purpleButtonGradient,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.purpleGlow,
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Text(
-                    'Create Group',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
+            child: ElevatedButton(
+              onPressed: onCreateGroup,
+              child: const Text(AppStrings.createGroup),
             ),
           ),
           const SizedBox(height: AppSizes.sm),
@@ -401,7 +382,7 @@ class _GroupsList extends StatelessWidget {
       itemBuilder: (context, index) {
         final group = groups[index];
         return Container(
-          margin: const EdgeInsets.only(bottom: AppSizes.sm),
+          margin: const EdgeInsetsDirectional.only(bottom: AppSizes.sm),
           decoration: BoxDecoration(
             color: AppColors.cardSurface,
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
@@ -410,7 +391,7 @@ class _GroupsList extends StatelessWidget {
             ),
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
+            contentPadding: const EdgeInsetsDirectional.symmetric(
               horizontal: AppSizes.md,
               vertical: AppSizes.sm,
             ),

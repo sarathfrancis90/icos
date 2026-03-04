@@ -6,11 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/utils/date_utils.dart';
+import '../../../core/services/audio_service.dart';
 import '../../../core/utils/haptics.dart';
 import '../domain/models/game_state.dart';
 import '../providers/daily_puzzle_provider.dart';
 import '../providers/game_provider.dart';
 import '../providers/score_submission_provider.dart';
+import '../../../shared/widgets/animated_background.dart';
+import '../../../shared/widgets/particle_field.dart';
 import 'widgets/celebration_overlay.dart';
 import 'widgets/game_controls.dart';
 import 'widgets/puzzle_grid.dart';
@@ -26,6 +29,7 @@ class PuzzleScreen extends ConsumerStatefulWidget {
 
 class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   bool _scoreSubmitted = false;
+  bool _showCelebration = false;
 
   @override
   void initState() {
@@ -45,13 +49,20 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     final puzzleAsync = ref.watch(dailyPuzzleProvider);
     final gameState = ref.watch(gameNotifierProvider);
 
-    // Auto-submit score when completed
+    // Auto-submit score when completed + delay celebration for ripple
     if (gameState != null &&
         gameState.status == GameStatus.completed &&
         !_scoreSubmitted) {
       _scoreSubmitted = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(scoreSubmitterProvider.notifier).submitScore(gameState);
+        // Delay celebration overlay to let the grid completion ripple play
+        Future.delayed(
+          const Duration(milliseconds: AppSizes.completionRippleMs),
+          () {
+            if (mounted) setState(() => _showCelebration = true);
+          },
+        );
       });
     }
 
@@ -70,6 +81,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
 
           return Stack(
             children: [
+              const Positioned.fill(child: AnimatedBackground()),
+              const Positioned.fill(child: ParticleField()),
               SafeArea(
                 child: Column(
                   children: [
@@ -113,13 +126,15 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                         child: PuzzleGrid(
                           gameState: gameState,
                           onCellTap: (row, col) {
-                            Haptics.light();
+                            Haptics.pathStep();
+                            AudioService.instance.play(SoundEffect.slither);
                             ref
                                 .read(gameNotifierProvider.notifier)
                                 .handleCellTap(row, col);
                           },
                           onCellDrag: (row, col) {
-                            Haptics.selection();
+                            Haptics.pathStep();
+                            AudioService.instance.play(SoundEffect.slither);
                             ref
                                 .read(gameNotifierProvider.notifier)
                                 .handleCellDrag(row, col);
@@ -132,7 +147,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                     GameControls(
                       gameState: gameState,
                       onUndo: () {
-                        Haptics.medium();
+                        Haptics.undo();
+                        AudioService.instance.play(SoundEffect.undo);
                         ref.read(gameNotifierProvider.notifier).undo();
                       },
                       onReset: () {
@@ -140,7 +156,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                         ref.read(gameNotifierProvider.notifier).reset();
                       },
                       onHint: () {
-                        Haptics.medium();
+                        Haptics.hintReveal();
+                        AudioService.instance.play(SoundEffect.hintReveal);
                         ref.read(gameNotifierProvider.notifier).useHint();
                       },
                     ),
@@ -148,7 +165,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                   ],
                 ),
               ),
-              if (gameState.status == GameStatus.completed)
+              if (_showCelebration)
                 CelebrationOverlay(
                   timeSeconds: gameState.elapsedSeconds,
                   hintsUsed: gameState.hintsUsed,

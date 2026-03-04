@@ -22,13 +22,14 @@ class ShareCardGenerator {
     }
   }
 
-  /// Build share text for the puzzle result.
+  /// Build share text for the puzzle result with emoji grid.
   static String buildShareText({
     required int timeSeconds,
     required int hintsUsed,
     required int gridSize,
     required String difficulty,
     required bool underPar,
+    List<List<bool>>? gridFilled,
   }) {
     final today = AppDateUtils.todayUtc();
     final timeStr = AppDateUtils.formatTime(timeSeconds);
@@ -39,6 +40,17 @@ class ShareCardGenerator {
       ..writeln('${gridSize}x$gridSize ${difficulty[0].toUpperCase()}${difficulty.substring(1)}')
       ..writeln('$timeStr · $hintStr')
       ..writeln(underPar ? '⭐ Under Par!' : '✅ Solved!');
+
+    // Emoji grid representation
+    if (gridFilled != null) {
+      buffer.writeln();
+      for (final row in gridFilled) {
+        for (final cell in row) {
+          buffer.write(cell ? '🟧' : '⬛');
+        }
+        buffer.writeln();
+      }
+    }
 
     return buffer.toString();
   }

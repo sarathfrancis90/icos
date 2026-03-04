@@ -76,7 +76,7 @@ abstract final class AppTheme {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: AppColors.cardSurface,
+          fillColor: AppColors.elevatedSurface,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
             borderSide: const BorderSide(color: AppColors.cellBorder),
@@ -89,6 +89,9 @@ abstract final class AppTheme {
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
             borderSide: const BorderSide(color: AppColors.purpleLight),
           ),
+          labelStyle: const TextStyle(color: AppColors.textSecondaryDark),
+          hintStyle: TextStyle(color: AppColors.textTertiaryDark),
+          prefixIconColor: AppColors.textSecondaryDark,
           contentPadding: const EdgeInsetsDirectional.symmetric(
             horizontal: AppSizes.md,
             vertical: AppSizes.sm + 4,
@@ -234,66 +237,64 @@ abstract final class AppTheme {
         ? AppColors.textSecondaryDark
         : AppColors.textSecondaryLight;
 
-    return GoogleFonts.interTextTheme(
+    final base = GoogleFonts.interTextTheme(
       TextTheme(
         displayLarge: TextStyle(
           fontSize: 32,
           fontWeight: FontWeight.w800,
-          color: baseColor,
           letterSpacing: -0.5,
         ),
         displayMedium: TextStyle(
           fontSize: 28,
           fontWeight: FontWeight.w800,
-          color: baseColor,
           letterSpacing: -0.5,
         ),
         headlineLarge: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w700,
-          color: baseColor,
         ),
         headlineMedium: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
-          color: baseColor,
         ),
         titleLarge: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: baseColor,
         ),
         titleMedium: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
-          color: baseColor,
         ),
         bodyLarge: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w400,
-          color: baseColor,
         ),
         bodyMedium: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w400,
-          color: baseColor,
         ),
         bodySmall: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w400,
-          color: secondaryColor,
         ),
         labelLarge: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w700,
-          color: baseColor,
         ),
         labelMedium: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w500,
-          color: secondaryColor,
         ),
       ),
+    );
+
+    // Apply colors AFTER GoogleFonts to prevent them being stripped
+    return base.apply(
+      bodyColor: baseColor,
+      displayColor: baseColor,
+    ).copyWith(
+      bodySmall: base.bodySmall?.copyWith(color: secondaryColor),
+      labelMedium: base.labelMedium?.copyWith(color: secondaryColor),
     );
   }
 }

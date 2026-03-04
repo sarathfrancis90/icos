@@ -25,6 +25,8 @@ android/.gradle/
 android/local.properties
 android/app/debug/
 android/app/release/
+android/key.properties
+android/play-store-credentials.json
 *.apk
 *.aab
 *.jks
@@ -38,6 +40,7 @@ ios/Flutter/Flutter.podspec
 ios/Runner.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
 ios/Flutter/App.framework
 ios/Flutter/Generated.xcconfig
+ios/AuthKey*.p8
 
 # Environment
 .env
@@ -64,6 +67,9 @@ test/goldens/failures/
 *.g.dart
 *.freezed.dart
 *.mocks.dart
+
+# OAuth secrets
+Oauth/
 
 # Claude Code
 .claude/projects/

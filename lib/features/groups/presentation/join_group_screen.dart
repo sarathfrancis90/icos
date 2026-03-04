@@ -53,6 +53,7 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.deepBlack,
       appBar: AppBar(
         title: const Text('Join Group'),
       ),

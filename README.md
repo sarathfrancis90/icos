@@ -1,6 +1,6 @@
-# icos
+# Icos
 
-Icos - Daily Hamiltonian Path Puzzle Game
+Icos — Feed the Path. A daily snake puzzle game.
 
 ## Getting Started
 

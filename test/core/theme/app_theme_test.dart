@@ -382,7 +382,7 @@ void main() {
       expect(capturedTheme.inputDecorationTheme.filled, isTrue);
       expect(
         capturedTheme.inputDecorationTheme.fillColor,
-        AppColors.cardSurface,
+        AppColors.elevatedSurface,
       );
     });
 

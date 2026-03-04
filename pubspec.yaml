@@ -1,5 +1,5 @@
 name: icos
-description: "Icos - Daily Hamiltonian Path Puzzle Game"
+description: "Icos - Feed the Path. A daily snake puzzle game."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -47,8 +47,13 @@ dependencies:
   flutter_native_splash: ^2.4.6
   confetti: ^0.8.0
 
+  # Audio
+  audioplayers: ^6.1.0
+
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   flutter_lints: ^6.0.0
 
@@ -85,4 +90,6 @@ flutter:
   assets:
     - assets/puzzles/
     - assets/icons/
+    - assets/sounds/
     - .env.development
+    - .env.production

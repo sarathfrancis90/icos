@@ -1,0 +1,54 @@
+name: Deploy iOS
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  deploy-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Create .env.production
+        run: |
+          cat > .env.production << EOF
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          EOF
+
+      - name: Install CocoaPods
+        run: cd ios && pod install
+
+      - name: Decode App Store Connect API Key
+        run: echo "${{ secrets.ASC_KEY_P8_BASE64 }}" | base64 --decode > ios/AuthKey.p8
+
+      - name: Build IPA
+        run: |
+          flutter build ipa \
+            --release \
+            --obfuscate \
+            --split-debug-info=build/ios/symbols \
+            --dart-define-from-file=.env.production
+
+      - name: Deploy to TestFlight
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_PATH: "../ios/AuthKey.p8"
+        run: |
+          cd ios
+          bundle exec fastlane beta

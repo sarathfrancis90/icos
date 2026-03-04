@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../features/auth/presentation/auth_screen.dart';
+import '../../features/auth/presentation/email_auth_screen.dart';
 import '../../features/auth/presentation/onboarding_screen.dart';
 import '../../features/groups/presentation/group_detail_screen.dart';
 import '../../features/groups/presentation/groups_screen.dart';
@@ -96,6 +97,11 @@ GoRouter appRouter(Ref ref) {
         path: '/auth',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const AuthScreen(),
+      ),
+      GoRoute(
+        path: '/auth/email',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const EmailAuthScreen(),
       ),
     ],
   );

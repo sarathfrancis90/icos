@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
+import 'animated_background.dart';
+import 'particle_field.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({required this.child, super.key});
@@ -34,7 +36,14 @@ class AppShell extends StatelessWidget {
     final currentIndex = _currentIndex(context);
 
     return Scaffold(
-      body: child,
+      backgroundColor: AppColors.deepBlack,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: AnimatedBackground()),
+          const Positioned.fill(child: ParticleField()),
+          child,
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: AppColors.navBarBackground,

@@ -19,9 +19,9 @@ abstract final class AppColors {
   static const cellShadow = Color(0xFF0D1219); // bottom-right shadow edge
   static const cellBorder = Color(0xFF2A3548);
 
-  /// Visited / filled cell warm amber
-  static const filledCellLight = Color(0xFF5C4012);
-  static const filledCellDark = Color(0xFF3A2808);
+  /// Visited / filled cell (snake trail green tint)
+  static const filledCellLight = Color(0xFF1B4332);
+  static const filledCellDark = Color(0xFF14291E);
 
   // Grid lines (subtle)
   static const gridLine = Color(0xFF1E2D42);
@@ -52,8 +52,9 @@ abstract final class AppColors {
   static const waypointStartBorder = Color(0xFFA1887F);
 
   // ─── Walls ───────────────────────────────────────────────────────
-  static const wallFill = Color(0xFF2A3448);
-  static const wallBorder = Color(0xFF1A2030);
+  static const wallFill = Color(0xFF2E3A50);
+  static const wallBorder = Color(0xFF4E5E78);
+  static const wallCross = Color(0xFF8090A8);
 
   // ─── Purple Accent (Buttons) ─────────────────────────────────────
   static const purpleLight = Color(0xFFB388FF);
@@ -77,6 +78,33 @@ abstract final class AppColors {
   static const coralOrange = Color(0xFFFF6B35);
   static const coralOrangeLight = Color(0xFFFF8F5E);
 
+  // ─── Snake Colors (Neon Green palette) ──────────────────────────────
+  static const snakeHeadHighlight = Color(0xFF7DFFB3); // mint-white specular
+  static const snakeHeadBright = Color(0xFF39FF7F); // electric neon head
+  static const snakeBodyStart = Color(0xFF22FF6E); // bright near head
+  static const snakeBodyMid = Color(0xFF00E650); // strong green
+  static const snakeBodyDark = Color(0xFF00B341); // deep emerald
+  static const snakeBodyEnd = Color(0xFF007A2D); // dark forest tail
+  static const snakeSegmentHighlight = Color(0xFFB3FFD6); // top-left specular
+  static const snakeSegmentShadow = Color(0xFF005C22); // bottom-right shadow
+  static const snakeEye = Color(0xFFF0FFF4); // green-tinted sclera
+  static const snakePupil = Color(0xFF0A1628); // matches background
+  static const snakeTongue = Color(0xFFFF4757); // coral-red contrast
+  static const snakeGlowOuter = Color(0x4000FF55); // outer neon bloom
+  static const snakeGlowInner = Color(0x6039FF7F); // inner glow halo
+  static const snakeBellyHighlight = Color(0xFF66FFB3); // underside stripe
+  static const snakeScaleHighlight = Color(0x30FFFFFF);
+  // Legacy alias
+  static const snakeGlow = snakeGlowOuter;
+
+  static const snakeGradientColors = [
+    snakeBodyEnd, // tail
+    snakeBodyDark,
+    snakeBodyMid,
+    snakeBodyStart,
+    snakeHeadBright, // head
+  ];
+
   // ─── Glow & Effects ──────────────────────────────────────────────
   static const pathGlowOrange = Color(0x60FF9100);
   static const pathGlowYellow = Color(0x60FFD740);
@@ -92,7 +120,7 @@ abstract final class AppColors {
   // ─── Text ────────────────────────────────────────────────────────
   static const textPrimaryDark = Color(0xFFF1F5F9);
   static const textSecondaryDark = Color(0xFF8899AA);
-  static const textTertiaryDark = Color(0xFF5A6B7D);
+  static const textTertiaryDark = Color(0xFF7A8B9D);
   static const textPrimaryLight = Color(0xFF0F172A);
   static const textSecondaryLight = Color(0xFF64748B);
 

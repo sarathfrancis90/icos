@@ -632,6 +632,108 @@ void main() {
     });
   });
 
+  group('backtrackToCell', () {
+    test('returns null when cell is not in path', () {
+      var state = engine.addToPath(initialState, 0, 0);
+      state = engine.addToPath(state, 0, 1);
+      state = engine.addToPath(state, 0, 2);
+
+      final result = engine.backtrackToCell(state, 2, 2);
+      expect(result, isNull);
+    });
+
+    test('returns null when cell is the last cell in path', () {
+      var state = engine.addToPath(initialState, 0, 0);
+      state = engine.addToPath(state, 0, 1);
+      state = engine.addToPath(state, 0, 2);
+
+      final result = engine.backtrackToCell(state, 0, 2);
+      expect(result, isNull);
+    });
+
+    test('backtracks to second-to-last cell (removes last)', () {
+      var state = engine.addToPath(initialState, 0, 0);
+      state = engine.addToPath(state, 0, 1);
+      state = engine.addToPath(state, 0, 2);
+
+      final result = engine.backtrackToCell(state, 0, 1)!;
+      expect(result.path.length, 2);
+      expect(result.path.last.row, 0);
+      expect(result.path.last.col, 1);
+      // Removed cell should be restored to empty
+      expect(result.grid[0][2], CellState.empty);
+    });
+
+    test('backtracks multiple cells at once', () {
+      var state = engine.addToPath(initialState, 0, 0);
+      state = engine.addToPath(state, 0, 1);
+      state = engine.addToPath(state, 0, 2);
+      state = engine.addToPath(state, 1, 2);
+      state = engine.addToPath(state, 1, 1);
+      expect(state.path.length, 5);
+
+      // Backtrack to (0,1) — should remove (0,2), (1,2), (1,1)
+      final result = engine.backtrackToCell(state, 0, 1)!;
+      expect(result.path.length, 2);
+      expect(result.path.last.col, 1);
+      expect(result.grid[0][2], CellState.empty);
+      expect(result.grid[1][2], CellState.empty);
+      expect(result.grid[1][1], CellState.empty);
+    });
+
+    test('backtracks to first cell (removes all but first)', () {
+      var state = engine.addToPath(initialState, 0, 0);
+      state = engine.addToPath(state, 0, 1);
+      state = engine.addToPath(state, 0, 2);
+
+      final result = engine.backtrackToCell(state, 0, 0)!;
+      expect(result.path.length, 1);
+      expect(result.path.first.row, 0);
+      expect(result.path.first.col, 0);
+    });
+
+    test('restores waypoint cell state when backtracking over waypoint', () {
+      // Build a path that goes through waypoint 2 at (2,2) and past it
+      var state = engine.addToPath(initialState, 0, 0);
+      state = engine.addToPath(state, 0, 1);
+      state = engine.addToPath(state, 0, 2);
+      state = engine.addToPath(state, 1, 2);
+      state = engine.addToPath(state, 2, 2); // waypoint 2
+      state = engine.addToPath(state, 2, 1);
+      expect(state.currentWaypointIndex, 1);
+
+      // Backtrack to (1,2) — removes (2,2) waypoint and (2,1)
+      final result = engine.backtrackToCell(state, 1, 2)!;
+      expect(result.grid[2][2], CellState.waypoint); // restored
+      expect(result.grid[2][1], CellState.empty);
+      expect(result.currentWaypointIndex, 0); // waypoint 2 no longer visited
+    });
+
+    test('recalculates waypoint index correctly after multi-cell backtrack', () {
+      var state = engine.addToPath(initialState, 0, 0);
+      state = engine.addToPath(state, 0, 1);
+      state = engine.addToPath(state, 0, 2);
+      state = engine.addToPath(state, 1, 2);
+      state = engine.addToPath(state, 2, 2); // waypoint 2
+      expect(state.currentWaypointIndex, 1);
+
+      // Backtrack to (0,0) — should reset waypoint index to 0 (only wp1 visited)
+      final result = engine.backtrackToCell(state, 0, 0)!;
+      expect(result.path.length, 1);
+      expect(result.currentWaypointIndex, 0);
+    });
+
+    test('does not modify the original state', () {
+      var state = engine.addToPath(initialState, 0, 0);
+      state = engine.addToPath(state, 0, 1);
+      state = engine.addToPath(state, 0, 2);
+      final originalPathLength = state.path.length;
+
+      engine.backtrackToCell(state, 0, 1);
+      expect(state.path.length, originalPathLength); // unchanged
+    });
+  });
+
   group('full solution walkthrough', () {
     test('complete solution path solves the puzzle via handleCellTap', () {
       // Solution: (0,0)->(0,1)->(0,2)->(1,2)->(1,1)->(1,0)->(2,0)->(2,1)->(2,2)

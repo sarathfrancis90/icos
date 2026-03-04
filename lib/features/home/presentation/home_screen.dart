@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/date_utils.dart';
+import '../../../shared/widgets/spring_button.dart';
 import '../../puzzle/providers/daily_puzzle_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -174,9 +175,9 @@ class _PuzzleCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSizes.lg + 4),
 
-                // Play button with gradient
-                GestureDetector(
-                  onTap: onPlay,
+                // Play button with gradient + spring physics
+                SpringButton(
+                  onPressed: onPlay,
                   child: Container(
                     width: double.infinity,
                     height: 56,

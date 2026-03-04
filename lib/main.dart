@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -19,7 +20,8 @@ Future<void> main() async {
   ]);
 
   // Load environment variables
-  await dotenv.load(fileName: '.env.development');
+  final envFile = kReleaseMode ? '.env.production' : '.env.development';
+  await dotenv.load(fileName: envFile);
 
   // Initialize services
   await StorageService.initialize();
@@ -28,9 +30,11 @@ Future<void> main() async {
   // Auto sign in anonymously if no session exists
   if (SupabaseService.auth.currentSession == null) {
     try {
-      await SupabaseService.auth.signInAnonymously();
+      await SupabaseService.auth
+          .signInAnonymously()
+          .timeout(const Duration(seconds: 5));
     } catch (_) {
-      // Offline — continue without auth
+      // Offline or timeout — continue without auth
     }
   }
 

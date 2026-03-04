@@ -62,7 +62,34 @@ class GameNotifier extends _$GameNotifier {
     if (state!.status == GameStatus.completed) return;
     if (state!.status == GameStatus.notStarted) return;
 
-    // Only add to path if this is a valid adjacent cell
+    // Skip if dragging over the current last cell
+    if (state!.path.isNotEmpty &&
+        state!.path.last.row == row &&
+        state!.path.last.col == col) {
+      return;
+    }
+
+    // Only allow backtracking to the second-to-last cell (single undo step).
+    // Dragging to any other already-visited cell is rejected.
+    if (state!.path.length >= 2) {
+      final secondToLast = state!.path[state!.path.length - 2];
+      if (secondToLast.row == row && secondToLast.col == col) {
+        var newState = _engine!.undo(state!);
+        if (newState.hintCell != null) {
+          newState = newState.copyWith(hintCell: null);
+        }
+        state = newState;
+        _saveGameState();
+        return;
+      }
+    }
+
+    // Reject any move to an already-visited cell
+    if (state!.path.any((p) => p.row == row && p.col == col)) {
+      return;
+    }
+
+    // Otherwise, try adding to path (forward movement)
     if (_engine!.canMoveToCell(state!, row, col)) {
       var newState = _engine!.addToPath(state!, row, col);
 

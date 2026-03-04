@@ -133,9 +133,7 @@ class AuthScreen extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      // TODO: email sign in
-                    },
+                    onPressed: () => context.push('/auth/email'),
                     icon: const Icon(Icons.email_outlined),
                     label: const Text(AppStrings.signInWithEmail),
                   ),

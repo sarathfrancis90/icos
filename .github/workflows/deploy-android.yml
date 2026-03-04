@@ -1,0 +1,57 @@
+name: Deploy Android
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  deploy-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Create .env.production
+        run: |
+          cat > .env.production << EOF
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          EOF
+
+      - name: Decode keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+
+      - name: Create key.properties
+        run: |
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=upload
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Decode Play Store credentials
+        run: echo "${{ secrets.PLAY_STORE_CREDENTIALS }}" | base64 --decode > android/play-store-credentials.json
+
+      - name: Build AAB
+        run: |
+          flutter build appbundle \
+            --release \
+            --obfuscate \
+            --split-debug-info=build/app/outputs/symbols \
+            --dart-define-from-file=.env.production
+
+      - name: Deploy to Play Store (Internal)
+        run: |
+          cd android
+          bundle exec fastlane internal

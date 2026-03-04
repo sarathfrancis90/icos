@@ -1,6 +1,6 @@
 abstract final class AppStrings {
   static const appName = 'Icos';
-  static const appTagline = 'Daily Path Puzzle';
+  static const appTagline = 'Feed the Path';
 
   // Navigation
   static const navHome = 'Home';

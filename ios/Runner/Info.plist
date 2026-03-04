@@ -63,6 +63,14 @@
 					<string>io.supabase.icos</string>
 				</array>
 			</dict>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.googleusercontent.apps.876802621972-oti80nkrl3ej684irm296qeuinfndhbn</string>
+				</array>
+			</dict>
 		</array>
 		<key>UISupportedInterfaceOrientations</key>
 		<array>

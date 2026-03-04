@@ -106,6 +106,38 @@ class GameEngine {
     );
   }
 
+  /// Backtrack the path to the given cell, removing all cells after it.
+  /// Returns null if the cell is not in the path or is the last cell.
+  GameState? backtrackToCell(GameState state, int row, int col) {
+    final index = state.path.indexWhere((p) => p.row == row && p.col == col);
+    if (index < 0 || index >= state.path.length - 1) return null;
+
+    final newPath = state.path.sublist(0, index + 1);
+    final removedCells = state.path.sublist(index + 1);
+
+    final newGrid = _copyGrid(state.grid);
+    for (final cell in removedCells) {
+      final waypointAtCell = _findWaypointAt(cell.row, cell.col);
+      newGrid[cell.row][cell.col] =
+          waypointAtCell != null ? CellState.waypoint : CellState.empty;
+    }
+
+    // Recalculate current waypoint index
+    var waypointIndex = 0;
+    for (final pos in newPath) {
+      final wp = _findWaypointAt(pos.row, pos.col);
+      if (wp != null) {
+        waypointIndex = wp.order - 1;
+      }
+    }
+
+    return state.copyWith(
+      path: newPath,
+      grid: newGrid,
+      currentWaypointIndex: waypointIndex,
+    );
+  }
+
   /// Remove the last cell from the path (undo).
   GameState undo(GameState state) {
     if (state.path.isEmpty) return state;

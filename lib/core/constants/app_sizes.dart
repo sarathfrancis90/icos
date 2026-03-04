@@ -30,6 +30,15 @@ abstract final class AppSizes {
   static const int celebrationConfettiMs = 600;
   static const int pathDrawMs = 150;
   static const int cellFillMs = 100;
+  static const int cellEntryBounceMs = 250;
+  static const int glowBreathCycleMs = 2000;
+  static const int hintPulseCycleMs = 1000;
+  static const int waypointBurstMs = 400;
+  static const int completionRippleMs = 200;
+  static const int springSettleMs = 600;
+  static const int buttonPressMs = 100;
+  static const int scoreCountUpMs = 1200;
+  static const int statRevealStaggerMs = 200;
 
   // Limits
   static const int maxGroupMembers = 50;

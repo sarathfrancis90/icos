@@ -51,6 +51,34 @@ class AuthNotifier extends _$AuthNotifier {
     }
   }
 
+  Future<void> signUpWithEmail(String email, String password) async {
+    state = const AsyncValue.loading();
+    try {
+      final response = await SupabaseService.auth.signUp(
+        email: email,
+        password: password,
+      );
+      state = AsyncValue.data(response.user);
+    } on AuthException catch (e) {
+      state = AsyncValue.error(e.message, StackTrace.current);
+      throw Exception(e.message);
+    }
+  }
+
+  Future<void> signInWithEmail(String email, String password) async {
+    state = const AsyncValue.loading();
+    try {
+      final response = await SupabaseService.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      state = AsyncValue.data(response.user);
+    } on AuthException catch (e) {
+      state = AsyncValue.error(e.message, StackTrace.current);
+      throw Exception(e.message);
+    }
+  }
+
   Future<void> signOut() async {
     await SupabaseService.auth.signOut();
     state = const AsyncValue.data(null);

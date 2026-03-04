@@ -1,32 +1,442 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/services/audio_service.dart';
+import '../../../../core/utils/haptics.dart';
+import '../../../../core/utils/motion.dart';
 import '../../domain/models/game_state.dart';
 import '../../domain/models/puzzle.dart';
+import 'snake_renderer.dart';
 
-class PuzzleGrid extends StatelessWidget {
+class PuzzleGrid extends StatefulWidget {
   const PuzzleGrid({
     required this.gameState,
     required this.onCellTap,
     required this.onCellDrag,
+    this.onInvalidMove,
     super.key,
   });
 
   final GameState gameState;
   final void Function(int row, int col) onCellTap;
   final void Function(int row, int col) onCellDrag;
+  final void Function(int row, int col)? onInvalidMove;
+
+  @override
+  State<PuzzleGrid> createState() => _PuzzleGridState();
+}
+
+class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
+  // ─── Path segment animation (Phase 1) ────────────────────────────
+  int _previousPathLength = 0;
+  final Map<int, AnimationController> _segmentControllers = {};
+
+  // ─── Glow breath (Phase 1) ───────────────────────────────────────
+  late final AnimationController _glowBreathController;
+
+  // ─── Cell entry bounce (Phase 2) ─────────────────────────────────
+  final Map<String, AnimationController> _cellEntryControllers = {};
+
+  // ─── Hint pulse (Phase 3) ────────────────────────────────────────
+  AnimationController? _hintPulseController;
+
+  // ─── Waypoint burst (Phase 4) ────────────────────────────────────
+  int _previousWaypointIndex = 0;
+  AnimationController? _waypointBurstController;
+  Offset? _waypointBurstCenter;
+
+  // ─── Completion ripple (Phase 5) ─────────────────────────────────
+  AnimationController? _completionRippleController;
+  bool _hasTriggeredCompletion = false;
+
+  // ─── Snake animations ──────────────────────────────────────────
+  AnimationController? _eatingController;
+  int _eatingSegmentIndex = -1;
+  AnimationController? _idleBlinkController;
+  AnimationController? _tongueController;
+  AnimationController? _invalidLungeController;
+  Offset _lungeDirection = Offset.zero;
+
+  bool _reduceMotion = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _previousPathLength = widget.gameState.path.length;
+    _previousWaypointIndex = widget.gameState.currentWaypointIndex;
+
+    _glowBreathController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: AppSizes.glowBreathCycleMs),
+    )..repeat(reverse: true);
+
+    // Init hint pulse if needed
+    if (widget.gameState.hintCell != null) {
+      _startHintPulse();
+    }
+
+    // Snake idle animations
+    _startIdleAnimations();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduceMotion = MotionUtils.shouldReduceMotion(context);
+  }
+
+  @override
+  void didUpdateWidget(covariant PuzzleGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final newLen = widget.gameState.path.length;
+    final oldLen = _previousPathLength;
+
+    // ── Phase 1: New path segments ──────────────────────────────
+    if (newLen > oldLen && !_reduceMotion) {
+      for (int i = oldLen; i < newLen; i++) {
+        _animateNewSegment(i);
+      }
+    }
+
+    // Clean up controllers for removed segments (undo/backtrack)
+    if (newLen < oldLen) {
+      final keysToRemove = <int>[];
+      for (final key in _segmentControllers.keys) {
+        if (key >= newLen) keysToRemove.add(key);
+      }
+      for (final key in keysToRemove) {
+        _segmentControllers[key]?.dispose();
+        _segmentControllers.remove(key);
+      }
+
+      // Clean up cell entry controllers for removed cells
+      final cellKeysToRemove = <String>[];
+      for (final cellKey in _cellEntryControllers.keys) {
+        final parts = cellKey.split(',');
+        final r = int.parse(parts[0]);
+        final c = int.parse(parts[1]);
+        final stillInPath =
+            widget.gameState.path.any((p) => p.row == r && p.col == c);
+        if (!stillInPath) cellKeysToRemove.add(cellKey);
+      }
+      for (final key in cellKeysToRemove) {
+        _cellEntryControllers[key]?.dispose();
+        _cellEntryControllers.remove(key);
+      }
+    }
+
+    // ── Phase 2: Cell entry bounce for new cells ────────────────
+    if (newLen > oldLen && !_reduceMotion) {
+      for (int i = oldLen; i < newLen; i++) {
+        final pos = widget.gameState.path[i];
+        _animateCellEntry(pos.row, pos.col);
+      }
+    }
+
+    _previousPathLength = newLen;
+
+    // ── Phase 3: Hint pulse ─────────────────────────────────────
+    final hadHint = oldWidget.gameState.hintCell != null;
+    final hasHint = widget.gameState.hintCell != null;
+    if (hasHint && !hadHint) {
+      _startHintPulse();
+    } else if (!hasHint && hadHint) {
+      _stopHintPulse();
+    }
+
+    // ── Phase 4: Waypoint reached + snake eating ───────────────
+    final newWpIdx = widget.gameState.currentWaypointIndex;
+    if (newWpIdx > _previousWaypointIndex && !_reduceMotion) {
+      _triggerWaypointBurst();
+      triggerEatingAnimation(newLen - 1);
+      AudioService.instance.play(SoundEffect.waypointReached);
+    }
+    _previousWaypointIndex = newWpIdx;
+
+    // ── Phase 5: Grid completion ────────────────────────────────
+    if (widget.gameState.status == GameStatus.completed &&
+        oldWidget.gameState.status != GameStatus.completed &&
+        !_hasTriggeredCompletion) {
+      _hasTriggeredCompletion = true;
+      _triggerCompletionRipple();
+    }
+  }
+
+  // ── Phase 1: Segment animation ──────────────────────────────────
+
+  void _animateNewSegment(int segmentIndex) {
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: AppSizes.pathDrawMs),
+    );
+    _segmentControllers[segmentIndex] = controller;
+    controller.forward().then((_) {
+      // Keep controller at 1.0 — don't dispose until segment is removed
+    });
+  }
+
+  double _getSegmentProgress(int index) {
+    if (_reduceMotion) return 1.0;
+    final controller = _segmentControllers[index];
+    if (controller == null) return 1.0;
+    return Curves.easeOut.transform(controller.value);
+  }
+
+  double _getGlowBreathValue() {
+    if (_reduceMotion) return 0.5;
+    return _glowBreathController.value;
+  }
+
+  // ── Phase 2: Cell entry animation ───────────────────────────────
+
+  void _animateCellEntry(int row, int col) {
+    final key = '$row,$col';
+    if (_cellEntryControllers.containsKey(key)) return;
+
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: AppSizes.cellEntryBounceMs),
+    );
+    _cellEntryControllers[key] = controller;
+    controller.forward();
+  }
+
+  double _getCellEntryScale(int row, int col) {
+    if (_reduceMotion) return 1.0;
+    final key = '$row,$col';
+    final controller = _cellEntryControllers[key];
+    if (controller == null) return 1.0;
+    // Elastic bounce: 1.0 → 1.08 → 1.0
+    final t = Curves.elasticOut.transform(controller.value);
+    return 1.0 + (0.08 * (1.0 - t).abs() * (t < 0.5 ? 1 : 0));
+  }
+
+  double _getCellEntryGlow(int row, int col) {
+    if (_reduceMotion) return 0.0;
+    final key = '$row,$col';
+    final controller = _cellEntryControllers[key];
+    if (controller == null) return 0.0;
+    // Flash glow: 0.3 → 0.0
+    return 0.3 * (1.0 - controller.value);
+  }
+
+  // ── Phase 3: Hint pulse ─────────────────────────────────────────
+
+  void _startHintPulse() {
+    if (_reduceMotion) return;
+    _hintPulseController?.dispose();
+    _hintPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: AppSizes.hintPulseCycleMs),
+    )..repeat(reverse: true);
+  }
+
+  void _stopHintPulse() {
+    _hintPulseController?.dispose();
+    _hintPulseController = null;
+  }
+
+  double _getHintPulseValue() {
+    if (_reduceMotion) return 0.0;
+    return _hintPulseController?.value ?? 0.0;
+  }
+
+  // ── Phase 4: Waypoint burst ─────────────────────────────────────
+
+  void _triggerWaypointBurst() {
+    Haptics.waypointReached();
+
+    // Find the waypoint that was just reached
+    final wpIdx = widget.gameState.currentWaypointIndex;
+    final waypoints = widget.gameState.puzzle.waypoints;
+    if (wpIdx <= 0 || wpIdx > waypoints.length) return;
+
+    // The waypoint order that was just reached
+    final reachedWp = waypoints.firstWhere(
+      (w) => w.order == wpIdx,
+      orElse: () => waypoints.first,
+    );
+
+    // We'll compute the actual pixel center in the painter using row/col
+    _waypointBurstCenter = Offset(
+      reachedWp.col.toDouble(),
+      reachedWp.row.toDouble(),
+    );
+
+    _waypointBurstController?.dispose();
+    _waypointBurstController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: AppSizes.waypointBurstMs),
+    )..forward();
+  }
+
+  double _getWaypointBurstProgress() {
+    if (_reduceMotion) return -1.0;
+    final controller = _waypointBurstController;
+    if (controller == null || !controller.isAnimating) return -1.0;
+    return controller.value;
+  }
+
+  // ── Phase 5: Completion ripple ──────────────────────────────────
+
+  void _triggerCompletionRipple() {
+    if (_reduceMotion) return;
+    Haptics.puzzleComplete();
+
+    _completionRippleController?.dispose();
+    _completionRippleController = AnimationController(
+      vsync: this,
+      duration:
+          const Duration(milliseconds: AppSizes.completionRippleMs + 200),
+    )..forward();
+  }
+
+  double _getCompletionRippleProgress() {
+    if (_reduceMotion) return -1.0;
+    final controller = _completionRippleController;
+    if (controller == null) return -1.0;
+    return controller.value;
+  }
+
+  // ── Snake animations ──────────────────────────────────────────────
+
+  void _startIdleAnimations() {
+    if (_reduceMotion) return;
+    // Eye blink every 4-6 seconds
+    _scheduleNextBlink();
+    // Tongue flick periodically
+    _scheduleNextTongue();
+  }
+
+  void _scheduleNextBlink() {
+    final delay = 4000 + (math.Random().nextInt(2000));
+    Future.delayed(Duration(milliseconds: delay), () {
+      if (!mounted) return;
+      _idleBlinkController?.dispose();
+      _idleBlinkController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 250),
+      )..forward().then((_) {
+          _idleBlinkController?.reverse().then((_) {
+            _scheduleNextBlink();
+          });
+        });
+    });
+  }
+
+  void _scheduleNextTongue() {
+    final delay = 6000 + (math.Random().nextInt(4000));
+    Future.delayed(Duration(milliseconds: delay), () {
+      if (!mounted) return;
+      _tongueController?.dispose();
+      _tongueController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 400),
+      )..forward().then((_) {
+          _tongueController?.reverse().then((_) {
+            _scheduleNextTongue();
+          });
+        });
+    });
+  }
+
+  void triggerEatingAnimation(int segmentIndex) {
+    if (_reduceMotion) return;
+    _eatingSegmentIndex = segmentIndex;
+    _eatingController?.dispose();
+    _eatingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    )..forward().then((_) {
+        _eatingSegmentIndex = -1;
+      });
+  }
+
+  void triggerInvalidLunge(Offset direction) {
+    if (_reduceMotion) return;
+    _lungeDirection = direction;
+    _invalidLungeController?.dispose();
+    _invalidLungeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    )..forward().then((_) {
+        _invalidLungeController?.reverse();
+      });
+  }
+
+  double _getEatingProgress() {
+    return _eatingController?.value ?? -1.0;
+  }
+
+  double _getIdleBlinkProgress() {
+    return _idleBlinkController?.value ?? -1.0;
+  }
+
+  double _getTongueProgress() {
+    return _tongueController?.value ?? -1.0;
+  }
+
+  Offset _getInvalidLungeOffset() {
+    final controller = _invalidLungeController;
+    if (controller == null || !controller.isAnimating) return Offset.zero;
+    final lungeAmount = cellSize * 0.15;
+    final t = Curves.easeOut.transform(controller.value);
+    return _lungeDirection * lungeAmount * t;
+  }
+
+  double get cellSize {
+    final size = widget.gameState.puzzle.gridSize;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final gridWidth = (screenWidth - AppSizes.gridPadding * 2)
+        .clamp(0.0, AppSizes.gridMaxWidth);
+    return gridWidth / size;
+  }
+
+  @override
+  void dispose() {
+    _glowBreathController.dispose();
+    _hintPulseController?.dispose();
+    _waypointBurstController?.dispose();
+    _completionRippleController?.dispose();
+    _eatingController?.dispose();
+    _idleBlinkController?.dispose();
+    _tongueController?.dispose();
+    _invalidLungeController?.dispose();
+    for (final c in _segmentControllers.values) {
+      c.dispose();
+    }
+    for (final c in _cellEntryControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final size = gameState.puzzle.gridSize;
+    final size = widget.gameState.puzzle.gridSize;
     final screenWidth = MediaQuery.of(context).size.width;
     final gridWidth = (screenWidth - AppSizes.gridPadding * 2)
         .clamp(0.0, AppSizes.gridMaxWidth);
     final cellSize = gridWidth / size;
+
+    // Merge all animation listenables for repaint
+    final listenables = <Listenable>[
+      _glowBreathController,
+      ?_hintPulseController,
+      ?_waypointBurstController,
+      ?_completionRippleController,
+      ?_eatingController,
+      ?_idleBlinkController,
+      ?_tongueController,
+      ?_invalidLungeController,
+      ..._segmentControllers.values,
+      ..._cellEntryControllers.values,
+    ];
 
     return Padding(
       padding: const EdgeInsetsDirectional.symmetric(
@@ -42,13 +452,29 @@ class PuzzleGrid extends StatelessWidget {
               final row = (localPos.dy / cellSize).floor();
               final col = (localPos.dx / cellSize).floor();
               if (row >= 0 && row < size && col >= 0 && col < size) {
-                onCellDrag(row, col);
+                _handleCellDrag(row, col);
               }
             },
             child: CustomPaint(
               painter: _GridPainter(
-                gameState: gameState,
+                gameState: widget.gameState,
                 cellSize: cellSize,
+                segmentProgressGetter: _getSegmentProgress,
+                glowBreathValue: _getGlowBreathValue(),
+                cellEntryScaleGetter: _getCellEntryScale,
+                cellEntryGlowGetter: _getCellEntryGlow,
+                hintPulseValue: _getHintPulseValue(),
+                waypointBurstProgress: _getWaypointBurstProgress(),
+                waypointBurstGridPos: _waypointBurstCenter,
+                completionRippleProgress: _getCompletionRippleProgress(),
+                eatingProgress: _getEatingProgress(),
+                eatingSegmentIndex: _eatingSegmentIndex,
+                idleBlinkProgress: _getIdleBlinkProgress(),
+                tongueProgress: _getTongueProgress(),
+                invalidLungeOffset: _getInvalidLungeOffset(),
+                repaintNotifier: listenables.isNotEmpty
+                    ? Listenable.merge(listenables)
+                    : null,
               ),
               child: _buildTapTargets(size, cellSize),
             ),
@@ -69,7 +495,7 @@ class PuzzleGrid extends StatelessWidget {
               width: cellSize,
               height: cellSize,
               child: GestureDetector(
-                onTap: () => onCellTap(row, col),
+                onTap: () => _handleCellTap(row, col),
                 behavior: HitTestBehavior.opaque,
                 child: Semantics(
                   label: _cellSemanticLabel(row, col),
@@ -81,8 +507,76 @@ class PuzzleGrid extends StatelessWidget {
     );
   }
 
+  void _handleCellDrag(int row, int col) {
+    final path = widget.gameState.path;
+
+    // Skip if dragging over the current head
+    if (path.isNotEmpty && path.last.row == row && path.last.col == col) {
+      return;
+    }
+
+    // Allow drag-undo to second-to-last cell only
+    if (path.length >= 2 &&
+        path[path.length - 2].row == row &&
+        path[path.length - 2].col == col) {
+      widget.onCellDrag(row, col);
+      return;
+    }
+
+    // Reject drag to any already-visited cell
+    if (path.any((p) => p.row == row && p.col == col)) {
+      return;
+    }
+
+    // Reject walls
+    if (widget.gameState.grid[row][col] == CellState.wall) {
+      return;
+    }
+
+    widget.onCellDrag(row, col);
+  }
+
+  void _handleCellTap(int row, int col) {
+    final path = widget.gameState.path;
+
+    // Check if tapping an already-visited cell (not the second-to-last for undo)
+    final isInPath = path.any((p) => p.row == row && p.col == col);
+    final isSecondToLast = path.length >= 2 &&
+        path[path.length - 2].row == row &&
+        path[path.length - 2].col == col;
+    final isLastCell = path.isNotEmpty &&
+        path.last.row == row &&
+        path.last.col == col;
+
+    if (isInPath && !isSecondToLast && !isLastCell) {
+      // Invalid move — trigger lunge animation + feedback
+      if (path.isNotEmpty) {
+        final headPos = path.last;
+        final dx = (col - headPos.col).toDouble();
+        final dy = (row - headPos.row).toDouble();
+        final len = math.sqrt(dx * dx + dy * dy);
+        if (len > 0) {
+          triggerInvalidLunge(Offset(dx / len, dy / len));
+        }
+      }
+      Haptics.error();
+      AudioService.instance.play(SoundEffect.invalidMove);
+      widget.onInvalidMove?.call(row, col);
+      return;
+    }
+
+    // Check if tapping a wall
+    if (widget.gameState.grid[row][col] == CellState.wall) {
+      Haptics.error();
+      AudioService.instance.play(SoundEffect.invalidMove);
+      return;
+    }
+
+    widget.onCellTap(row, col);
+  }
+
   String _cellSemanticLabel(int row, int col) {
-    final cellState = gameState.grid[row][col];
+    final cellState = widget.gameState.grid[row][col];
     final stateLabel = switch (cellState) {
       CellState.empty => 'empty',
       CellState.filled => 'filled',
@@ -93,7 +587,7 @@ class PuzzleGrid extends StatelessWidget {
   }
 
   String _waypointLabel(int row, int col) {
-    for (final wp in gameState.puzzle.waypoints) {
+    for (final wp in widget.gameState.puzzle.waypoints) {
       if (wp.row == row && wp.col == col) {
         return 'waypoint ${wp.order}';
       }
@@ -106,10 +600,37 @@ class _GridPainter extends CustomPainter {
   _GridPainter({
     required this.gameState,
     required this.cellSize,
-  });
+    required this.segmentProgressGetter,
+    required this.glowBreathValue,
+    required this.cellEntryScaleGetter,
+    required this.cellEntryGlowGetter,
+    required this.hintPulseValue,
+    required this.waypointBurstProgress,
+    this.waypointBurstGridPos,
+    required this.completionRippleProgress,
+    required this.eatingProgress,
+    required this.eatingSegmentIndex,
+    required this.idleBlinkProgress,
+    required this.tongueProgress,
+    required this.invalidLungeOffset,
+    Listenable? repaintNotifier,
+  }) : super(repaint: repaintNotifier);
 
   final GameState gameState;
   final double cellSize;
+  final double Function(int index) segmentProgressGetter;
+  final double glowBreathValue;
+  final double Function(int row, int col) cellEntryScaleGetter;
+  final double Function(int row, int col) cellEntryGlowGetter;
+  final double hintPulseValue;
+  final double waypointBurstProgress;
+  final Offset? waypointBurstGridPos;
+  final double completionRippleProgress;
+  final double eatingProgress;
+  final int eatingSegmentIndex;
+  final double idleBlinkProgress;
+  final double tongueProgress;
+  final Offset invalidLungeOffset;
 
   // Cell geometry constants
   static const double _cellInset = 2.0;
@@ -129,8 +650,8 @@ class _GridPainter extends CustomPainter {
     // Draw hint cell highlight
     _drawHintCell(canvas);
 
-    // Draw path with gradient tube effect
-    _drawGradientTubePath(canvas);
+    // Draw snake path
+    _drawSnakePath(canvas);
 
     // Draw waypoints on top
     for (int row = 0; row < gridSize; row++) {
@@ -139,6 +660,16 @@ class _GridPainter extends CustomPainter {
           _drawWaypoint(canvas, row, col);
         }
       }
+    }
+
+    // Draw waypoint burst effect (Phase 4)
+    if (waypointBurstProgress >= 0 && waypointBurstGridPos != null) {
+      _drawWaypointBurst(canvas);
+    }
+
+    // Draw completion ripple (Phase 5)
+    if (completionRippleProgress >= 0) {
+      _drawCompletionRipple(canvas, size);
     }
   }
 
@@ -151,29 +682,69 @@ class _GridPainter extends CustomPainter {
       cellSize - _cellInset * 2,
       cellSize - _cellInset * 2,
     );
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(_cellRadius));
+    final rrect =
+        RRect.fromRectAndRadius(rect, const Radius.circular(_cellRadius));
 
     final isInPath = gameState.path.any((p) => p.row == row && p.col == col);
 
     if (cellState == CellState.wall) {
-      // Walls: darker solid fill
-      final paint = Paint()..color = AppColors.wallFill;
-      canvas.drawRRect(rrect, paint);
+      _drawWallCell(canvas, rect, rrect);
       return;
     }
 
     if (isInPath && cellState != CellState.waypoint) {
-      // Visited cell: warm amber fill
       _drawVisitedCell(canvas, rect, rrect, row, col);
     } else {
-      // Normal empty cell with 3D inset effect
       _drawInsetCell(canvas, rect, rrect);
     }
   }
 
+  /// Draws a wall cell — raised block with bold cross pattern.
+  void _drawWallCell(Canvas canvas, Rect rect, RRect rrect) {
+    // Outer shadow for raised 3D look
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.5)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+    canvas.drawRRect(
+      rrect.shift(const Offset(1.5, 1.5)),
+      shadowPaint,
+    );
+
+    // Fill — darker than empty cells for a "solid block" feel
+    final fillPaint = Paint()..color = AppColors.wallFill;
+    canvas.drawRRect(rrect, fillPaint);
+
+    // Border — bright enough to see the cell outline clearly
+    final borderPaint = Paint()
+      ..color = AppColors.wallBorder
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawRRect(rrect, borderPaint);
+
+    // Bold diagonal cross (X) — high-contrast lines
+    canvas.save();
+    canvas.clipRRect(rrect);
+    final crossPaint = Paint()
+      ..color = AppColors.wallCross
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final inset = cellSize * 0.22;
+    canvas.drawLine(
+      Offset(rect.left + inset, rect.top + inset),
+      Offset(rect.right - inset, rect.bottom - inset),
+      crossPaint,
+    );
+    canvas.drawLine(
+      Offset(rect.right - inset, rect.top + inset),
+      Offset(rect.left + inset, rect.bottom - inset),
+      crossPaint,
+    );
+    canvas.restore();
+  }
+
   /// Draws the 3D inset empty cell (dark sunken look).
   void _drawInsetCell(Canvas canvas, Rect rect, RRect rrect) {
-    // Shadow at bottom-right (gives "pushed in" effect)
     final shadowPaint = Paint()
       ..color = AppColors.cellShadow
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
@@ -182,7 +753,6 @@ class _GridPainter extends CustomPainter {
       shadowPaint,
     );
 
-    // Highlight at top-left
     final highlightPaint = Paint()
       ..color = AppColors.cellHighlight.withValues(alpha: 0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.5);
@@ -191,11 +761,9 @@ class _GridPainter extends CustomPainter {
       highlightPaint,
     );
 
-    // Main cell fill
     final fillPaint = Paint()..color = AppColors.cellBackground;
     canvas.drawRRect(rrect, fillPaint);
 
-    // Subtle inner border
     final borderPaint = Paint()
       ..color = AppColors.cellBorder.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
@@ -203,172 +771,80 @@ class _GridPainter extends CustomPainter {
     canvas.drawRRect(rrect, borderPaint);
   }
 
-  /// Draws a visited cell with warm amber tint.
-  void _drawVisitedCell(Canvas canvas, Rect rect, RRect rrect, int row, int col) {
-    // Determine how far along path this cell is (for color progression)
-    final pathIndex = gameState.path.indexWhere((p) => p.row == row && p.col == col);
+  /// Draws a visited cell with warm amber tint + Phase 2 entry effects.
+  void _drawVisitedCell(
+      Canvas canvas, Rect rect, RRect rrect, int row, int col) {
+    final pathIndex =
+        gameState.path.indexWhere((p) => p.row == row && p.col == col);
     final progress = gameState.path.length > 1
         ? pathIndex / (gameState.path.length - 1)
         : 0.0;
 
-    // Interpolate from dark amber to brighter amber/yellow
     final baseColor = Color.lerp(
       AppColors.filledCellDark,
       AppColors.filledCellLight,
       progress,
     )!;
 
+    // Phase 2: Cell entry scale effect
+    final scale = cellEntryScaleGetter(row, col);
+    final entryGlow = cellEntryGlowGetter(row, col);
+
+    if (scale != 1.0) {
+      canvas.save();
+      final center = rect.center;
+      canvas.translate(center.dx, center.dy);
+      canvas.scale(scale);
+      canvas.translate(-center.dx, -center.dy);
+    }
+
     final fillPaint = Paint()..color = baseColor;
     canvas.drawRRect(rrect, fillPaint);
 
-    // Subtle warm border
+    // Phase 2: White glow ring flash on entry
+    if (entryGlow > 0) {
+      final glowPaint = Paint()
+        ..color = Colors.white.withValues(alpha: entryGlow)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+      canvas.drawRRect(rrect, glowPaint);
+    }
+
     final borderPaint = Paint()
       ..color = AppColors.pathAmber.withValues(alpha: 0.2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.5;
     canvas.drawRRect(rrect, borderPaint);
-  }
 
-  /// Draws the thick gradient "tube" path from orange → yellow.
-  void _drawGradientTubePath(Canvas canvas) {
-    if (gameState.path.length < 2) return;
-
-    final tubeWidth = cellSize * 0.45;
-    final points = gameState.path
-        .map((p) => Offset(
-              p.col * cellSize + cellSize / 2,
-              p.row * cellSize + cellSize / 2,
-            ))
-        .toList();
-
-    // Draw each segment with a gradient that progresses along the path
-    for (int i = 0; i < points.length - 1; i++) {
-      final progress = i / (points.length - 1);
-      final nextProgress = (i + 1) / (points.length - 1);
-
-      final startColor = _pathColorAtProgress(progress);
-      final endColor = _pathColorAtProgress(nextProgress);
-
-      _drawTubeSegment(
-        canvas,
-        points[i],
-        points[i + 1],
-        tubeWidth,
-        startColor,
-        endColor,
-      );
-    }
-
-    // Draw rounded end caps at path start and end
-    _drawTubeEndCap(canvas, points.first, tubeWidth, _pathColorAtProgress(0));
-    _drawTubeEndCap(canvas, points.last, tubeWidth, _pathColorAtProgress(1));
-
-    // Draw rounded joints at turns
-    for (int i = 1; i < points.length - 1; i++) {
-      final progress = i / (points.length - 1);
-      _drawTubeEndCap(canvas, points[i], tubeWidth, _pathColorAtProgress(progress));
+    if (scale != 1.0) {
+      canvas.restore();
     }
   }
 
-  /// Gets the gradient color at a given progress (0.0 = start, 1.0 = end).
-  Color _pathColorAtProgress(double t) {
-    // Map to gradient: deep orange → orange → amber → yellow → bright yellow
-    const colors = AppColors.pathGradientColors;
-    if (colors.length < 2) return colors.first;
+  /// Draws the snake path using the SnakeRenderer.
+  void _drawSnakePath(Canvas canvas) {
+    if (gameState.path.isEmpty) return;
 
-    final segmentCount = colors.length - 1;
-    final segment = (t * segmentCount).floor().clamp(0, segmentCount - 1);
-    final localT = (t * segmentCount - segment).clamp(0.0, 1.0);
+    final points = <Offset>[];
+    for (final p in gameState.path) {
+      points.add(Offset(
+        p.col * cellSize + cellSize / 2,
+        p.row * cellSize + cellSize / 2,
+      ));
+    }
 
-    return Color.lerp(colors[segment], colors[segment + 1], localT)!;
-  }
-
-  /// Draws a single tube segment between two points.
-  void _drawTubeSegment(
-    Canvas canvas,
-    Offset start,
-    Offset end,
-    double width,
-    Color startColor,
-    Color endColor,
-  ) {
-    // Main tube body
-    final bodyPaint = Paint()
-      ..shader = ui.Gradient.linear(
-        start,
-        end,
-        [startColor, endColor],
-      )
-      ..strokeWidth = width
-      ..strokeCap = StrokeCap.butt
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(start, end, bodyPaint);
-
-    // Offset highlight slightly to create tube illusion
-    final dx = end.dx - start.dx;
-    final dy = end.dy - start.dy;
-    final len = math.sqrt(dx * dx + dy * dy);
-    if (len == 0) return;
-
-    // Perpendicular offset for highlight
-    final nx = -dy / len * width * 0.12;
-    final ny = dx / len * width * 0.12;
-    final hStart = Offset(start.dx + nx, start.dy + ny);
-    final hEnd = Offset(end.dx + nx, end.dy + ny);
-
-    final innerHighlight = Paint()
-      ..shader = ui.Gradient.linear(
-        hStart,
-        hEnd,
-        [
-          Colors.white.withValues(alpha: 0.25),
-          Colors.white.withValues(alpha: 0.15),
-        ],
-      )
-      ..strokeWidth = width * 0.3
-      ..strokeCap = StrokeCap.butt
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(hStart, hEnd, innerHighlight);
-
-    // Outer glow
-    final glowPaint = Paint()
-      ..shader = ui.Gradient.linear(
-        start,
-        end,
-        [
-          startColor.withValues(alpha: 0.15),
-          endColor.withValues(alpha: 0.15),
-        ],
-      )
-      ..strokeWidth = width + 8
-      ..strokeCap = StrokeCap.butt
-      ..style = PaintingStyle.stroke
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-    canvas.drawLine(start, end, glowPaint);
-  }
-
-  /// Draws a rounded cap at a path point (for smooth joints).
-  void _drawTubeEndCap(Canvas canvas, Offset center, double width, Color color) {
-    final radius = width / 2;
-
-    // Glow
-    final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.15)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-    canvas.drawCircle(center, radius + 4, glowPaint);
-
-    // Main cap
-    final capPaint = Paint()..color = color;
-    canvas.drawCircle(center, radius, capPaint);
-
-    // Highlight on cap
-    final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.2);
-    canvas.drawCircle(
-      Offset(center.dx - radius * 0.15, center.dy - radius * 0.15),
-      radius * 0.5,
-      highlightPaint,
+    final renderer = SnakeRenderer(
+      cellSize: cellSize,
+      glowBreathValue: glowBreathValue,
+      eatingProgress: eatingProgress,
+      eatingSegmentIndex: eatingSegmentIndex,
+      idleBlinkProgress: idleBlinkProgress,
+      tongueProgress: tongueProgress,
+      invalidLungeOffset: invalidLungeOffset,
     );
+
+    renderer.paint(canvas, points, segmentProgressGetter);
   }
 
   /// Draws a waypoint circle with number.
@@ -390,16 +866,25 @@ class _GridPainter extends CustomPainter {
     );
     final radius = cellSize * 0.34;
 
-    // Outer glow for visited waypoints
+    // Phase 4: waypoint scale bounce when burst is active and this is the target
+    double wpScale = 1.0;
+    if (waypointBurstProgress >= 0 &&
+        waypointBurstGridPos != null &&
+        waypointBurstGridPos!.dx.round() == col &&
+        waypointBurstGridPos!.dy.round() == row) {
+      // Scale 1.0 → 1.15 → 1.0 over first half of burst
+      final t = (waypointBurstProgress * 2).clamp(0.0, 1.0);
+      wpScale = 1.0 + 0.15 * math.sin(t * math.pi);
+    }
+
     if (isVisited) {
       final glowColor = isStart ? AppColors.waypointStartFill : Colors.white;
       final glowPaint = Paint()
         ..color = glowColor.withValues(alpha: 0.2)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-      canvas.drawCircle(center, radius + 4, glowPaint);
+      canvas.drawCircle(center, radius * wpScale + 4, glowPaint);
     }
 
-    // Waypoint circle fill
     Color fillColor;
     if (isStart) {
       fillColor = isVisited
@@ -411,33 +896,30 @@ class _GridPainter extends CustomPainter {
           : AppColors.waypointFill.withValues(alpha: 0.8);
     }
 
-    // Drop shadow
     final shadowPaint = Paint()
       ..color = Colors.black.withValues(alpha: 0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-    canvas.drawCircle(center + const Offset(0, 1), radius, shadowPaint);
+    canvas.drawCircle(
+        center + const Offset(0, 1), radius * wpScale, shadowPaint);
 
-    // Main fill
     final circlePaint = Paint()..color = fillColor;
-    canvas.drawCircle(center, radius, circlePaint);
+    canvas.drawCircle(center, radius * wpScale, circlePaint);
 
-    // Border ring
     final borderPaint = Paint()
       ..color = isStart
           ? AppColors.waypointStartBorder.withValues(alpha: 0.5)
           : AppColors.waypointBorder.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
-    canvas.drawCircle(center, radius, borderPaint);
+    canvas.drawCircle(center, radius * wpScale, borderPaint);
 
-    // Waypoint number
     final textColor = isStart ? Colors.white : AppColors.waypointText;
     final textPainter = TextPainter(
       text: TextSpan(
         text: '${wp.order}',
         style: TextStyle(
           color: textColor,
-          fontSize: cellSize * 0.28,
+          fontSize: cellSize * 0.28 * wpScale,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -453,7 +935,7 @@ class _GridPainter extends CustomPainter {
     );
   }
 
-  /// Draws the hint cell highlight.
+  /// Draws the hint cell highlight with Phase 3 pulsing.
   void _drawHintCell(Canvas canvas) {
     final hint = gameState.hintCell;
     if (hint == null) return;
@@ -464,18 +946,20 @@ class _GridPainter extends CustomPainter {
     );
     final radius = cellSize * 0.35;
 
-    // Outer glow (pulsing effect simulated by stronger blur)
-    final glowPaint = Paint()
-      ..color = AppColors.hintPurple.withValues(alpha: 0.25)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
-    canvas.drawCircle(center, radius + 8, glowPaint);
+    // Phase 3: Pulsing glow
+    final pulseScale = 1.0 + hintPulseValue * 0.15;
+    final pulseAlpha = 0.15 + hintPulseValue * 0.15;
+    final pulseBlur = 8.0 + hintPulseValue * 6.0;
 
-    // Fill
+    final glowPaint = Paint()
+      ..color = AppColors.hintPurple.withValues(alpha: pulseAlpha)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, pulseBlur);
+    canvas.drawCircle(center, (radius + 8) * pulseScale, glowPaint);
+
     final circlePaint = Paint()
       ..color = AppColors.hintPurple.withValues(alpha: 0.5);
     canvas.drawCircle(center, radius, circlePaint);
 
-    // Border ring
     final borderPaint = Paint()
       ..color = AppColors.hintPurple
       ..style = PaintingStyle.stroke
@@ -483,8 +967,75 @@ class _GridPainter extends CustomPainter {
     canvas.drawCircle(center, radius, borderPaint);
   }
 
+  /// Phase 4: Waypoint burst — expanding gold ring + particle dots.
+  void _drawWaypointBurst(Canvas canvas) {
+    if (waypointBurstGridPos == null || waypointBurstProgress < 0) return;
+
+    final center = Offset(
+      waypointBurstGridPos!.dx * cellSize + cellSize / 2,
+      waypointBurstGridPos!.dy * cellSize + cellSize / 2,
+    );
+
+    final t = waypointBurstProgress;
+    final maxRadius = cellSize * 0.8;
+    final ringRadius = maxRadius * Curves.easeOut.transform(t);
+    final ringAlpha = (1.0 - t) * 0.6;
+
+    // Expanding gold ring
+    final ringPaint = Paint()
+      ..color = AppColors.streakGold.withValues(alpha: ringAlpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5 * (1.0 - t)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 3 * t);
+    canvas.drawCircle(center, ringRadius, ringPaint);
+
+    // 4 radiating particle dots
+    for (int i = 0; i < 4; i++) {
+      final angle = (i * math.pi / 2) + (math.pi / 4);
+      final particleRadius = ringRadius * 0.9;
+      final px = center.dx + math.cos(angle) * particleRadius;
+      final py = center.dy + math.sin(angle) * particleRadius;
+      final dotPaint = Paint()
+        ..color = AppColors.streakGold.withValues(alpha: ringAlpha * 0.8);
+      canvas.drawCircle(Offset(px, py), 2.5 * (1.0 - t), dotPaint);
+    }
+  }
+
+  /// Phase 5: Grid completion ripple — white ring expands from center.
+  void _drawCompletionRipple(Canvas canvas, Size size) {
+    if (completionRippleProgress < 0) return;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxRadius = size.width * 0.8;
+    final t = Curves.easeOut.transform(completionRippleProgress);
+    final rippleRadius = maxRadius * t;
+    final rippleAlpha = (1.0 - t) * 0.4;
+
+    final ripplePaint = Paint()
+      ..color = Colors.white.withValues(alpha: rippleAlpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0 * (1.0 - t)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4 + 8 * t);
+    canvas.drawCircle(center, rippleRadius, ripplePaint);
+
+    // Inner brighter ring
+    final innerPaint = Paint()
+      ..color = Colors.white.withValues(alpha: rippleAlpha * 0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0 * (1.0 - t);
+    canvas.drawCircle(center, rippleRadius * 0.95, innerPaint);
+  }
+
   @override
   bool shouldRepaint(covariant _GridPainter oldDelegate) {
-    return oldDelegate.gameState != gameState;
+    return oldDelegate.gameState != gameState ||
+        oldDelegate.glowBreathValue != glowBreathValue ||
+        oldDelegate.hintPulseValue != hintPulseValue ||
+        oldDelegate.waypointBurstProgress != waypointBurstProgress ||
+        oldDelegate.completionRippleProgress != completionRippleProgress ||
+        oldDelegate.eatingProgress != eatingProgress ||
+        oldDelegate.idleBlinkProgress != idleBlinkProgress ||
+        oldDelegate.tongueProgress != tongueProgress ||
+        oldDelegate.invalidLungeOffset != invalidLungeOffset;
   }
 }

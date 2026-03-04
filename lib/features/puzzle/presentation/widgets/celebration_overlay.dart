@@ -5,6 +5,8 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/utils/date_utils.dart';
+import '../../../../core/utils/motion.dart';
+import '../../../../shared/widgets/spring_button.dart';
 import '../../../sharing/domain/share_card_generator.dart';
 
 class CelebrationOverlay extends StatefulWidget {
@@ -35,6 +37,17 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
   late final Animation<double> _cardScale;
   late final Animation<double> _cardSlide;
   late final ConfettiController _confettiController;
+  late final ConfettiController _confettiBottomController;
+
+  // Phase 8: Trophy bounce
+  late final AnimationController _trophyController;
+  late final Animation<double> _trophyScale;
+
+  // Phase 8: Staggered stat reveals
+  late final AnimationController _statsController;
+
+  // Phase 8: Score count-up
+  late final AnimationController _countUpController;
 
   @override
   void initState() {
@@ -49,7 +62,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
     );
 
-    // Card entrance (bounce in from bottom)
+    // Card entrance with spring feel
     _cardController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -64,9 +77,35 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
       ),
     );
 
-    // Confetti
+    // Confetti — top burst
     _confettiController = ConfettiController(
       duration: const Duration(seconds: 3),
+    );
+
+    // Confetti — bottom upward burst (Phase 8)
+    _confettiBottomController = ConfettiController(
+      duration: const Duration(seconds: 2),
+    );
+
+    // Phase 8: Trophy bounce
+    _trophyController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _trophyScale = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _trophyController, curve: Curves.elasticOut),
+    );
+
+    // Phase 8: Stats stagger
+    _statsController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+
+    // Phase 8: Score count-up
+    _countUpController = AnimationController(
+      duration: const Duration(milliseconds: AppSizes.scoreCountUpMs),
+      vsync: this,
     );
 
     // Start animations
@@ -75,7 +114,17 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
       if (mounted) {
         _cardController.forward();
         _confettiController.play();
+        _confettiBottomController.play();
       }
+    });
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) {
+        _statsController.forward();
+        _countUpController.forward();
+      }
+    });
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _trophyController.forward();
     });
   }
 
@@ -84,12 +133,28 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
     _fadeController.dispose();
     _cardController.dispose();
     _confettiController.dispose();
+    _confettiBottomController.dispose();
+    _trophyController.dispose();
+    _statsController.dispose();
+    _countUpController.dispose();
     super.dispose();
+  }
+
+  /// Stagger helper: returns 0-1 for an element that appears at [delayMs]
+  /// within the stats controller timeline.
+  double _staggeredValue(int delayMs) {
+    final totalMs = 1200.0;
+    final start = delayMs / totalMs;
+    final end = (delayMs + AppSizes.statRevealStaggerMs) / totalMs;
+    if (_statsController.value < start) return 0.0;
+    if (_statsController.value > end) return 1.0;
+    return ((_statsController.value - start) / (end - start)).clamp(0.0, 1.0);
   }
 
   @override
   Widget build(BuildContext context) {
     final underPar = widget.timeSeconds <= widget.parTimeSeconds;
+    final reduceMotion = MotionUtils.shouldReduceMotion(context);
 
     return Stack(
       children: [
@@ -114,14 +179,14 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
           ),
         ),
 
-        // Confetti
+        // Confetti — top
         Align(
           alignment: Alignment.topCenter,
           child: ConfettiWidget(
             confettiController: _confettiController,
             blastDirectionality: BlastDirectionality.explosive,
             shouldLoop: false,
-            numberOfParticles: 40,
+            numberOfParticles: 30,
             maxBlastForce: 30,
             minBlastForce: 10,
             emissionFrequency: 0.06,
@@ -133,6 +198,28 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
               AppColors.success,
               AppColors.streakGold,
               Colors.white,
+              AppColors.pathAmber,
+            ],
+          ),
+        ),
+
+        // Phase 8: Confetti — bottom upward burst
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: ConfettiWidget(
+            confettiController: _confettiBottomController,
+            blastDirection: -3.14159 / 2, // upward
+            shouldLoop: false,
+            numberOfParticles: 30,
+            maxBlastForce: 25,
+            minBlastForce: 8,
+            emissionFrequency: 0.05,
+            gravity: 0.3,
+            colors: const [
+              AppColors.pathYellowBright,
+              AppColors.pathOrange,
+              AppColors.purpleLight,
+              AppColors.streakGold,
               AppColors.pathAmber,
             ],
           ),
@@ -165,6 +252,10 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                   parTimeSeconds: widget.parTimeSeconds,
                   gridSize: widget.gridSize,
                   difficulty: widget.difficulty,
+                  trophyScale: reduceMotion ? 1.0 : _trophyScale.value,
+                  countUpValue: reduceMotion ? 1.0 : _countUpController.value,
+                  staggeredValue: reduceMotion ? (_) => 1.0 : _staggeredValue,
+                  statsAnimation: _statsController,
                 ),
               ),
             ),
@@ -183,6 +274,10 @@ class _CelebrationCard extends StatelessWidget {
     required this.parTimeSeconds,
     required this.gridSize,
     required this.difficulty,
+    required this.trophyScale,
+    required this.countUpValue,
+    required this.staggeredValue,
+    required this.statsAnimation,
   });
 
   final bool underPar;
@@ -191,9 +286,16 @@ class _CelebrationCard extends StatelessWidget {
   final int parTimeSeconds;
   final int gridSize;
   final String difficulty;
+  final double trophyScale;
+  final double countUpValue;
+  final double Function(int delayMs) staggeredValue;
+  final Animation<double> statsAnimation;
 
   @override
   Widget build(BuildContext context) {
+    // Phase 8: Count-up display time
+    final displayTime = (timeSeconds * countUpValue).round();
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
@@ -211,113 +313,186 @@ class _CelebrationCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSizes.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Title
-            Text(
-              underPar ? 'Crushed It!' : 'Puzzle Complete!',
-              style: TextStyle(
-                color: underPar ? AppColors.streakGold : AppColors.textPrimaryDark,
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
+        child: AnimatedBuilder(
+          animation: statsAnimation,
+          builder: (context, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Title
+              Text(
+                underPar ? 'Crushed It!' : 'Puzzle Complete!',
+                style: TextStyle(
+                  color:
+                      underPar ? AppColors.streakGold : AppColors.textPrimaryDark,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSizes.xs),
+              const SizedBox(height: AppSizes.xs),
 
-            // Trophy icon
-            Icon(
-              underPar ? Icons.emoji_events_rounded : Icons.check_circle_rounded,
-              size: 40,
-              color: underPar ? AppColors.streakGold : AppColors.success,
-            ),
-            const SizedBox(height: AppSizes.md),
+              // Phase 8: Trophy icon with bounce-in
+              Transform.scale(
+                scale: trophyScale,
+                child: Icon(
+                  underPar
+                      ? Icons.emoji_events_rounded
+                      : Icons.check_circle_rounded,
+                  size: 40,
+                  color: underPar ? AppColors.streakGold : AppColors.success,
+                ),
+              ),
+              const SizedBox(height: AppSizes.md),
 
-            // Stats row
-            Row(
-              children: [
-                Expanded(
-                  child: _StatPill(
-                    label: '${gridSize}x$gridSize · ${difficulty[0].toUpperCase()}${difficulty.substring(1)}',
+              // Phase 8: Staggered stat reveals — grid pill at 0ms
+              _StaggeredReveal(
+                progress: staggeredValue(0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _StatPill(
+                        label:
+                            '${gridSize}x$gridSize · ${difficulty[0].toUpperCase()}${difficulty.substring(1)}',
+                      ),
+                    ),
+                    const SizedBox(width: AppSizes.sm),
+                    // Time at 200ms stagger
+                    Expanded(
+                      child: _StaggeredReveal(
+                        progress: staggeredValue(200),
+                        child: _StatPill(
+                          label: AppDateUtils.formatTime(displayTime),
+                          icon: Icons.timer_rounded,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSizes.sm),
+
+              // Par comparison at 400ms stagger
+              if (underPar)
+                _StaggeredReveal(
+                  progress: staggeredValue(400),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsetsDirectional.symmetric(
+                      vertical: AppSizes.sm,
+                      horizontal: AppSizes.md,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                      border: Border.all(
+                        color: AppColors.purpleLight.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Text(
+                      'Under par by ${AppDateUtils.formatTime(parTimeSeconds - timeSeconds)}!',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.purpleLight,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(width: AppSizes.sm),
-                Expanded(
-                  child: _StatPill(
-                    label: AppDateUtils.formatTime(timeSeconds),
-                    icon: Icons.timer_rounded,
+
+              if (hintsUsed > 0) ...[
+                const SizedBox(height: AppSizes.sm),
+                _StaggeredReveal(
+                  progress: staggeredValue(600),
+                  child: Text(
+                    '$hintsUsed hint${hintsUsed == 1 ? '' : 's'} used',
+                    style: TextStyle(
+                      color: AppColors.textSecondaryDark,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: AppSizes.sm),
 
-            // Par comparison
-            if (underPar)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsetsDirectional.symmetric(
-                  vertical: AppSizes.sm,
-                  horizontal: AppSizes.md,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                  border: Border.all(
-                    color: AppColors.purpleLight.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Text(
-                  'Under par by ${AppDateUtils.formatTime(parTimeSeconds - timeSeconds)}!',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.purpleLight,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+              const SizedBox(height: AppSizes.lg),
 
-            if (hintsUsed > 0) ...[
-              const SizedBox(height: AppSizes.sm),
-              Text(
-                '$hintsUsed hint${hintsUsed == 1 ? '' : 's'} used',
-                style: TextStyle(
-                  color: AppColors.textSecondaryDark,
-                  fontSize: 13,
+              // Buttons at 800ms stagger
+              _StaggeredReveal(
+                progress: staggeredValue(800),
+                child: Column(
+                  children: [
+                    // Share button — purple gradient with spring
+                    _GradientButton(
+                      label: 'Share Result',
+                      icon: Icons.share_rounded,
+                      onPressed: () {
+                        final text = ShareCardGenerator.buildShareText(
+                          timeSeconds: timeSeconds,
+                          hintsUsed: hintsUsed,
+                          gridSize: gridSize,
+                          difficulty: difficulty,
+                          underPar: underPar,
+                        );
+                        Share.share(text);
+                      },
+                    ),
+                    const SizedBox(height: AppSizes.sm),
+
+                    // Done button — outlined
+                    SizedBox(
+                      width: double.infinity,
+                      child: SpringButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Container(
+                          height: AppSizes.minTouchTarget,
+                          decoration: BoxDecoration(
+                            borderRadius:
+                                BorderRadius.circular(AppSizes.radiusXl),
+                            border: Border.all(
+                              color: AppColors.textSecondaryDark
+                                  .withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Done',
+                              style: TextStyle(
+                                color: AppColors.textPrimaryDark,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
-
-            const SizedBox(height: AppSizes.lg),
-
-            // Share button — purple gradient
-            _GradientButton(
-              label: 'Share Result',
-              icon: Icons.share_rounded,
-              onPressed: () {
-                final text = ShareCardGenerator.buildShareText(
-                  timeSeconds: timeSeconds,
-                  hintsUsed: hintsUsed,
-                  gridSize: gridSize,
-                  difficulty: difficulty,
-                  underPar: underPar,
-                );
-                Share.share(text);
-              },
-            ),
-            const SizedBox(height: AppSizes.sm),
-
-            // Done button — outlined
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Done'),
-              ),
-            ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// Phase 8: Slide-up + fade-in reveal for staggered stats.
+class _StaggeredReveal extends StatelessWidget {
+  const _StaggeredReveal({
+    required this.progress,
+    required this.child,
+  });
+
+  final double progress;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: progress.clamp(0.0, 1.0),
+      child: Transform.translate(
+        offset: Offset(0, 20 * (1.0 - progress)),
+        child: child,
       ),
     );
   }
@@ -378,8 +553,8 @@ class _GradientButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
+    return SpringButton(
+      onPressed: onPressed,
       child: Container(
         width: double.infinity,
         height: AppSizes.minTouchTarget + 8,

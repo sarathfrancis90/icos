@@ -18,15 +18,16 @@ void main() {
 
         expect(find.text('Welcome to Icos'), findsOneWidget);
         expect(
-          find.textContaining('Draw a continuous path'),
+          find.textContaining('Guide the snake'),
           findsOneWidget,
         );
       });
 
-      testWidgets('shows route icon on first page', (tester) async {
+      testWidgets('shows animated illustration on first page', (tester) async {
         await tester.pumpWidget(buildOnboardingScreen());
 
-        expect(find.byIcon(Icons.route_rounded), findsOneWidget);
+        // Animated illustrations use CustomPaint instead of Icon widgets
+        expect(find.byType(CustomPaint), findsWidgets);
       });
 
       testWidgets('has 3 pages total', (tester) async {
@@ -168,23 +169,26 @@ void main() {
       });
     });
 
-    group('Icons per page', () {
-      testWidgets('first page has route icon', (tester) async {
+    group('Illustrations per page', () {
+      testWidgets('first page has animated illustration', (tester) async {
         await tester.pumpWidget(buildOnboardingScreen());
 
-        expect(find.byIcon(Icons.route_rounded), findsOneWidget);
+        // Animated illustrations use CustomPaint instead of Icon widgets
+        expect(find.byType(CustomPaint), findsWidgets);
+        expect(find.text('Welcome to Icos'), findsOneWidget);
       });
 
-      testWidgets('second page has calendar icon', (tester) async {
+      testWidgets('second page has animated illustration', (tester) async {
         await tester.pumpWidget(buildOnboardingScreen());
 
         await tester.tap(find.text('Next'));
         await tester.pumpAndSettle();
 
-        expect(find.byIcon(Icons.calendar_today_rounded), findsOneWidget);
+        expect(find.byType(CustomPaint), findsWidgets);
+        expect(find.text('One Puzzle Per Day'), findsOneWidget);
       });
 
-      testWidgets('third page has group icon', (tester) async {
+      testWidgets('third page has animated illustration', (tester) async {
         await tester.pumpWidget(buildOnboardingScreen());
 
         await tester.tap(find.text('Next'));
@@ -192,7 +196,8 @@ void main() {
         await tester.tap(find.text('Next'));
         await tester.pumpAndSettle();
 
-        expect(find.byIcon(Icons.group_rounded), findsOneWidget);
+        expect(find.byType(CustomPaint), findsWidgets);
+        expect(find.text('Compete with Friends'), findsOneWidget);
       });
     });
 

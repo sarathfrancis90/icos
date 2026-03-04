@@ -45,6 +45,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
         final group = groups.where((g) => g.id == widget.groupId).firstOrNull;
         if (group == null) {
           return Scaffold(
+            backgroundColor: AppColors.deepBlack,
             appBar: AppBar(),
             body: const Center(child: Text('Group not found')),
           );
@@ -52,10 +53,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
         return _buildContent(context, theme, group);
       },
       loading: () => Scaffold(
+        backgroundColor: AppColors.deepBlack,
         appBar: AppBar(),
         body: const Center(child: CircularProgressIndicator(color: AppColors.purpleLight)),
       ),
       error: (error, _) => Scaffold(
+        backgroundColor: AppColors.deepBlack,
         appBar: AppBar(),
         body: Center(child: Text('Error: $error')),
       ),
@@ -64,6 +67,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
 
   Widget _buildContent(BuildContext context, ThemeData theme, Group group) {
     return Scaffold(
+      backgroundColor: AppColors.deepBlack,
       appBar: AppBar(
         title: Text(group.name),
         actions: [
