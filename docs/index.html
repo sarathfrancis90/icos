@@ -2,10 +2,700 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0;url=privacy-policy.html">
-    <title>Icos</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icos - Daily Path Puzzle Game</title>
+    <meta name="description" content="Draw a path, connect the waypoints, fill every cell. One puzzle a day. Compete with friends.">
+    <meta property="og:title" content="Icos - Daily Path Puzzle Game">
+    <meta property="og:description" content="Draw a path, connect the waypoints, fill every cell. One puzzle a day.">
+    <meta property="og:image" content="https://sarathfrancis90.github.io/icos/app_icon.png">
+    <meta property="og:url" content="https://sarathfrancis90.github.io/icos/">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" type="image/png" href="app_icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --deep-black: #0A0E14;
+            --dark-surface: #141A24;
+            --card-surface: #1A2232;
+            --elevated: #1F2A3C;
+            --purple-light: #B388FF;
+            --purple-primary: #9C27B0;
+            --purple-deep: #7B1FA2;
+            --purple-glow: rgba(156, 39, 176, 0.25);
+            --orange: #FF6D00;
+            --amber: #FF9100;
+            --yellow: #FFBF00;
+            --yellow-bright: #FFD740;
+            --text-primary: #F1F5F9;
+            --text-secondary: #8899AA;
+            --text-tertiary: #7A8B9D;
+            --success: #22C55E;
+            --cell-border: #2A3548;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--deep-black);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* ── Ambient background ───────────────────── */
+        .bg-glow {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .bg-glow::before {
+            content: '';
+            position: absolute;
+            width: 600px; height: 600px;
+            top: -200px; left: -100px;
+            background: radial-gradient(circle, rgba(156,39,176,0.12) 0%, transparent 70%);
+            animation: drift 20s ease-in-out infinite;
+        }
+        .bg-glow::after {
+            content: '';
+            position: absolute;
+            width: 500px; height: 500px;
+            bottom: -150px; right: -100px;
+            background: radial-gradient(circle, rgba(255,109,0,0.08) 0%, transparent 70%);
+            animation: drift 25s ease-in-out infinite reverse;
+        }
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(80px, 40px); }
+        }
+
+        /* ── Navigation ───────────────────────────── */
+        nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 100;
+            padding: 16px 24px;
+            background: rgba(10, 14, 20, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(42, 53, 72, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+        .nav-brand img {
+            width: 36px; height: 36px;
+            border-radius: 8px;
+        }
+        .nav-brand span {
+            font-size: 20px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--purple-light), var(--yellow-bright));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .nav-links { display: flex; gap: 28px; align-items: center; }
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--text-primary); }
+        .nav-cta {
+            background: linear-gradient(135deg, #AB47BC, #7B1FA2);
+            color: white !important;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600 !important;
+            transition: transform 0.2s, box-shadow 0.2s !important;
+        }
+        .nav-cta:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px var(--purple-glow);
+        }
+
+        /* ── Hero ─────────────────────────────────── */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 24px 80px;
+            position: relative;
+        }
+        .hero-inner {
+            max-width: 1100px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+        .hero-text { max-width: 500px; }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            color: var(--success);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .hero-badge::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+        h1 {
+            font-size: clamp(40px, 6vw, 64px);
+            font-weight: 900;
+            line-height: 1.05;
+            letter-spacing: -1.5px;
+            margin-bottom: 20px;
+        }
+        h1 .gradient {
+            background: linear-gradient(135deg, var(--purple-light), var(--yellow-bright));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-sub {
+            font-size: 18px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            margin-bottom: 36px;
+        }
+        .hero-buttons { display: flex; gap: 14px; flex-wrap: wrap; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 28px;
+            font-size: 15px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.25s;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #AB47BC, #7B1FA2);
+            color: white;
+            box-shadow: 0 4px 20px var(--purple-glow);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(156,39,176,0.4);
+        }
+        .btn-secondary {
+            background: var(--card-surface);
+            color: var(--text-primary);
+            border: 1px solid var(--cell-border);
+        }
+        .btn-secondary:hover {
+            background: var(--elevated);
+            transform: translateY(-2px);
+        }
+        .btn svg { width: 20px; height: 20px; }
+
+        /* Phone mockup */
+        .hero-visual {
+            display: flex;
+            justify-content: center;
+            position: relative;
+        }
+        .phone-frame {
+            position: relative;
+            width: 280px;
+        }
+        .phone-frame img {
+            width: 100%;
+            border-radius: 32px;
+            box-shadow:
+                0 0 0 8px var(--dark-surface),
+                0 0 0 10px var(--cell-border),
+                0 20px 60px rgba(0,0,0,0.5),
+                0 0 80px var(--purple-glow);
+        }
+        .phone-frame::before {
+            content: '';
+            position: absolute;
+            inset: -40px;
+            background: radial-gradient(circle, rgba(255,145,0,0.08) 0%, transparent 60%);
+            z-index: -1;
+        }
+        .phone-secondary {
+            position: absolute;
+            width: 220px;
+            right: -40px;
+            bottom: -30px;
+        }
+        .phone-secondary img {
+            width: 100%;
+            border-radius: 26px;
+            box-shadow:
+                0 0 0 6px var(--dark-surface),
+                0 0 0 8px var(--cell-border),
+                0 16px 40px rgba(0,0,0,0.5);
+        }
+
+        /* ── Section styling ──────────────────────── */
+        section { padding: 100px 24px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .section-label {
+            display: inline-block;
+            color: var(--purple-light);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+        h2 {
+            font-size: clamp(28px, 4vw, 42px);
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+        }
+        .section-desc {
+            color: var(--text-secondary);
+            font-size: 17px;
+            max-width: 540px;
+            margin-bottom: 48px;
+        }
+
+        /* ── How it works ─────────────────────────── */
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+        .step-card {
+            background: var(--card-surface);
+            border: 1px solid var(--cell-border);
+            border-radius: 16px;
+            padding: 32px 24px;
+            position: relative;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+        .step-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--purple-light);
+        }
+        .step-num {
+            position: absolute;
+            top: -16px;
+            left: 24px;
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, var(--orange), var(--yellow));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--deep-black);
+        }
+        .step-icon {
+            font-size: 36px;
+            margin-bottom: 16px;
+        }
+        .step-card h3 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .step-card p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* ── Features ─────────────────────────────── */
+        #features { background: var(--dark-surface); }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        .feature-card {
+            background: var(--card-surface);
+            border: 1px solid var(--cell-border);
+            border-radius: 16px;
+            padding: 28px;
+            display: flex;
+            gap: 16px;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+        .feature-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(179, 136, 255, 0.3);
+        }
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+        .feature-icon.purple { background: rgba(156,39,176,0.15); }
+        .feature-icon.orange { background: rgba(255,109,0,0.15); }
+        .feature-icon.green { background: rgba(34,197,94,0.15); }
+        .feature-icon.gold { background: rgba(255,215,0,0.15); }
+        .feature-content h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .feature-content p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* ── Screenshots ──────────────────────────── */
+        .screenshots-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .screenshot-item {
+            width: 200px;
+            flex-shrink: 0;
+            transition: transform 0.3s;
+        }
+        .screenshot-item:hover { transform: scale(1.03); }
+        .screenshot-item img {
+            width: 100%;
+            border-radius: 20px;
+            box-shadow:
+                0 0 0 4px var(--dark-surface),
+                0 0 0 5px var(--cell-border),
+                0 12px 40px rgba(0,0,0,0.4);
+        }
+        .screenshot-item .caption {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--text-tertiary);
+            font-weight: 500;
+        }
+
+        /* ── CTA ──────────────────────────────────── */
+        .cta-section {
+            text-align: center;
+            padding: 80px 24px 100px;
+        }
+        .cta-card {
+            max-width: 600px;
+            margin: 0 auto;
+            background: linear-gradient(135deg, rgba(156,39,176,0.1), rgba(255,109,0,0.05));
+            border: 1px solid rgba(179, 136, 255, 0.15);
+            border-radius: 24px;
+            padding: 56px 40px;
+        }
+        .cta-card h2 { margin-bottom: 12px; }
+        .cta-card p {
+            color: var(--text-secondary);
+            font-size: 16px;
+            margin-bottom: 32px;
+        }
+        .cta-buttons { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+        /* ── Footer ───────────────────────────────── */
+        footer {
+            background: var(--dark-surface);
+            border-top: 1px solid var(--cell-border);
+            padding: 40px 24px;
+        }
+        .footer-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .footer-brand img { width: 28px; height: 28px; border-radius: 6px; }
+        .footer-brand span { font-weight: 700; font-size: 16px; }
+        .footer-links { display: flex; gap: 24px; }
+        .footer-links a {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+        .footer-links a:hover { color: var(--text-primary); }
+        .footer-copy {
+            color: var(--text-tertiary);
+            font-size: 12px;
+        }
+
+        /* ── Responsive ───────────────────────────── */
+        @media (max-width: 768px) {
+            .hero-inner {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: 40px;
+            }
+            .hero-text { max-width: 100%; }
+            .hero-buttons { justify-content: center; }
+            .hero-visual { order: -1; }
+            .phone-frame { width: 220px; }
+            .phone-secondary { width: 170px; right: -20px; bottom: -20px; }
+            .steps-grid { grid-template-columns: 1fr; }
+            .features-grid { grid-template-columns: 1fr; }
+            .nav-links { display: none; }
+            .screenshot-item { width: 160px; }
+            .footer-inner { flex-direction: column; text-align: center; }
+        }
+
+        /* ── Animations ───────────────────────────── */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
 </head>
 <body>
-    <p><a href="privacy-policy.html">Privacy Policy</a></p>
+    <div class="bg-glow"></div>
+
+    <!-- Navigation -->
+    <nav>
+        <a href="#" class="nav-brand">
+            <img src="app_icon.png" alt="Icos icon">
+            <span>Icos</span>
+        </a>
+        <div class="nav-links">
+            <a href="#how-it-works">How It Works</a>
+            <a href="#features">Features</a>
+            <a href="#screenshots">Screenshots</a>
+            <a href="#download" class="nav-cta">Download</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-inner">
+            <div class="hero-text fade-in">
+                <div class="hero-badge">New Daily Puzzle</div>
+                <h1>Feed the Path.<br><span class="gradient">Crush the Grid.</span></h1>
+                <p class="hero-sub">Draw a continuous path through the grid, connect numbered waypoints in order, and fill every cell. One fresh puzzle every day. Compete with friends. Build your streak.</p>
+                <div class="hero-buttons">
+                    <a href="#download" class="btn btn-primary">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                        App Store
+                    </a>
+                    <a href="#download" class="btn btn-secondary">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23L12 13.77 20.83 23 22 21.75l-9.12-9.43L22 2.25 20.83 1 12 10.23 3.18 1 2 2.25l9.12 9.43v.64L2 21.75z"/><path d="M12 13.77L3.18 23l-.71-.73L12 12.79l9.53 9.48-.7.73z"/></svg>
+                        Google Play
+                    </a>
+                </div>
+            </div>
+            <div class="hero-visual fade-in">
+                <div class="phone-frame">
+                    <img src="screen_gameplay.png" alt="Icos puzzle gameplay showing a snake path through the grid">
+                </div>
+                <div class="phone-secondary">
+                    <img src="screen_celebration.png" alt="Icos celebration screen with confetti">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section id="how-it-works">
+        <div class="container">
+            <div class="fade-in">
+                <span class="section-label">How It Works</span>
+                <h2>Simple to learn. Satisfying to master.</h2>
+                <p class="section-desc">Every day brings a new grid puzzle. The rules are simple, but finding the path takes real thought.</p>
+            </div>
+            <div class="steps-grid">
+                <div class="step-card fade-in">
+                    <div class="step-num">1</div>
+                    <div class="step-icon">&#9312;</div>
+                    <h3>Start at Waypoint 1</h3>
+                    <p>Tap the first waypoint and begin drawing your path through the grid. Swipe or tap adjacent cells to extend it.</p>
+                </div>
+                <div class="step-card fade-in">
+                    <div class="step-num">2</div>
+                    <div class="step-icon">&#128268;</div>
+                    <h3>Connect in Order</h3>
+                    <p>Visit each numbered waypoint in sequence. Plan ahead &mdash; you need to fill every cell while hitting every checkpoint.</p>
+                </div>
+                <div class="step-card fade-in">
+                    <div class="step-num">3</div>
+                    <div class="step-icon">&#127942;</div>
+                    <h3>Fill Every Cell</h3>
+                    <p>Complete the grid with no empty cells left. Beat the par time, share your result, and climb the leaderboard.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features">
+        <div class="container">
+            <div class="fade-in">
+                <span class="section-label">Features</span>
+                <h2>Built for puzzle lovers.</h2>
+                <p class="section-desc">Everything you need for your daily brain workout, nothing you don't.</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card fade-in">
+                    <div class="feature-icon purple">&#128197;</div>
+                    <div class="feature-content">
+                        <h3>One Puzzle Per Day</h3>
+                        <p>Same puzzle for everyone, worldwide. Monday is easy, Sunday is hard. Build anticipation for each new challenge.</p>
+                    </div>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon orange">&#128293;</div>
+                    <div class="feature-content">
+                        <h3>Daily Streaks</h3>
+                        <p>Keep your streak alive with daily solves. Use streak freezes when life gets in the way. Track your longest run.</p>
+                    </div>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon green">&#128101;</div>
+                    <div class="feature-content">
+                        <h3>Groups & Leaderboards</h3>
+                        <p>Create groups with friends and family. Compare solve times on daily and weekly leaderboards. Who's the fastest?</p>
+                    </div>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon gold">&#128161;</div>
+                    <div class="feature-content">
+                        <h3>Hints When You Need Them</h3>
+                        <p>Stuck? Use a hint to reveal the next waypoint. Three hints per puzzle, use them wisely.</p>
+                    </div>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon purple">&#127912;</div>
+                    <div class="feature-content">
+                        <h3>Dark Immersive Theme</h3>
+                        <p>A premium dark gaming aesthetic with glowing paths, ambient particles, and satisfying animations. Looks stunning at night.</p>
+                    </div>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon orange">&#128246;</div>
+                    <div class="feature-content">
+                        <h3>Works Offline</h3>
+                        <p>Puzzles are pre-cached so you can play anywhere. No wifi? No problem. Your results sync when you're back online.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Screenshots -->
+    <section id="screenshots">
+        <div class="container">
+            <div class="fade-in" style="text-align:center;">
+                <span class="section-label">Screenshots</span>
+                <h2>See it in action.</h2>
+                <p class="section-desc" style="margin-left:auto; margin-right:auto;">From the first tap to the celebration screen, every moment is crafted.</p>
+            </div>
+            <div class="screenshots-row fade-in">
+                <div class="screenshot-item">
+                    <img src="screen_home.png" alt="Home screen with today's puzzle card and Play button">
+                    <div class="caption">Today's Puzzle</div>
+                </div>
+                <div class="screenshot-item">
+                    <img src="screen_puzzle.png" alt="Puzzle grid with numbered waypoints ready to solve">
+                    <div class="caption">Start the puzzle</div>
+                </div>
+                <div class="screenshot-item">
+                    <img src="screen_gameplay.png" alt="Snake path being drawn through the grid with neon glow">
+                    <div class="caption">Feed the path</div>
+                </div>
+                <div class="screenshot-item">
+                    <img src="screen_celebration.png" alt="Celebration screen with confetti and score">
+                    <div class="caption">Crushed it!</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section" id="download">
+        <div class="cta-card fade-in">
+            <h2>Ready to play?</h2>
+            <p>Download Icos and start your streak today. Free to play, no ads.</p>
+            <div class="cta-buttons">
+                <a href="#" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                    App Store
+                </a>
+                <a href="#" class="btn btn-secondary">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M3.18 23L12 13.77 20.83 23 22 21.75l-9.12-9.43L22 2.25 20.83 1 12 10.23 3.18 1 2 2.25l9.12 9.43v.64L2 21.75z"/></svg>
+                    Google Play
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <img src="app_icon.png" alt="Icos">
+                <span>Icos</span>
+            </div>
+            <div class="footer-links">
+                <a href="privacy-policy.html">Privacy Policy</a>
+                <a href="mailto:sarathfrancis90@gmail.com">Contact</a>
+            </div>
+            <div class="footer-copy">&copy; 2026 Icos. All rights reserved.</div>
+        </div>
+    </footer>
+
+    <!-- Scroll animations -->
+    <script>
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+        document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+    </script>
 </body>
 </html>
