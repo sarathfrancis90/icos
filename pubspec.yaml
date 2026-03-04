@@ -1,7 +1,7 @@
 name: icos
 description: "Icos - Feed the Path. A daily snake puzzle game."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.11.1
