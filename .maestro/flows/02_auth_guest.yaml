@@ -1,0 +1,37 @@
+# Flow 02: Anonymous Auto-Login
+# Verifies the app auto-signs in anonymously after onboarding.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# Skip through onboarding
+- tapOn: "Skip"
+- waitForAnimationToEnd
+
+# Should be on home screen now (auto-signed in as anonymous)
+- assertVisible: "Icos"
+- assertVisible: "Today's Puzzle"
+- assertVisible: "Play"
+- takeScreenshot: 02_auth/home_auto_signed_in
+
+# Verify bottom nav
+- assertVisible:
+    text: "Home\nTab 1 of 4"
+- assertVisible:
+    text: "Groups\nTab 2 of 4"
+- assertVisible:
+    text: "Stats\nTab 3 of 4"
+- assertVisible:
+    text: "Profile\nTab 4 of 4"
+- takeScreenshot: 02_auth/bottom_nav_visible
+
+# Verify guest status on profile
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- assertVisible: "Create Account"
+- takeScreenshot: 02_auth/profile_guest_state

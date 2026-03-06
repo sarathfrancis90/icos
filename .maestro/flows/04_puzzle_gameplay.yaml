@@ -1,0 +1,81 @@
+# Flow 04: Puzzle Gameplay
+# Tests the core puzzle experience: grid rendering, waypoints, walls, controls.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# -- Start puzzle --
+- tapOn: "Play"
+- waitForAnimationToEnd
+- takeScreenshot: 04_puzzle/puzzle_screen_initial
+
+# -- Verify puzzle elements --
+- assertVisible: "00:00"
+- assertVisible:
+    text: ".*Hard"
+- assertVisible:
+    text: "Par.*"
+- takeScreenshot: 04_puzzle/timer_and_info_bar
+
+# -- Game Controls --
+- assertVisible:
+    text: "Reset.*"
+- assertVisible:
+    text: "Hint.*"
+- assertVisible: "Undo"
+- takeScreenshot: 04_puzzle/game_controls_bar
+
+# -- Verify grid cells are accessible --
+- assertVisible:
+    text: "Row 6, Column 3, waypoint 1"
+- takeScreenshot: 04_puzzle/waypoint1_visible
+
+# -- Tap waypoint 1 to start the path --
+- tapOn:
+    text: "Row 6, Column 3, waypoint 1"
+- waitForAnimationToEnd
+- takeScreenshot: 04_puzzle/after_tap_waypoint1
+
+# -- Tap adjacent cell to draw path --
+- tapOn:
+    text: "Row 6, Column 2, empty"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 04_puzzle/after_second_cell
+
+# -- Tap more cells to extend path --
+- tapOn:
+    text: "Row 6, Column 1, empty"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Row 5, Column 1, empty"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 04_puzzle/path_extended
+
+# -- Test Hint button --
+- tapOn:
+    text: "Hint.*"
+- waitForAnimationToEnd
+- takeScreenshot: 04_puzzle/after_hint
+
+# -- Test Undo button --
+- tapOn: "Undo"
+- waitForAnimationToEnd
+- takeScreenshot: 04_puzzle/after_undo
+
+# -- Test Reset button --
+- tapOn:
+    text: "Reset.*"
+- waitForAnimationToEnd
+- takeScreenshot: 04_puzzle/after_reset
+
+# -- Navigate back to home --
+- tapOn: "Go back"
+- waitForAnimationToEnd
+- takeScreenshot: 04_puzzle/back_to_home

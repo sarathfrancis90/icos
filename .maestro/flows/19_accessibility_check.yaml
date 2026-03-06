@@ -1,0 +1,111 @@
+# Flow 19: Layout Integrity & Stress Test
+# Verifies layouts don't break with rapid navigation and scrolling.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# ====== Home layout check ======
+- takeScreenshot: 19_layout/home_layout
+
+# ====== Puzzle layout check ======
+- tapOn: "Play"
+- waitForAnimationToEnd
+- takeScreenshot: 19_layout/puzzle_layout
+
+# Verify key elements present
+- assertVisible: "Undo"
+- assertVisible:
+    text: "Reset.*"
+- assertVisible:
+    text: "Hint.*"
+- takeScreenshot: 19_layout/puzzle_controls_layout
+
+# Back
+- tapOn: "Go back"
+- waitForAnimationToEnd
+
+# ====== Tab switching stress test ======
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 19_layout/rapid_groups
+
+- tapOn:
+    text: "Stats\nTab 3 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 19_layout/rapid_stats
+
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 19_layout/rapid_profile
+
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 19_layout/rapid_home
+
+# Rapid switches without waiting
+- tapOn:
+    text: "Stats\nTab 3 of 4"
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 19_layout/after_rapid_tab_switching
+
+# ====== Stats deep scroll test ======
+- tapOn:
+    text: "Stats\nTab 3 of 4"
+- waitForAnimationToEnd
+- scroll
+- scroll
+- scroll
+- takeScreenshot: 19_layout/stats_deep_scroll
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- takeScreenshot: 19_layout/stats_scroll_back_up
+
+# ====== Profile scroll test ======
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- scroll
+- scroll
+- takeScreenshot: 19_layout/profile_scrolled_bottom
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- takeScreenshot: 19_layout/profile_scrolled_top
+
+# ====== Final screenshots all tabs ======
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 19_layout/final_home
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 19_layout/final_groups
+- tapOn:
+    text: "Stats\nTab 3 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 19_layout/final_stats
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 19_layout/final_profile

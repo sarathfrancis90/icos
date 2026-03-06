@@ -674,7 +674,7 @@ void main() {
         ),
       );
 
-      expect(capturedTheme.cardTheme.elevation, 1);
+      expect(capturedTheme.cardTheme.elevation, 0);
     });
 
     testWidgets('SnackBar has floating behavior', (tester) async {
@@ -745,7 +745,7 @@ void main() {
       expect(capturedTheme.inputDecorationTheme.filled, isTrue);
       expect(
         capturedTheme.inputDecorationTheme.fillColor,
-        AppColors.lightBackground,
+        AppColors.lightSurface,
       );
     });
 

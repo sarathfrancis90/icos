@@ -167,18 +167,24 @@ abstract final class AppTheme {
           foregroundColor: AppColors.lightOnBackground,
           elevation: 0,
           centerTitle: true,
+          scrolledUnderElevation: 0,
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           backgroundColor: AppColors.lightSurface,
           selectedItemColor: AppColors.purpleDeep,
           unselectedItemColor: AppColors.textSecondaryLight,
           type: BottomNavigationBarType.fixed,
+          elevation: 0,
         ),
         cardTheme: CardThemeData(
           color: AppColors.lightSurface,
-          elevation: 1,
+          elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            side: const BorderSide(
+              color: AppColors.lightGridLine,
+              width: 0.5,
+            ),
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
@@ -188,6 +194,12 @@ abstract final class AppTheme {
             minimumSize: const Size(double.infinity, AppSizes.minTouchTarget + 8),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSizes.radiusXl),
+            ),
+            elevation: 0,
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
             ),
           ),
         ),
@@ -199,12 +211,20 @@ abstract final class AppTheme {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSizes.radiusXl),
             ),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: AppColors.lightBackground,
+          fillColor: AppColors.lightSurface,
           border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            borderSide: const BorderSide(color: AppColors.lightGridLine),
+          ),
+          enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
             borderSide: const BorderSide(color: AppColors.lightGridLine),
           ),
@@ -212,6 +232,9 @@ abstract final class AppTheme {
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
             borderSide: const BorderSide(color: AppColors.purpleDeep),
           ),
+          labelStyle: const TextStyle(color: AppColors.textSecondaryLight),
+          hintStyle: TextStyle(color: AppColors.textSecondaryLight),
+          prefixIconColor: AppColors.textSecondaryLight,
           contentPadding: const EdgeInsetsDirectional.symmetric(
             horizontal: AppSizes.md,
             vertical: AppSizes.sm + 4,
@@ -219,13 +242,60 @@ abstract final class AppTheme {
         ),
         dividerTheme: const DividerThemeData(
           color: AppColors.lightGridLine,
-          thickness: 1,
+          thickness: 0.5,
         ),
         snackBarTheme: SnackBarThemeData(
+          backgroundColor: AppColors.lightSurface,
+          contentTextStyle: const TextStyle(color: AppColors.lightOnSurface),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
           ),
           behavior: SnackBarBehavior.floating,
+        ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: AppColors.lightSurface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          ),
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: AppColors.lightSurface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(AppSizes.radiusLg),
+            ),
+          ),
+        ),
+        switchTheme: SwitchThemeData(
+          thumbColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return AppColors.purpleDeep;
+            }
+            return AppColors.textSecondaryLight;
+          }),
+          trackColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return AppColors.purpleLight.withValues(alpha: 0.4);
+            }
+            return AppColors.lightGridLine;
+          }),
+        ),
+        listTileTheme: const ListTileThemeData(
+          iconColor: AppColors.textSecondaryLight,
+          titleTextStyle: TextStyle(
+            color: AppColors.lightOnSurface,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+          subtitleTextStyle: TextStyle(
+            color: AppColors.textSecondaryLight,
+            fontSize: 13,
+          ),
+        ),
+        dropdownMenuTheme: const DropdownMenuThemeData(
+          menuStyle: MenuStyle(
+            backgroundColor: WidgetStatePropertyAll(AppColors.lightSurface),
+          ),
         ),
       );
 

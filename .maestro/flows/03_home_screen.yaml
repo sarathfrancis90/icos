@@ -1,0 +1,35 @@
+# Flow 03: Home Screen
+# Verifies the home screen renders with puzzle card and all elements.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# -- Home Screen --
+- assertVisible: "Icos"
+- assertVisible: "Feed the Path"
+- takeScreenshot: 03_home/home_screen_full
+
+# -- Puzzle Card --
+- assertVisible: "Today's Puzzle"
+- assertVisible: "Play"
+- takeScreenshot: 03_home/puzzle_card_with_play
+
+# -- Puzzle metadata (grid size, difficulty, par time) --
+- assertVisible: "7x7"
+- assertVisible: "Hard"
+- takeScreenshot: 03_home/puzzle_metadata
+
+# -- Bottom Navigation --
+- assertVisible:
+    text: "Home\nTab 1 of 4"
+- assertVisible:
+    text: "Groups\nTab 2 of 4"
+- assertVisible:
+    text: "Stats\nTab 3 of 4"
+- assertVisible:
+    text: "Profile\nTab 4 of 4"
+- takeScreenshot: 03_home/bottom_navigation

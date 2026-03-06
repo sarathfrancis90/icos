@@ -1,0 +1,59 @@
+# Flow 10: Auth - Email Form Visual Audit
+# Tests the email auth form fields, validation states, toggle between modes.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# Navigate to Profile > Create Account > Email
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- tapOn: "Create Account"
+- waitForAnimationToEnd
+- tapOn:
+    text: ".*Email.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 10_email/email_form_create_mode
+
+# -- Enter email --
+- tapOn:
+    text: ".*email.*"
+    optional: true
+- inputText: "test@example.com"
+- takeScreenshot: 10_email/email_entered
+
+# -- Enter password --
+- tapOn:
+    text: ".*assword.*"
+    optional: true
+- inputText: "Test123456"
+# Tap elsewhere to dismiss keyboard instead of hideKeyboard
+- tapOn:
+    point: "50%,15%"
+- waitForAnimationToEnd
+- takeScreenshot: 10_email/password_entered
+
+# -- Toggle to Sign In mode if available --
+- tapOn:
+    text: ".*Sign In.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 10_email/sign_in_mode
+
+# -- Toggle back --
+- tapOn:
+    text: ".*Sign Up.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 10_email/sign_up_mode_again
+
+# -- Back to profile --
+- back
+- waitForAnimationToEnd
+- back
+- waitForAnimationToEnd

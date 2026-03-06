@@ -1,0 +1,29 @@
+# Maestro Visual E2E Audit - Icos
+# Run: maestro test --test-output-dir=maestro-screenshots .maestro/
+appId: com.icos.icos
+
+flows:
+  - "flows/*"
+
+executionOrder:
+  continueOnFailure: true
+  flowsOrder:
+    - 01_onboarding
+    - 02_auth_guest
+    - 03_home_screen
+    - 04_puzzle_gameplay
+    - 05_puzzle_completion
+    - 06_stats_screen
+    - 07_groups_screen
+    - 08_profile_screen
+    - 09_auth_email_signup
+    - 10_auth_email_signin
+    - 11_auth_oauth
+    - 12_theme_light
+    - 13_theme_dark
+    - 14_colorblind_modes
+    - 15_group_create_join
+    - 16_group_detail
+    - 17_error_empty_states
+    - 18_profile_edit
+    - 19_accessibility_check

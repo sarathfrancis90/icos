@@ -34,22 +34,25 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentIndex = _currentIndex(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppColors.deepBlack,
+      backgroundColor: isDark ? AppColors.deepBlack : AppColors.lightBackground,
       body: Stack(
         children: [
-          const Positioned.fill(child: AnimatedBackground()),
-          const Positioned.fill(child: ParticleField()),
+          if (isDark) ...[
+            const Positioned.fill(child: AnimatedBackground()),
+            const Positioned.fill(child: ParticleField()),
+          ],
           child,
         ],
       ),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.navBarBackground,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.navBarBackground : AppColors.lightSurface,
           border: Border(
             top: BorderSide(
-              color: AppColors.cellBorder,
+              color: isDark ? AppColors.cellBorder : AppColors.lightGridLine,
               width: 0.5,
             ),
           ),

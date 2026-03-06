@@ -1,0 +1,44 @@
+# Flow 08: Profile Screen
+# Full audit of profile screen: avatar, guest state, settings, app info.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# Navigate to Profile tab
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+
+# -- Profile header --
+- assertVisible: "Profile"
+- assertVisible: "Create Account"
+- takeScreenshot: 08_profile/profile_screen_top
+
+# -- Settings section --
+- assertVisible: "Settings"
+- assertVisible:
+    text: "Theme\n.*"
+- assertVisible: "Haptic Feedback"
+- assertVisible: "Sound Effects"
+- assertVisible:
+    text: "Colorblind Mode.*"
+- assertVisible: "Notifications"
+- takeScreenshot: 08_profile/settings_section
+
+# -- Scroll to App section --
+- scroll
+- waitForAnimationToEnd
+- assertVisible: "App"
+- assertVisible:
+    text: "About\nVersion.*"
+- takeScreenshot: 08_profile/app_section
+
+# -- Scroll back up --
+- swipe:
+    direction: DOWN
+- waitForAnimationToEnd
+- takeScreenshot: 08_profile/profile_full_view

@@ -1,0 +1,23 @@
+# Flow 16: Group Detail Screen
+# Note: Fresh guest has no groups, so this captures the empty state.
+# The group detail tabs are only reachable with existing group membership.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# Navigate to Groups
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 16_group_detail/groups_no_membership
+
+# Verify empty state is properly displayed
+- assertVisible: "Create Group"
+- assertVisible: "Join Group"
+- assertVisible:
+    text: "Create or join a group.*"
+- takeScreenshot: 16_group_detail/empty_state_verified

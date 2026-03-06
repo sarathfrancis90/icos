@@ -1,0 +1,51 @@
+# Flow 15: Group Create & Join Dialogs
+# Tests group creation and join dialog forms.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# Navigate to Groups
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 15_groups/groups_initial
+
+# ====== Create Group Flow ======
+- tapOn: "Create Group"
+- waitForAnimationToEnd
+- takeScreenshot: 15_groups/create_dialog_empty
+
+# -- Fill in group name (tap the field, enter text, tap done on keyboard) --
+- tapOn:
+    text: ".*roup.*ame.*"
+    optional: true
+- inputText: "Test Puzzle Squad"
+- takeScreenshot: 15_groups/create_name_entered
+
+# Tap "done" on keyboard to dismiss it first
+- pressKey: enter
+- waitForAnimationToEnd
+
+# Now Cancel with keyboard dismissed
+- tapOn: "Cancel"
+- waitForAnimationToEnd
+- takeScreenshot: 15_groups/after_create_cancel
+
+# ====== Join Group Flow ======
+# For anonymous users, tapping Join Group shows upgrade prompt.
+- tapOn:
+    text: "Join Group"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 15_groups/join_group_result
+
+# Dismiss any dialog that appeared
+- tapOn:
+    text: "Cancel"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 15_groups/groups_final

@@ -1,0 +1,76 @@
+# Flow 13: Dark Theme - Full Visual Audit
+# Ensures dark theme is applied and screenshots every screen.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# -- Navigate to Profile to set Dark theme --
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- tapOn:
+    text: "Theme\n.*"
+- waitForAnimationToEnd
+- tapOn:
+    text: "Dark"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 13_dark/profile_dark
+
+# -- Home Screen in Dark --
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 13_dark/home_dark
+
+# -- Stats Screen in Dark --
+- tapOn:
+    text: "Stats\nTab 3 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 13_dark/stats_dark
+- scroll
+- takeScreenshot: 13_dark/stats_dark_scrolled
+
+# -- Groups Screen in Dark --
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 13_dark/groups_dark
+
+# -- Profile Screen full in Dark --
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 13_dark/profile_dark_full
+- scroll
+- takeScreenshot: 13_dark/profile_dark_scrolled
+
+# -- Puzzle in Dark --
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- waitForAnimationToEnd
+- tapOn: "Play"
+- waitForAnimationToEnd
+- takeScreenshot: 13_dark/puzzle_dark
+
+# Draw some path to see dark theme colors
+- tapOn:
+    text: "Row 6, Column 3, waypoint 1"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Row 6, Column 2.*"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Row 6, Column 1.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 13_dark/puzzle_path_dark
+
+- tapOn: "Go back"
+- waitForAnimationToEnd

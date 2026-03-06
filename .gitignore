@@ -71,5 +71,9 @@ test/goldens/failures/
 # OAuth secrets
 Oauth/
 
+# Maestro test output
+maestro-screenshots/
+maestro-report/
+
 # Claude Code
 .claude/projects/

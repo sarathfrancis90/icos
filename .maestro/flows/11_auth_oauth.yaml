@@ -1,0 +1,43 @@
+# Flow 11: OAuth Buttons Visual Check
+# Verifies Google and Apple OAuth buttons render correctly on auth screen.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# Navigate to auth screen via Profile > Create Account
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- tapOn: "Create Account"
+- waitForAnimationToEnd
+- takeScreenshot: 11_oauth/auth_screen_all_buttons
+
+# -- Screenshot each button area --
+- takeScreenshot: 11_oauth/oauth_options_full
+
+# -- Tap Google to see what happens (native dialog or error) --
+- tapOn:
+    text: ".*Google.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 11_oauth/after_google_tap
+
+# Dismiss any dialog
+- back
+- waitForAnimationToEnd
+
+# -- Tap Apple to see what happens --
+- tapOn:
+    text: ".*Apple.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 11_oauth/after_apple_tap
+
+# Dismiss
+- back
+- waitForAnimationToEnd
+- takeScreenshot: 11_oauth/auth_screen_final

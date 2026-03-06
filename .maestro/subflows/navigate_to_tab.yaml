@@ -1,0 +1,10 @@
+# Reusable subflow: Navigate to a bottom tab
+# Usage: runFlow with env.TAB_NAME = "Home" | "Groups" | "Statistics" | "Profile"
+appId: com.icos.icos
+
+---
+
+- tapOn:
+    text: ${TAB_NAME}
+    optional: true
+- waitForAnimationToEnd

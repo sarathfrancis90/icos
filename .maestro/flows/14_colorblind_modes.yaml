@@ -1,0 +1,143 @@
+# Flow 14: Colorblind Mode Visual Audit
+# Tests all 3 colorblind palettes on the puzzle screen.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# -- Navigate to Profile --
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+
+# ====== Deuteranopia (green-blind) ======
+- tapOn:
+    text: "Colorblind Mode.*"
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/selector_sheet
+
+- tapOn:
+    text: ".*Deuteranopia.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/deuteranopia_selected
+
+# Dismiss bottom sheet (back or tap outside)
+- back
+- waitForAnimationToEnd
+
+# See puzzle in deuteranopia
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- waitForAnimationToEnd
+- tapOn: "Play"
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/puzzle_deuteranopia
+
+# Draw path to see colors
+- tapOn:
+    text: "Row 6, Column 3, waypoint 1"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Row 6, Column 2.*"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Row 6, Column 1.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/path_deuteranopia
+
+- tapOn: "Go back"
+- waitForAnimationToEnd
+
+# ====== Protanopia (red-blind) ======
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- tapOn:
+    text: "Colorblind Mode.*"
+- waitForAnimationToEnd
+- tapOn:
+    text: ".*Protanopia.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/protanopia_selected
+
+# Dismiss bottom sheet
+- back
+- waitForAnimationToEnd
+
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- waitForAnimationToEnd
+- tapOn: "Play"
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/puzzle_protanopia
+
+- tapOn:
+    text: "Row 6, Column 3, waypoint 1"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Row 6, Column 2.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/path_protanopia
+
+- tapOn: "Go back"
+- waitForAnimationToEnd
+
+# ====== Tritanopia (blue-blind) ======
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- tapOn:
+    text: "Colorblind Mode.*"
+- waitForAnimationToEnd
+- tapOn:
+    text: ".*Tritanopia.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/tritanopia_selected
+
+# Dismiss bottom sheet
+- back
+- waitForAnimationToEnd
+
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- waitForAnimationToEnd
+- tapOn: "Play"
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/puzzle_tritanopia
+
+- tapOn:
+    text: "Row 6, Column 3, waypoint 1"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Row 6, Column 2.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/path_tritanopia
+
+- tapOn: "Go back"
+- waitForAnimationToEnd
+
+# ====== Reset to None ======
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- tapOn:
+    text: "Colorblind Mode.*"
+- waitForAnimationToEnd
+- tapOn:
+    text: ".*None.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 14_colorblind/reset_to_none

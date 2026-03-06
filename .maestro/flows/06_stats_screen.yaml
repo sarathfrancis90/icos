@@ -1,0 +1,43 @@
+# Flow 06: Stats Screen
+# Verifies all stats elements: streaks, calendar, time distribution.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# Navigate to Stats tab
+- tapOn:
+    text: "Stats\nTab 3 of 4"
+- waitForAnimationToEnd
+
+# -- Stats screen visible --
+- assertVisible: "Statistics"
+- takeScreenshot: 06_stats/stats_screen_top
+
+# -- Verify streak and puzzle data --
+- assertVisible:
+    text: ".*Current Streak.*"
+- assertVisible:
+    text: ".*Longest Streak.*"
+- assertVisible:
+    text: ".*Puzzles Solved.*"
+- takeScreenshot: 06_stats/streak_and_stats_cards
+
+# -- Verify calendar --
+- assertVisible:
+    text: "Last 30 Days.*"
+- takeScreenshot: 06_stats/calendar_section
+
+# -- Scroll down to see more --
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: 06_stats/stats_scrolled_down
+
+# -- Scroll back up --
+- swipe:
+    direction: DOWN
+- waitForAnimationToEnd
+- takeScreenshot: 06_stats/stats_back_to_top

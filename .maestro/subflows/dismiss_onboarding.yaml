@@ -1,0 +1,9 @@
+# Reusable subflow: Skip onboarding if it appears
+appId: com.icos.icos
+
+---
+
+- tapOn:
+    text: "Skip"
+    optional: true
+- waitForAnimationToEnd

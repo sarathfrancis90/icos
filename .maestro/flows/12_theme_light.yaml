@@ -1,0 +1,75 @@
+# Flow 12: Light Theme - Full Visual Audit
+# Switches to light theme and screenshots every screen.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# -- Navigate to Profile to change theme --
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+
+# Tap the Theme setting to open dropdown
+- tapOn:
+    text: "Theme\n.*"
+- waitForAnimationToEnd
+- takeScreenshot: 12_light/theme_dropdown_open
+
+# Select Light
+- tapOn:
+    text: "Light"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 12_light/profile_light_theme
+
+# -- Home Screen in Light --
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 12_light/home_light
+
+# -- Stats Screen in Light --
+- tapOn:
+    text: "Stats\nTab 3 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 12_light/stats_light
+
+# -- Groups Screen in Light --
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 12_light/groups_light
+
+# -- Profile Screen in Light --
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 12_light/profile_light_full
+- scroll
+- takeScreenshot: 12_light/profile_light_scrolled
+
+# -- Puzzle in Light --
+- tapOn:
+    text: "Home\nTab 1 of 4"
+- waitForAnimationToEnd
+- tapOn: "Play"
+- waitForAnimationToEnd
+- takeScreenshot: 12_light/puzzle_light
+
+# Tap a cell to see path color in light theme
+- tapOn:
+    text: "Row 6, Column 3, waypoint 1"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Row 6, Column 2.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 12_light/puzzle_path_light
+
+- tapOn: "Go back"
+- waitForAnimationToEnd

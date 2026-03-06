@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../auth/providers/auth_provider.dart';
+import '../../../core/services/supabase_service.dart';
 import '../domain/models/group.dart';
 import '../providers/groups_provider.dart';
 
@@ -15,7 +15,6 @@ class GroupsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final groupsAsync = ref.watch(myGroupsProvider);
-    final authState = ref.watch(authNotifierProvider);
 
     return SafeArea(
       child: Padding(
@@ -45,7 +44,7 @@ class GroupsScreen extends ConsumerWidget {
                         icon: Icons.group_add_rounded,
                         tooltip: AppStrings.joinGroup,
                         onPressed: () =>
-                            _showJoinGroupDialog(context, ref, authState),
+                            _showJoinGroupDialog(context, ref),
                       ),
                     ],
                   ),
@@ -60,7 +59,7 @@ class GroupsScreen extends ConsumerWidget {
                       onCreateGroup: () =>
                           _showCreateGroupDialog(context, ref),
                       onJoinGroup: () =>
-                          _showJoinGroupDialog(context, ref, authState),
+                          _showJoinGroupDialog(context, ref),
                     );
                   }
                   return _GroupsList(groups: groups);
@@ -175,10 +174,11 @@ class GroupsScreen extends ConsumerWidget {
   Future<void> _showJoinGroupDialog(
     BuildContext context,
     WidgetRef ref,
-    AsyncValue<dynamic> authState,
   ) async {
-    final authNotifier = ref.read(authNotifierProvider.notifier);
-    if (authNotifier.isAnonymous) {
+    // Check anonymous status directly via Supabase (not via provider) to
+    // avoid _dependents.isEmpty assertion from provider rebuild during dialog.
+    final isAnon = SupabaseService.auth.currentUser?.isAnonymous ?? true;
+    if (isAnon) {
       _showUpgradePrompt(context);
       return;
     }
@@ -381,13 +381,16 @@ class _GroupsList extends StatelessWidget {
       itemCount: groups.length,
       itemBuilder: (context, index) {
         final group = groups[index];
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Container(
           margin: const EdgeInsetsDirectional.only(bottom: AppSizes.sm),
           decoration: BoxDecoration(
-            color: AppColors.cardSurface,
+            color: isDark ? AppColors.cardSurface : AppColors.lightSurface,
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
             border: Border.all(
-              color: AppColors.cellBorder.withValues(alpha: 0.3),
+              color: isDark
+                  ? AppColors.cellBorder.withValues(alpha: 0.3)
+                  : AppColors.lightGridLine,
             ),
           ),
           child: ListTile(

@@ -1,0 +1,48 @@
+# Flow 01: Onboarding - First Launch Experience
+# Verifies all 3 onboarding pages render correctly with proper content.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# -- Page 1: Welcome --
+- assertVisible:
+    text: "Welcome to Icos.*"
+- assertVisible: "Skip"
+- assertVisible: "Next"
+- takeScreenshot: 01_onboarding/page1_welcome
+
+# -- Page 2: One Puzzle Per Day --
+- tapOn: "Next"
+- waitForAnimationToEnd
+- assertVisible:
+    text: "One Puzzle Per Day.*"
+- takeScreenshot: 01_onboarding/page2_one_puzzle_per_day
+
+# -- Page 3: Compete with Friends --
+- tapOn: "Next"
+- waitForAnimationToEnd
+- assertVisible:
+    text: "Compete with Friends.*"
+- assertVisible: "Get Started"
+- takeScreenshot: 01_onboarding/page3_compete_with_friends
+
+# -- Test swipe back to page 1 --
+- swipe:
+    direction: RIGHT
+- waitForAnimationToEnd
+- swipe:
+    direction: RIGHT
+- waitForAnimationToEnd
+- assertVisible:
+    text: "Welcome to Icos.*"
+- takeScreenshot: 01_onboarding/page1_after_swipe_back
+
+# -- Skip button takes to home --
+- tapOn: "Skip"
+- waitForAnimationToEnd
+- assertVisible: "Today's Puzzle"
+- takeScreenshot: 01_onboarding/home_after_skip

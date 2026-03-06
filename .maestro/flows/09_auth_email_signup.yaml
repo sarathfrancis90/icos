@@ -1,0 +1,49 @@
+# Flow 09: Auth - Create Account Flow
+# Tests navigating to the auth screen from Profile > Create Account.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# Navigate to Profile
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 09_auth/profile_with_create_account
+
+# Tap Create Account
+- tapOn: "Create Account"
+- waitForAnimationToEnd
+- takeScreenshot: 09_auth/auth_screen
+
+# -- Verify OAuth buttons --
+- assertVisible:
+    text: ".*Google.*"
+    optional: true
+- assertVisible:
+    text: ".*Apple.*"
+    optional: true
+- assertVisible:
+    text: ".*Email.*"
+    optional: true
+- takeScreenshot: 09_auth/auth_options
+
+# -- Go to email auth --
+- tapOn:
+    text: ".*Email.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 09_auth/email_auth_screen
+
+# -- Back to auth --
+- back
+- waitForAnimationToEnd
+- takeScreenshot: 09_auth/back_to_auth
+
+# -- Back to profile --
+- back
+- waitForAnimationToEnd
+- takeScreenshot: 09_auth/back_to_profile

@@ -215,13 +215,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: AppSizes.md),
-        Container(
+        Builder(builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final cardBg = isDark ? AppColors.cardSurface : AppColors.lightSurface;
+          final borderColor = isDark
+              ? AppColors.cellBorder.withValues(alpha: 0.3)
+              : AppColors.lightGridLine;
+          return Container(
           decoration: BoxDecoration(
-            color: AppColors.cardSurface,
+            color: cardBg,
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            border: Border.all(
-              color: AppColors.cellBorder.withValues(alpha: 0.3),
-            ),
+            border: Border.all(color: borderColor),
           ),
           child: Column(
             children: [
@@ -230,13 +234,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 title: const Text('Email'),
                 subtitle: Text(email),
               ),
-              Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
+              const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.person_rounded),
                 title: const Text('Account Type'),
                 subtitle: Text(accountType),
               ),
-              Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
+              const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.calendar_today_rounded),
                 title: const Text('Member Since'),
@@ -244,7 +248,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             ],
           ),
-        ),
+        );
+        }),
       ],
     );
   }
@@ -254,13 +259,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ThemeMode themeMode,
     UserProfile? profile,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? AppColors.cardSurface : AppColors.lightSurface;
+    final borderColor = isDark
+        ? AppColors.cellBorder.withValues(alpha: 0.3)
+        : AppColors.lightGridLine;
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
+        color: cardBg,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(
-          color: AppColors.cellBorder.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         children: [
@@ -294,7 +303,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ],
             ),
           ),
-          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
+          const Divider(height: 1),
           SwitchListTile(
             secondary: const Icon(Icons.vibration_rounded),
             title: const Text('Haptic Feedback'),
@@ -306,7 +315,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   .updateHaptic(value);
             },
           ),
-          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
+          const Divider(height: 1),
           SwitchListTile(
             secondary: const Icon(Icons.volume_up_rounded),
             title: const Text('Sound Effects'),
@@ -318,7 +327,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   .updateSound(value);
             },
           ),
-          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
+          const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.accessibility_new_rounded),
             title: const Text('Colorblind Mode'),
@@ -326,7 +335,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiaryDark),
             onTap: () => _showColorblindSelector(context),
           ),
-          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
+          const Divider(height: 1),
           SwitchListTile(
             secondary: const Icon(Icons.notifications_rounded),
             title: const Text('Notifications'),
@@ -344,13 +353,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildAppCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? AppColors.cardSurface : AppColors.lightSurface;
+    final borderColor = isDark
+        ? AppColors.cellBorder.withValues(alpha: 0.3)
+        : AppColors.lightGridLine;
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
+        color: cardBg,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(
-          color: AppColors.cellBorder.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         children: [
@@ -361,7 +374,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiaryDark),
             onTap: () => _showAboutDialog(context),
           ),
-          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
+          const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('Privacy Policy'),
@@ -370,7 +383,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // TODO: Open privacy policy URL
             },
           ),
-          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
+          const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Terms of Service'),
@@ -379,7 +392,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // TODO: Open terms of service URL
             },
           ),
-          Divider(height: 1, color: AppColors.cellBorder.withValues(alpha: 0.3)),
+          const Divider(height: 1),
           ListTile(
             leading: const Icon(
               Icons.delete_forever_rounded,

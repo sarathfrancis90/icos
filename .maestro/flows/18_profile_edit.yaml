@@ -1,0 +1,101 @@
+# Flow 18: Profile Settings Interactions
+# Tests all interactive settings: toggles, theme cycling, delete dialog.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# Wait for home screen to fully load before navigating
+- assertVisible:
+    text: "Home\nTab 1 of 4"
+    optional: true
+
+# Navigate to Profile
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/profile_initial
+
+# ====== Toggle Haptic Feedback ======
+- tapOn: "Haptic Feedback"
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/haptic_toggled_off
+- tapOn: "Haptic Feedback"
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/haptic_toggled_on
+
+# ====== Toggle Sound Effects ======
+- tapOn: "Sound Effects"
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/sound_toggled_off
+- tapOn: "Sound Effects"
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/sound_toggled_on
+
+# ====== Toggle Notifications ======
+- tapOn: "Notifications"
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/notifications_toggled
+
+# ====== Theme cycling: System -> Light -> Dark -> System ======
+- tapOn:
+    text: "Theme\n.*"
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/theme_dropdown_open
+
+- tapOn:
+    text: "Light"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/theme_light_applied
+
+- tapOn:
+    text: "Theme\n.*"
+- waitForAnimationToEnd
+- tapOn:
+    text: "Dark"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/theme_dark_applied
+
+- tapOn:
+    text: "Theme\n.*"
+- waitForAnimationToEnd
+- tapOn:
+    text: "System"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/theme_system_applied
+
+# ====== Colorblind selector open/close ======
+- tapOn:
+    text: "Colorblind Mode.*"
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/colorblind_sheet_open
+
+# Close sheet
+- back
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/colorblind_sheet_closed
+
+# ====== Scroll to Delete Account ======
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/app_section_visible
+
+# Try Delete Account if visible
+- tapOn:
+    text: ".*Delete.*"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/delete_dialog
+
+# Cancel delete
+- tapOn:
+    text: "Cancel"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 18_settings/after_cancel_delete

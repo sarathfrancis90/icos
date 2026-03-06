@@ -1,0 +1,45 @@
+# Flow 07: Groups Screen
+# Verifies groups screen empty state, Create Group and Join Group dialogs.
+appId: com.icos.icos
+
+---
+
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+
+# Navigate to Groups tab
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+
+# -- Empty state --
+- assertVisible: "Groups"
+- assertVisible:
+    text: "Create or join a group.*"
+- assertVisible: "Create Group"
+- assertVisible: "Join Group"
+- takeScreenshot: 07_groups/groups_empty_state
+
+# -- Open Create Group dialog --
+- tapOn: "Create Group"
+- waitForAnimationToEnd
+- takeScreenshot: 07_groups/create_group_dialog
+
+# Cancel the dialog
+- tapOn:
+    text: "Cancel"
+    optional: true
+- waitForAnimationToEnd
+
+# -- Open Join Group dialog --
+- tapOn: "Join Group"
+- waitForAnimationToEnd
+- takeScreenshot: 07_groups/join_group_dialog
+
+# Cancel
+- tapOn:
+    text: "Cancel"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 07_groups/groups_back_to_empty

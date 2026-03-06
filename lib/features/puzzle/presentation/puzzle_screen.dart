@@ -294,22 +294,26 @@ class _GlassCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.elevatedSurface.withValues(alpha: 0.7),
-          border: Border.all(
-            color: AppColors.cellBorder.withValues(alpha: 0.5),
+    return Semantics(
+      label: 'Go back',
+      button: true,
+      child: GestureDetector(
+        onTap: onPressed,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.elevatedSurface.withValues(alpha: 0.7),
+            border: Border.all(
+              color: AppColors.cellBorder.withValues(alpha: 0.5),
+            ),
           ),
-        ),
-        child: Icon(
-          icon,
-          color: AppColors.textSecondaryDark,
-          size: 22,
+          child: Icon(
+            icon,
+            color: AppColors.textSecondaryDark,
+            size: 22,
+          ),
         ),
       ),
     );

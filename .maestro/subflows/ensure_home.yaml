@@ -1,0 +1,17 @@
+# Reusable subflow: Get past onboarding to home screen
+# App auto-signs in as anonymous, so no auth screen needed.
+appId: com.icos.icos
+
+---
+
+# If onboarding is showing, skip it
+- tapOn:
+    text: "Skip"
+    optional: true
+- waitForAnimationToEnd
+
+# If Get Started is showing (page 3 of onboarding)
+- tapOn:
+    text: "Get Started"
+    optional: true
+- waitForAnimationToEnd
