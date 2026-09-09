@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../../../../core/utils/haptics.dart';
 import '../../../../core/utils/motion.dart';
 import '../../domain/models/game_state.dart';
 import '../../domain/models/puzzle.dart';
+import 'grid_palette.dart';
 import 'snake_renderer.dart';
 
 class PuzzleGrid extends StatefulWidget {
@@ -17,6 +19,9 @@ class PuzzleGrid extends StatefulWidget {
     required this.onCellTap,
     required this.onCellDrag,
     this.onInvalidMove,
+    this.palette = GridPalette.standard,
+    this.wrongCell,
+    this.readOnly = false,
     super.key,
   });
 
@@ -24,6 +29,15 @@ class PuzzleGrid extends StatefulWidget {
   final void Function(int row, int col) onCellTap;
   final void Function(int row, int col) onCellDrag;
   final void Function(int row, int col)? onInvalidMove;
+
+  /// Colours (standard or colorblind palette with pattern overlays).
+  final GridPalette palette;
+
+  /// Cell where the path diverged from the solution (wrong-cell hint).
+  final GridPosition? wrongCell;
+
+  /// Replay of a finished puzzle: input is ignored.
+  final bool readOnly;
 
   @override
   State<PuzzleGrid> createState() => _PuzzleGridState();
@@ -57,6 +71,8 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   int _eatingSegmentIndex = -1;
   AnimationController? _idleBlinkController;
   AnimationController? _tongueController;
+  Timer? _blinkTimer;
+  Timer? _tongueTimer;
   AnimationController? _invalidLungeController;
   Offset _lungeDirection = Offset.zero;
 
@@ -141,8 +157,9 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     _previousPathLength = newLen;
 
     // ── Phase 3: Hint pulse ─────────────────────────────────────
-    final hadHint = oldWidget.gameState.hintCell != null;
-    final hasHint = widget.gameState.hintCell != null;
+    final hadHint =
+        oldWidget.gameState.hintCell != null || oldWidget.wrongCell != null;
+    final hasHint = widget.gameState.hintCell != null || widget.wrongCell != null;
     if (hasHint && !hadHint) {
       _startHintPulse();
     } else if (!hasHint && hadHint) {
@@ -315,7 +332,8 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
 
   void _scheduleNextBlink() {
     final delay = 4000 + (math.Random().nextInt(2000));
-    Future.delayed(Duration(milliseconds: delay), () {
+    _blinkTimer?.cancel();
+    _blinkTimer = Timer(Duration(milliseconds: delay), () {
       if (!mounted) return;
       _idleBlinkController?.dispose();
       _idleBlinkController = AnimationController(
@@ -331,7 +349,8 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
 
   void _scheduleNextTongue() {
     final delay = 6000 + (math.Random().nextInt(4000));
-    Future.delayed(Duration(milliseconds: delay), () {
+    _tongueTimer?.cancel();
+    _tongueTimer = Timer(Duration(milliseconds: delay), () {
       if (!mounted) return;
       _tongueController?.dispose();
       _tongueController = AnimationController(
@@ -399,6 +418,8 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _blinkTimer?.cancel();
+    _tongueTimer?.cancel();
     _glowBreathController.dispose();
     _hintPulseController?.dispose();
     _waypointBurstController?.dispose();
@@ -448,6 +469,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
           height: gridWidth,
           child: GestureDetector(
             onPanUpdate: (details) {
+              if (widget.readOnly) return;
               final localPos = details.localPosition;
               final row = (localPos.dy / cellSize).floor();
               final col = (localPos.dx / cellSize).floor();
@@ -459,6 +481,8 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
               painter: _GridPainter(
                 gameState: widget.gameState,
                 cellSize: cellSize,
+                palette: widget.palette,
+                wrongCell: widget.wrongCell,
                 segmentProgressGetter: _getSegmentProgress,
                 glowBreathValue: _getGlowBreathValue(),
                 cellEntryScaleGetter: _getCellEntryScale,
@@ -537,6 +561,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   }
 
   void _handleCellTap(int row, int col) {
+    if (widget.readOnly) return;
     final path = widget.gameState.path;
 
     // Check if tapping an already-visited cell (not the second-to-last for undo)
@@ -600,6 +625,8 @@ class _GridPainter extends CustomPainter {
   _GridPainter({
     required this.gameState,
     required this.cellSize,
+    required this.palette,
+    this.wrongCell,
     required this.segmentProgressGetter,
     required this.glowBreathValue,
     required this.cellEntryScaleGetter,
@@ -618,6 +645,8 @@ class _GridPainter extends CustomPainter {
 
   final GameState gameState;
   final double cellSize;
+  final GridPalette palette;
+  final GridPosition? wrongCell;
   final double Function(int index) segmentProgressGetter;
   final double glowBreathValue;
   final double Function(int row, int col) cellEntryScaleGetter;
@@ -649,6 +678,7 @@ class _GridPainter extends CustomPainter {
 
     // Draw hint cell highlight
     _drawHintCell(canvas);
+    _drawWrongCell(canvas);
 
     // Draw snake path
     _drawSnakePath(canvas);
@@ -781,8 +811,8 @@ class _GridPainter extends CustomPainter {
         : 0.0;
 
     final baseColor = Color.lerp(
-      AppColors.filledCellDark,
-      AppColors.filledCellLight,
+      palette.filledCellDark,
+      palette.filledCellLight,
       progress,
     )!;
 
@@ -812,14 +842,35 @@ class _GridPainter extends CustomPainter {
     }
 
     final borderPaint = Paint()
-      ..color = AppColors.pathAmber.withValues(alpha: 0.2)
+      ..color = palette.filledCellBorder.withValues(alpha: 0.2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.5;
     canvas.drawRRect(rrect, borderPaint);
 
+    if (palette.patterns) _drawHatch(canvas, rect, rrect);
+
     if (scale != 1.0) {
       canvas.restore();
     }
+  }
+
+  /// Colorblind pattern: diagonal hatching clipped to the cell.
+  void _drawHatch(Canvas canvas, Rect rect, RRect rrect) {
+    final paint = Paint()
+      ..color = palette.patternOverlay
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    canvas.save();
+    canvas.clipRRect(rrect);
+    final step = (cellSize / 5).clamp(4.0, 12.0);
+    for (var d = -rect.height; d < rect.width; d += step) {
+      canvas.drawLine(
+        Offset(rect.left + d, rect.bottom),
+        Offset(rect.left + d + rect.height, rect.top),
+        paint,
+      );
+    }
+    canvas.restore();
   }
 
   /// Draws the snake path using the SnakeRenderer.
@@ -836,6 +887,7 @@ class _GridPainter extends CustomPainter {
 
     final renderer = SnakeRenderer(
       cellSize: cellSize,
+      palette: palette,
       glowBreathValue: glowBreathValue,
       eatingProgress: eatingProgress,
       eatingSegmentIndex: eatingSegmentIndex,
@@ -878,7 +930,7 @@ class _GridPainter extends CustomPainter {
     }
 
     if (isVisited) {
-      final glowColor = isStart ? AppColors.waypointStartFill : Colors.white;
+      final glowColor = isStart ? palette.waypointStartFill : palette.waypointFill;
       final glowPaint = Paint()
         ..color = glowColor.withValues(alpha: 0.2)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
@@ -888,12 +940,12 @@ class _GridPainter extends CustomPainter {
     Color fillColor;
     if (isStart) {
       fillColor = isVisited
-          ? AppColors.waypointStartFill
-          : AppColors.waypointStartFill.withValues(alpha: 0.7);
+          ? palette.waypointStartFill
+          : palette.waypointStartFill.withValues(alpha: 0.7);
     } else {
       fillColor = isVisited
-          ? AppColors.waypointFill
-          : AppColors.waypointFill.withValues(alpha: 0.8);
+          ? palette.waypointFill
+          : palette.waypointFill.withValues(alpha: 0.8);
     }
 
     final shadowPaint = Paint()
@@ -907,13 +959,23 @@ class _GridPainter extends CustomPainter {
 
     final borderPaint = Paint()
       ..color = isStart
-          ? AppColors.waypointStartBorder.withValues(alpha: 0.5)
-          : AppColors.waypointBorder.withValues(alpha: 0.3)
+          ? palette.waypointStartBorder.withValues(alpha: 0.5)
+          : palette.waypointBorder.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     canvas.drawCircle(center, radius * wpScale, borderPaint);
 
-    final textColor = isStart ? Colors.white : AppColors.waypointText;
+    // Colorblind pattern: inner ring so waypoints read by shape too.
+    if (palette.patterns) {
+      final ringPaint = Paint()
+        ..color = (isStart ? palette.waypointStartText : palette.waypointText)
+            .withValues(alpha: 0.45)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      canvas.drawCircle(center, radius * wpScale * 0.78, ringPaint);
+    }
+
+    final textColor = isStart ? palette.waypointStartText : palette.waypointText;
     final textPainter = TextPainter(
       text: TextSpan(
         text: '${wp.order}',
@@ -952,19 +1014,68 @@ class _GridPainter extends CustomPainter {
     final pulseBlur = 8.0 + hintPulseValue * 6.0;
 
     final glowPaint = Paint()
-      ..color = AppColors.hintPurple.withValues(alpha: pulseAlpha)
+      ..color = palette.hint.withValues(alpha: pulseAlpha)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, pulseBlur);
     canvas.drawCircle(center, (radius + 8) * pulseScale, glowPaint);
 
-    final circlePaint = Paint()
-      ..color = AppColors.hintPurple.withValues(alpha: 0.5);
+    final circlePaint = Paint()..color = palette.hint.withValues(alpha: 0.5);
     canvas.drawCircle(center, radius, circlePaint);
 
     final borderPaint = Paint()
-      ..color = AppColors.hintPurple
+      ..color = palette.hint
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
     canvas.drawCircle(center, radius, borderPaint);
+  }
+
+  /// Wrong-cell hint: reddish pulsing frame + cross on the divergent cell.
+  void _drawWrongCell(Canvas canvas) {
+    final cell = wrongCell;
+    if (cell == null) return;
+
+    final rect = Rect.fromLTWH(
+      cell.col * cellSize + _cellInset,
+      cell.row * cellSize + _cellInset,
+      cellSize - _cellInset * 2,
+      cellSize - _cellInset * 2,
+    );
+    final rrect =
+        RRect.fromRectAndRadius(rect, const Radius.circular(_cellRadius));
+    final pulseAlpha = 0.25 + hintPulseValue * 0.2;
+
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = palette.wrongCell.withValues(alpha: pulseAlpha)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()..color = palette.wrongCell.withValues(alpha: 0.35),
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = palette.wrongCell
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
+    );
+
+    final inset = cellSize * 0.32;
+    final crossPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.9)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      rect.topLeft + Offset(inset, inset),
+      rect.bottomRight - Offset(inset, inset),
+      crossPaint,
+    );
+    canvas.drawLine(
+      rect.topRight + Offset(-inset, inset),
+      rect.bottomLeft + Offset(inset, -inset),
+      crossPaint,
+    );
   }
 
   /// Phase 4: Waypoint burst — expanding gold ring + particle dots.
@@ -1029,6 +1140,8 @@ class _GridPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _GridPainter oldDelegate) {
     return oldDelegate.gameState != gameState ||
+        oldDelegate.palette != palette ||
+        oldDelegate.wrongCell != wrongCell ||
         oldDelegate.glowBreathValue != glowBreathValue ||
         oldDelegate.hintPulseValue != hintPulseValue ||
         oldDelegate.waypointBurstProgress != waypointBurstProgress ||

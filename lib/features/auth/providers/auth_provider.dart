@@ -351,7 +351,7 @@ class AuthNotifier extends _$AuthNotifier {
             {'method': 'email'},
           ));
           if (res.session == null) {
-            return AuthEmailConfirmationRequired(email: email);
+            return AuthEmailConfirmationRequired(email: email, fromSignUp: true);
           }
           return AuthSuccess(user: res.user, isNewAccount: true);
 
@@ -401,10 +401,10 @@ class AuthNotifier extends _$AuthNotifier {
     }
   }
 
-  Future<void> resendConfirmation(String email) async {
+  Future<void> resendConfirmation(String email, {bool fromSignUp = false}) async {
     try {
       await SupabaseService.auth.resend(
-        type: OtpType.emailChange,
+        type: fromSignUp ? OtpType.signup : OtpType.emailChange,
         email: email,
         emailRedirectTo: kAuthRedirectUri,
       );

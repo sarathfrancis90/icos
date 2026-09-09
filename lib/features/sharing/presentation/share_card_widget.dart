@@ -4,6 +4,8 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/utils/date_utils.dart';
 
+/// Spoiler-free result card rendered through a [RepaintBoundary] so it can
+/// be captured as a PNG (see `ShareCardGenerator.captureFromWidget`).
 class ShareCardWidget extends StatelessWidget {
   const ShareCardWidget({
     required this.repaintKey,
@@ -13,6 +15,8 @@ class ShareCardWidget extends StatelessWidget {
     required this.hintsUsed,
     required this.parTimeSeconds,
     required this.pathVisualization,
+    this.dateLabel,
+    this.streak,
     super.key,
   });
 
@@ -24,10 +28,16 @@ class ShareCardWidget extends StatelessWidget {
   final int parTimeSeconds;
   final Widget pathVisualization;
 
+  /// Shown top-right; defaults to today's UTC date.
+  final String? dateLabel;
+
+  /// Current streak (daily solves only).
+  final int? streak;
+
   @override
   Widget build(BuildContext context) {
     final underPar = timeSeconds <= parTimeSeconds;
-    final today = AppDateUtils.todayUtc();
+    final label = dateLabel ?? AppDateUtils.todayUtc();
 
     return RepaintBoundary(
       key: repaintKey,
@@ -54,7 +64,7 @@ class ShareCardWidget extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  today,
+                  label,
                   style: const TextStyle(
                     color: AppColors.textSecondaryDark,
                     fontSize: 14,
@@ -97,6 +107,14 @@ class ShareCardWidget extends StatelessWidget {
                   value: '$hintsUsed hint${hintsUsed != 1 ? 's' : ''}',
                   highlight: hintsUsed == 0,
                 ),
+                if (streak != null && streak! > 0) ...[
+                  const SizedBox(width: AppSizes.sm),
+                  _ResultPill(
+                    icon: Icons.local_fire_department_rounded,
+                    value: '$streak day${streak == 1 ? '' : 's'}',
+                    highlight: true,
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: AppSizes.sm),
@@ -115,6 +133,89 @@ class ShareCardWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Abstract block rendering of a solved grid: walls are dark, every other
+/// cell gets a colour from a coarse band of its path position. No numbers,
+/// arrows or exact ordering — enough to show the shape, not the solution.
+class PathBlocksVisualization extends StatelessWidget {
+  const PathBlocksVisualization({
+    required this.gridSize,
+    required this.path,
+    required this.walls,
+    super.key,
+  });
+
+  final int gridSize;
+
+  /// `[[row, col], ...]`
+  final List<List<int>> path;
+
+  /// `[[row, col], ...]`
+  final List<List<int>> walls;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _PathBlocksPainter(gridSize: gridSize, path: path, walls: walls),
+    );
+  }
+}
+
+class _PathBlocksPainter extends CustomPainter {
+  _PathBlocksPainter({
+    required this.gridSize,
+    required this.path,
+    required this.walls,
+  });
+
+  final int gridSize;
+  final List<List<int>> path;
+  final List<List<int>> walls;
+
+  static const _bands = [
+    AppColors.pathOrangeDeep,
+    AppColors.pathOrange,
+    AppColors.pathAmber,
+    AppColors.pathYellow,
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (gridSize <= 0) return;
+    final cell = size.width / gridSize;
+    final wallSet = {for (final w in walls) w[0] * gridSize + w[1]};
+    final band = <int, int>{};
+    for (var i = 0; i < path.length; i++) {
+      final idx = path[i][0] * gridSize + path[i][1];
+      band[idx] = path.length <= 1
+          ? 0
+          : (i * _bands.length ~/ path.length).clamp(0, _bands.length - 1);
+    }
+
+    for (var row = 0; row < gridSize; row++) {
+      for (var col = 0; col < gridSize; col++) {
+        final idx = row * gridSize + col;
+        final rect = Rect.fromLTWH(col * cell + 2, row * cell + 2, cell - 4, cell - 4);
+        final rrect = RRect.fromRectAndRadius(rect, Radius.circular(cell * 0.18));
+        final Color color;
+        if (wallSet.contains(idx)) {
+          color = AppColors.wallFill;
+        } else if (band.containsKey(idx)) {
+          color = _bands[band[idx]!];
+        } else {
+          color = AppColors.cellBackground;
+        }
+        canvas.drawRRect(rrect, Paint()..color = color);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PathBlocksPainter oldDelegate) =>
+      oldDelegate.gridSize != gridSize ||
+      oldDelegate.path != path ||
+      oldDelegate.walls != walls;
 }
 
 class _ResultPill extends StatelessWidget {

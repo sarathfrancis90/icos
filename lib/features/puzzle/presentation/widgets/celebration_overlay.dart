@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/services/analytics_service.dart';
+import '../../../../core/services/app_logger.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/utils/motion.dart';
 import '../../../../shared/widgets/spring_button.dart';
 import '../../../sharing/domain/share_card_generator.dart';
+import '../../../sharing/presentation/share_card_widget.dart';
+import '../../data/submission_result.dart';
 
 class CelebrationOverlay extends StatefulWidget {
   const CelebrationOverlay({
@@ -16,6 +22,15 @@ class CelebrationOverlay extends StatefulWidget {
     required this.parTimeSeconds,
     required this.gridSize,
     required this.difficulty,
+    this.dateLabel,
+    this.streak,
+    this.status,
+    this.isArchive = false,
+    this.isPractice = false,
+    this.path = const [],
+    this.walls = const [],
+    this.onDone,
+    this.onNewPuzzle,
     super.key,
   });
 
@@ -24,6 +39,27 @@ class CelebrationOverlay extends StatefulWidget {
   final int parTimeSeconds;
   final int gridSize;
   final String difficulty;
+
+  /// Date shown on the share card (`YYYY-MM-DD`) or `Practice`.
+  final String? dateLabel;
+
+  /// Current streak after this solve (daily only).
+  final int? streak;
+
+  /// Server acknowledgement state; drives the "verified / not counted" note.
+  final SubmissionStatus? status;
+  final bool isArchive;
+  final bool isPractice;
+
+  /// Solved path `[[row, col], ...]` and walls for the spoiler-free card.
+  final List<List<int>> path;
+  final List<List<int>> walls;
+
+  /// Called by "Done"; defaults to popping the route.
+  final VoidCallback? onDone;
+
+  /// Practice only: starts another puzzle.
+  final VoidCallback? onNewPuzzle;
 
   @override
   State<CelebrationOverlay> createState() => _CelebrationOverlayState();
@@ -48,6 +84,50 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
 
   // Phase 8: Score count-up
   late final AnimationController _countUpController;
+
+  final GlobalKey _shareCardKey = GlobalKey();
+  bool _sharing = false;
+
+  Future<void> _share() async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    final underPar = widget.timeSeconds <= widget.parTimeSeconds;
+    final text = ShareCardGenerator.buildShareText(
+      timeSeconds: widget.timeSeconds,
+      hintsUsed: widget.hintsUsed,
+      gridSize: widget.gridSize,
+      difficulty: widget.difficulty,
+      underPar: underPar,
+      dateLabel: widget.dateLabel,
+      streak: widget.streak,
+    );
+    try {
+      final bytes = await ShareCardGenerator.captureFromWidget(_shareCardKey);
+      if (bytes != null) {
+        final name = 'icos-${widget.dateLabel ?? 'result'}.png';
+        await Share.shareXFiles(
+          [XFile.fromData(bytes, mimeType: 'image/png', name: name)],
+          text: text,
+          fileNameOverrides: [name],
+        );
+      } else {
+        await Share.share(text);
+      }
+      unawaited(
+        AnalyticsService.logEvent(AnalyticsEvents.shareResult, {
+          'image': bytes != null,
+          'practice': widget.isPractice,
+        }),
+      );
+    } catch (e, st) {
+      AppLogger.warn('share failed', error: e, st: st);
+      try {
+        await Share.share(text);
+      } catch (_) {}
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
 
   @override
   void initState() {
@@ -158,6 +238,27 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
 
     return Stack(
       children: [
+        // Off-screen share card (must be painted for RepaintBoundary.toImage).
+        Positioned(
+          left: -2000,
+          top: 0,
+          child: ShareCardWidget(
+            repaintKey: _shareCardKey,
+            gridSize: widget.gridSize,
+            difficulty: widget.difficulty,
+            timeSeconds: widget.timeSeconds,
+            hintsUsed: widget.hintsUsed,
+            parTimeSeconds: widget.parTimeSeconds,
+            dateLabel: widget.dateLabel,
+            streak: widget.streak,
+            pathVisualization: PathBlocksVisualization(
+              gridSize: widget.gridSize,
+              path: widget.path,
+              walls: widget.walls,
+            ),
+          ),
+        ),
+
         // Dark overlay with radial burst
         AnimatedBuilder(
           animation: _fadeController,
@@ -252,6 +353,13 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                   parTimeSeconds: widget.parTimeSeconds,
                   gridSize: widget.gridSize,
                   difficulty: widget.difficulty,
+                  streak: widget.streak,
+                  status: widget.status,
+                  isArchive: widget.isArchive,
+                  isPractice: widget.isPractice,
+                  onShare: _sharing ? null : _share,
+                  onDone: widget.onDone ?? () => Navigator.of(context).pop(),
+                  onNewPuzzle: widget.onNewPuzzle,
                   trophyScale: reduceMotion ? 1.0 : _trophyScale.value,
                   countUpValue: reduceMotion ? 1.0 : _countUpController.value,
                   staggeredValue: reduceMotion ? (_) => 1.0 : _staggeredValue,
@@ -278,6 +386,13 @@ class _CelebrationCard extends StatelessWidget {
     required this.countUpValue,
     required this.staggeredValue,
     required this.statsAnimation,
+    required this.onShare,
+    required this.onDone,
+    this.onNewPuzzle,
+    this.streak,
+    this.status,
+    this.isArchive = false,
+    this.isPractice = false,
   });
 
   final bool underPar;
@@ -286,10 +401,30 @@ class _CelebrationCard extends StatelessWidget {
   final int parTimeSeconds;
   final int gridSize;
   final String difficulty;
+  final VoidCallback? onShare;
+  final VoidCallback onDone;
+  final VoidCallback? onNewPuzzle;
+  final int? streak;
+  final SubmissionStatus? status;
+  final bool isArchive;
+  final bool isPractice;
   final double trophyScale;
   final double countUpValue;
   final double Function(int delayMs) staggeredValue;
   final Animation<double> statsAnimation;
+
+  String? get _note {
+    if (isPractice) return 'Practice solves stay on this device.';
+    if (status == SubmissionStatus.rejected) {
+      return 'This solve could not be verified and was not counted.';
+    }
+    if (isArchive) return "Archive solves don't affect your streak.";
+    if (status == SubmissionStatus.localOnly) {
+      return 'Saved on this device only.';
+    }
+    if (status == SubmissionStatus.pending) return 'Saving your result…';
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -405,9 +540,52 @@ class _CelebrationCard extends StatelessWidget {
                   progress: staggeredValue(600),
                   child: Text(
                     '$hintsUsed hint${hintsUsed == 1 ? '' : 's'} used',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppColors.textSecondaryDark,
                       fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+
+              if (streak != null && streak! > 0 && !isArchive && !isPractice) ...[
+                const SizedBox(height: AppSizes.sm),
+                _StaggeredReveal(
+                  progress: staggeredValue(600),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.local_fire_department_rounded,
+                        color: AppColors.streakGold,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$streak day streak',
+                        style: const TextStyle(
+                          color: AppColors.streakGold,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (_note != null) ...[
+                const SizedBox(height: AppSizes.sm),
+                _StaggeredReveal(
+                  progress: staggeredValue(700),
+                  child: Text(
+                    _note!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: status == SubmissionStatus.rejected
+                          ? AppColors.warning
+                          : AppColors.textSecondaryDark,
+                      fontSize: 12,
                     ),
                   ),
                 ),
@@ -422,26 +600,26 @@ class _CelebrationCard extends StatelessWidget {
                   children: [
                     // Share button — purple gradient with spring
                     _GradientButton(
-                      label: 'Share Result',
+                      label: onShare == null ? 'Sharing…' : 'Share Result',
                       icon: Icons.share_rounded,
-                      onPressed: () {
-                        final text = ShareCardGenerator.buildShareText(
-                          timeSeconds: timeSeconds,
-                          hintsUsed: hintsUsed,
-                          gridSize: gridSize,
-                          difficulty: difficulty,
-                          underPar: underPar,
-                        );
-                        Share.share(text);
-                      },
+                      onPressed: onShare ?? () {},
                     ),
                     const SizedBox(height: AppSizes.sm),
+
+                    if (onNewPuzzle != null) ...[
+                      _GradientButton(
+                        label: 'New Puzzle',
+                        icon: Icons.refresh_rounded,
+                        onPressed: onNewPuzzle!,
+                      ),
+                      const SizedBox(height: AppSizes.sm),
+                    ],
 
                     // Done button — outlined
                     SizedBox(
                       width: double.infinity,
                       child: SpringButton(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: onDone,
                         child: Container(
                           height: AppSizes.minTouchTarget,
                           decoration: BoxDecoration(

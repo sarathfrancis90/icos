@@ -13,7 +13,9 @@ recurs per release.
 
 - [ ] macOS with Xcode 16+ and Command Line Tools (`xcode-select --install`)
 - [ ] Flutter **3.41.3** (`.fvmrc` pins it; `fvm install` or `flutter version` to match)
-- [ ] Java 17 and the Android SDK (`flutter doctor` must be green for Android + iOS)
+- [ ] Java 17 and the Android SDK (`flutter doctor` must be green for Android + iOS). Android Studio's bundled JDK 25 is NOT supported by Gradle; point Flutter at Homebrew's JDK 17 once:
+  `flutter config --jdk-dir="$(/usr/libexec/java_home -v 17)"` (already done on this Mac on 2026-09-09)
+- [ ] CocoaPods specs up to date: `cd ios && pod repo update && pod install` (first iOS build after the Firebase/notification plugins were added needs this)
 - [ ] Ruby 3.3 + Bundler: `bundle install` at the repo root installs fastlane and CocoaPods
 - [ ] Deno 2.x (`brew install deno`) and the Supabase CLI (`brew install supabase/tap/supabase`)
 - [ ] Access to: Apple Developer Program, Google Play Console, Supabase org, Firebase (optional), DNS for `icos.app`, this GitHub repo's Settings > Secrets

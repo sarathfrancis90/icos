@@ -30,6 +30,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Required by flutter_local_notifications (java.time on API < 26).
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -41,7 +43,7 @@ android {
         // Android 6.0 (Marshmallow). Required by firebase_messaging / google_sign_in
         // and gives us runtime permissions + modern TLS. Do not rely on the Flutter
         // default here; it changes between Flutter releases.
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -113,4 +115,8 @@ tasks.configureEach {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

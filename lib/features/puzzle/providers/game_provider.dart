@@ -2,59 +2,136 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/services/analytics_service.dart';
+import '../../../core/services/app_logger.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/services/sync_service.dart';
+import '../data/puzzle_source.dart';
+import '../data/submission_result.dart';
 import '../domain/game_engine.dart';
 import '../domain/models/game_state.dart';
 import '../domain/models/puzzle.dart';
+import 'hint_engine.dart';
 
 part 'game_provider.g.dart';
 
-@riverpod
+/// Transient hint UI state kept outside [GameState] (which lives in the
+/// read-only domain layer).
+class HintUiState {
+  const HintUiState({
+    this.thinking = false,
+    this.wrongCell,
+    this.noHint = false,
+  });
+
+  /// Solver is running; hint button shows "Thinking…" and ignores taps.
+  final bool thinking;
+
+  /// First cell where the player's path diverged from the solution.
+  final GridPosition? wrongCell;
+
+  /// Solver found nothing to suggest (unsolvable / already complete).
+  final bool noHint;
+
+  bool get isIdle => !thinking && wrongCell == null && !noHint;
+
+  @override
+  bool operator ==(Object other) =>
+      other is HintUiState &&
+      other.thinking == thinking &&
+      other.wrongCell == wrongCell &&
+      other.noHint == noHint;
+
+  @override
+  int get hashCode => Object.hash(thinking, wrongCell, noHint);
+}
+
+@Riverpod(keepAlive: true)
+class HintUi extends _$HintUi {
+  @override
+  HintUiState build(PuzzleSource source) => const HintUiState();
+
+  void thinking() => state = const HintUiState(thinking: true);
+  void idle() => state = const HintUiState();
+  void wrong(GridPosition cell) => state = HintUiState(wrongCell: cell);
+  void none() => state = const HintUiState(noHint: true);
+}
+
+/// Game state for one [PuzzleSource]. Kept alive so an in-flight solve or
+/// score submission survives the puzzle screen being popped; call
+/// [discard] to drop a finished practice game.
+@Riverpod(keepAlive: true)
 class GameNotifier extends _$GameNotifier {
   GameEngine? _engine;
   Timer? _timer;
+  List<GridPosition>? _solution;
+  bool _sessionRequested = false;
+  bool _disposed = false;
+
+  /// Whether the current state was loaded from a stored result (read-only
+  /// replay) rather than played, so it must not be submitted again.
+  bool isReplay = false;
 
   @override
-  GameState? build() {
+  GameState? build(PuzzleSource source) {
     ref.onDispose(() {
+      _disposed = true;
       _timer?.cancel();
     });
     return null;
   }
 
+  /// Starts (or re-attaches to) a game. Idempotent: calling again with the
+  /// same puzzle keeps the current state and resumes the timer.
   void startGame(Puzzle puzzle) {
+    if (state != null && state!.puzzle == puzzle) {
+      resumeTimer();
+      return;
+    }
     _engine = GameEngine(puzzle);
+    _solution = null;
+    isReplay = false;
     state = _engine!.createInitialState();
-    _restoreGameState(puzzle.puzzleDate);
+    _restoreGameState();
+    if (state!.status == GameStatus.playing) _sessionRequested = true;
+  }
+
+  /// Loads a completed solve for read-only viewing.
+  void loadCompleted(Puzzle puzzle, SubmissionResult result) {
+    _timer?.cancel();
+    _engine = GameEngine(puzzle);
+    _solution = null;
+    isReplay = true;
+    var replay = _engine!.createInitialState();
+    for (final cell in result.path) {
+      if (_engine!.canMoveToCell(replay, cell[0], cell[1])) {
+        replay = _engine!.addToPath(replay, cell[0], cell[1]);
+      }
+    }
+    state = replay.copyWith(
+      status: GameStatus.completed,
+      elapsedSeconds: result.timeSeconds,
+      hintsUsed: result.hintsUsed,
+      undosUsed: result.undosUsed,
+    );
+  }
+
+  /// Drops the state (e.g. leaving a practice puzzle) so memory is freed.
+  void discard() {
+    _timer?.cancel();
+    ref.invalidateSelf();
   }
 
   void handleCellTap(int row, int col) {
     if (state == null || _engine == null) return;
     if (state!.status == GameStatus.completed) return;
 
+    final wasNotStarted = state!.status == GameStatus.notStarted;
     var newState = _engine!.handleCellTap(state!, row, col);
+    if (newState == state) return;
 
-    // Clear hint highlight on any move
-    if (newState.hintCell != null) {
-      newState = newState.copyWith(hintCell: null);
-    }
-
-    // Start timer on first move
-    if (state!.status == GameStatus.notStarted &&
-        newState.status == GameStatus.playing) {
-      _startTimer();
-    }
-
-    state = newState;
-
-    // Check for completion
-    if (_engine!.isSolved(newState)) {
-      _timer?.cancel();
-      state = newState.copyWith(status: GameStatus.completed);
-    }
-
-    // Auto-save game state
-    _saveGameState();
+    newState = _clearHint(newState);
+    _applyMove(newState, wasNotStarted);
   }
 
   void handleCellDrag(int row, int col) {
@@ -70,84 +147,171 @@ class GameNotifier extends _$GameNotifier {
     }
 
     // Only allow backtracking to the second-to-last cell (single undo step).
-    // Dragging to any other already-visited cell is rejected.
     if (state!.path.length >= 2) {
       final secondToLast = state!.path[state!.path.length - 2];
       if (secondToLast.row == row && secondToLast.col == col) {
-        var newState = _engine!.undo(state!);
-        if (newState.hintCell != null) {
-          newState = newState.copyWith(hintCell: null);
-        }
-        state = newState;
+        state = _clearHint(_engine!.undo(state!));
         _saveGameState();
         return;
       }
     }
 
     // Reject any move to an already-visited cell
-    if (state!.path.any((p) => p.row == row && p.col == col)) {
-      return;
-    }
+    if (state!.path.any((p) => p.row == row && p.col == col)) return;
 
-    // Otherwise, try adding to path (forward movement)
     if (_engine!.canMoveToCell(state!, row, col)) {
-      var newState = _engine!.addToPath(state!, row, col);
-
-      // Clear hint highlight on any move
-      if (newState.hintCell != null) {
-        newState = newState.copyWith(hintCell: null);
-      }
-
-      state = newState;
-
-      if (_engine!.isSolved(newState)) {
-        _timer?.cancel();
-        state = newState.copyWith(status: GameStatus.completed);
-      }
-
-      _saveGameState();
+      final newState = _clearHint(_engine!.addToPath(state!, row, col));
+      _applyMove(newState, false);
     }
+  }
+
+  void _applyMove(GameState newState, bool wasNotStarted) {
+    if (wasNotStarted && newState.status == GameStatus.playing) {
+      _startTimer();
+      _onFirstMove();
+    }
+    state = newState;
+    if (_engine!.isSolved(newState)) {
+      _timer?.cancel();
+      state = newState.copyWith(status: GameStatus.completed);
+    }
+    _saveGameState();
+  }
+
+  GameState _clearHint(GameState s) {
+    final ui = ref.read(hintUiProvider(source));
+    if (!ui.isIdle && !ui.thinking) {
+      ref.read(hintUiProvider(source).notifier).idle();
+    }
+    return s.hintCell != null ? s.copyWith(hintCell: null) : s;
   }
 
   void undo() {
     if (state == null || _engine == null) return;
     if (state!.status == GameStatus.completed) return;
-    state = _engine!.undo(state!);
+    state = _clearHint(_engine!.undo(state!));
     _saveGameState();
   }
 
   void reset() {
     if (state == null || _engine == null) return;
-    state = _engine!.reset(state!);
+    if (state!.status == GameStatus.completed) return;
+    state = _clearHint(_engine!.reset(state!));
     _saveGameState();
   }
 
-  void useHint() {
+  /// Runs the solver off the UI thread and applies the verdict. Re-entrant
+  /// taps while thinking are ignored.
+  Future<void> useHint() async {
     if (state == null || _engine == null) return;
     if (state!.status == GameStatus.completed) return;
+    final hintUi = ref.read(hintUiProvider(source).notifier);
+    if (ref.read(hintUiProvider(source)).thinking) return;
 
-    // If the game hasn't started yet, start it and then get the hint
-    var currentState = state!;
-    if (currentState.status == GameStatus.notStarted) {
-      currentState = currentState.copyWith(status: GameStatus.playing);
+    var current = state!;
+    if (current.status == GameStatus.notStarted) {
+      current = current.copyWith(status: GameStatus.playing);
+      state = current;
       _startTimer();
+      _onFirstMove();
     }
 
-    state = _engine!.useHint(currentState);
+    hintUi.thinking();
+    final puzzle = current.puzzle;
+    final path = List<GridPosition>.unmodifiable(current.path);
+    final engine = ref.read(hintEngineProvider);
+
+    HintResult result;
+    try {
+      _solution ??= await engine.solve(puzzle);
+      result = await engine.hint(puzzle, path, _solution);
+    } catch (e, st) {
+      AppLogger.warn('hint solver failed', error: e, st: st);
+      result = const HintResult.none();
+    }
+    if (_disposed || state == null) return;
+
+    // The player kept moving while we were thinking: verdict is stale.
+    if (!_samePath(state!.path, path) ||
+        state!.status == GameStatus.completed) {
+      hintUi.idle();
+      return;
+    }
+
+    switch (result.type) {
+      case HintType.nextCell:
+        state = state!.copyWith(
+          hintCell: result.cell,
+          hintsUsed: state!.hintsUsed + 1,
+        );
+        hintUi.idle();
+      case HintType.wrongCell:
+        state = state!.copyWith(
+          hintCell: null,
+          hintsUsed: state!.hintsUsed + 1,
+        );
+        hintUi.wrong(result.cell!);
+      case HintType.none:
+        hintUi.none();
+    }
     _saveGameState();
+    unawaited(
+      AnalyticsService.logEvent(AnalyticsEvents.hintUsed, {
+        'type': result.type.name,
+        'hints_used': state!.hintsUsed,
+      }),
+    );
+  }
+
+  static bool _samePath(List<GridPosition> a, List<GridPosition> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  /// Stops counting while the puzzle screen is not visible.
+  void pauseTimer() {
+    _timer?.cancel();
+    _timer = null;
+    _saveGameState();
+  }
+
+  void resumeTimer() {
+    if (_timer != null) return;
+    if (state?.status == GameStatus.playing) _startTimer();
+  }
+
+  void _onFirstMove() {
+    if (_sessionRequested) return;
+    _sessionRequested = true;
+    final date = source.date;
+    if (!source.submitsToServer || date == null) return;
+    unawaited(
+      AnalyticsService.logEvent(AnalyticsEvents.puzzleStart, {
+        'puzzle_date': date,
+        'archive': source.isArchive,
+      }),
+    );
+    unawaited(
+      ref.read(syncNotifierProvider.notifier).ensureSessionStarted(date),
+    );
   }
 
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_disposed) return;
       if (state != null && state!.status == GameStatus.playing) {
         state = state!.copyWith(elapsedSeconds: state!.elapsedSeconds + 1);
+        _saveGameState();
       }
     });
   }
 
   void _saveGameState() {
-    if (state == null) return;
+    if (state == null || isReplay) return;
     final data = {
       'path': state!.path.map((p) => [p.row, p.col]).toList(),
       'elapsed_seconds': state!.elapsedSeconds,
@@ -155,11 +319,11 @@ class GameNotifier extends _$GameNotifier {
       'undos_used': state!.undosUsed,
       'status': state!.status.name,
     };
-    StorageService.saveGameState(state!.puzzle.puzzleDate, data);
+    StorageService.saveGameState(source.storageKey, data);
   }
 
-  void _restoreGameState(String puzzleDate) {
-    final saved = StorageService.getGameState(puzzleDate);
+  void _restoreGameState() {
+    final saved = StorageService.getGameState(source.storageKey);
     if (saved == null || state == null || _engine == null) return;
 
     final pathData = (saved['path'] as List<dynamic>?) ?? [];
@@ -167,23 +331,28 @@ class GameNotifier extends _$GameNotifier {
 
     for (final pos in pathData) {
       final coords = pos as List<dynamic>;
-      final row = coords[0] as int;
-      final col = coords[1] as int;
+      final row = (coords[0] as num).toInt();
+      final col = (coords[1] as num).toInt();
       if (_engine!.canMoveToCell(restoredState, row, col)) {
         restoredState = _engine!.addToPath(restoredState, row, col);
       }
     }
 
     final statusStr = saved['status'] as String? ?? 'notStarted';
-    final status = GameStatus.values.firstWhere(
+    var status = GameStatus.values.firstWhere(
       (s) => s.name == statusStr,
       orElse: () => GameStatus.notStarted,
     );
+    // A saved "completed" game whose result was already recorded is replayed
+    // read-only; otherwise treat it as still playing so it gets submitted.
+    if (status == GameStatus.completed && !_engine!.isSolved(restoredState)) {
+      status = GameStatus.playing;
+    }
 
     restoredState = restoredState.copyWith(
-      elapsedSeconds: (saved['elapsed_seconds'] as int?) ?? 0,
-      hintsUsed: (saved['hints_used'] as int?) ?? 0,
-      undosUsed: (saved['undos_used'] as int?) ?? 0,
+      elapsedSeconds: (saved['elapsed_seconds'] as num?)?.toInt() ?? 0,
+      hintsUsed: (saved['hints_used'] as num?)?.toInt() ?? 0,
+      undosUsed: (saved['undos_used'] as num?)?.toInt() ?? 0,
       status: status,
     );
 

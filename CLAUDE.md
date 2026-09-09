@@ -1,10 +1,10 @@
-# Icos - Project Context for AI Agents
+# Icos (formerly Icos) - Project Context for AI Agents
 
 _Critical rules and patterns that AI agents must follow when implementing code. Focus on unobvious details that agents might otherwise miss._
 
 ## Project Overview
 
-Icos is a cross-platform mobile puzzle game (iOS + Android) built with Flutter. Players draw a continuous path through a grid, connecting numbered waypoints in order while filling every cell. One puzzle per day, same for all users worldwide. Difficulty scales Monday (5x5 easy) to Sunday (8x8 hard).
+Icos (Dart package `icos`, bundle id `com.icos.icos`; planning docs still say "Icos") is a cross-platform mobile puzzle game (iOS + Android) built with Flutter. Players draw a continuous path through a grid, connecting numbered waypoints in order while filling every cell. One puzzle per day, same for all users worldwide. Difficulty scales Monday (5x5 easy) to Sunday (8x8 hard).
 
 ## Technology Stack & Versions
 
@@ -12,18 +12,18 @@ Icos is a cross-platform mobile puzzle game (iOS + Android) built with Flutter. 
 |-----------|-----------|---------------|
 | Framework | Flutter | 3.x with Impeller engine |
 | Language | Dart | Latest stable |
-| State Management | Riverpod | 3.x (riverpod ^3.2.x, riverpod_annotation ^4.0.x) |
+| State Management | Riverpod | 2.x (flutter_riverpod ^2.6, riverpod_annotation ^2.6, codegen) |
 | Navigation | GoRouter | Latest stable, declarative routes |
 | Backend | Supabase | PostgreSQL + Auth + Realtime + Edge Functions + Storage |
 | Auth | Supabase Auth (GoTrue) | Anonymous + Email + Google + Apple |
-| Edge Functions | Deno runtime | 4 functions: daily-puzzle, submit-score, join-group |
+| Edge Functions | Deno runtime | daily-puzzle, start-puzzle, submit-score, join-group, export-data (shared code in `_shared/`) |
 | Local Storage | Hive | Puzzle cache, offline sync queue |
 | Settings | SharedPreferences | User preferences, flags |
-| Analytics | Firebase Analytics (GA4) | Event tracking |
+| Analytics | Firebase Analytics (GA4) | Optional: enabled only when FIREBASE_* env values are set (`lib/firebase_options.dart`); no-op otherwise |
 | Crash Reporting | Firebase Crashlytics | Error monitoring |
 | Performance | Firebase Performance Monitoring | App metrics |
-| Feature Flags | Firebase Remote Config | A/B testing, kill switches |
-| Push Notifications | Firebase Cloud Messaging | Topic-based (daily_puzzle, group_{id}) |
+| Feature Flags / kill switch | Supabase `app_config` table | `min_supported_version`, `latest_version`, `maintenance_mode`, `store_urls` (router gates in `app_router.dart`) |
+| Notifications | flutter_local_notifications (+ FCM topic `daily_puzzle` when Firebase configured) | Daily reminder + streak-at-risk reminder |
 | Animations | Flutter AnimationController + Rive | Celebration animations |
 | CI/CD | GitHub Actions + Fastlane | Automated builds and store deployment |
 
@@ -102,21 +102,26 @@ Every feature under `lib/features/{feature}/` follows this structure:
 
 | Table | Created In | Purpose |
 |-------|-----------|---------|
-| profiles | Story 1.1 | User identity, display name, avatar, settings |
-| puzzles | Story 3.1 | Daily puzzle data (grid, waypoints, walls, metadata) |
-| puzzle_attempts | Story 3.4 | Solve records (time, hints, undos, path) |
-| streaks | Story 3.5 | Current streak, longest streak, freeze count |
-| groups | Story 4.1 | Group name, description, invite code, admin |
-| group_members | Story 4.1 | User-group membership with role and join date |
-| reports | Story 8.2 | Content moderation reports |
+| profiles | 1.1 | Identity, settings, `is_banned`, `deleted_at`, `last_active_at` |
+| puzzles | 3.1 | Public puzzle data (NO solution column) |
+| puzzle_solutions | 2026-09 | Reference path per puzzle; service role only |
+| puzzle_attempts | 3.4 | Solve records; written ONLY by `submit-score`; partial unique on completed |
+| puzzle_sessions / submission_log | 2026-09 | HMAC nonce per user/date; rate limiting |
+| streaks / streak_freezes | 3.5 | Recomputed by `recompute_streak(uid)` from attempts + freezes |
+| groups / group_members / group_feed | 4.1 | Groups, membership (count via trigger), realtime activity feed |
+| app_config | 2026-09 | Force-update / maintenance / store URLs |
+| reports / banned_words | 8.2 | Moderation reports, profanity list used by `contains_profanity()` |
 
 **Critical:** Create tables just-in-time in the story that first needs them. Do NOT create all tables upfront.
 
 **Row-Level Security (RLS):** Every public table MUST have RLS policies. Users can only read their own attempts and data within groups they belong to.
 
-**Database RPC Functions:**
-- `get_group_daily_leaderboard(group_id, puzzle_date)` — ranked by hints ASC, time ASC, undos ASC
-- `get_group_weekly_leaderboard(group_id, week_start)` — ranked by completed DESC, avg_time ASC
+**Database RPC Functions (clients never write groups/attempts/streaks directly):**
+- `get_group_daily_leaderboard(p_group_id, p_puzzle_date)` — rank, hints ASC, time ASC, undos ASC (+ `verified`)
+- `get_group_weekly_leaderboard(p_group_id, p_week_start)` — completed DESC, avg_time ASC
+- `create_group`, `update_group`, `leave_group`, `remove_group_member`, `transfer_group_admin`, `delete_group`
+- `request_account_deletion`, `cancel_account_deletion`; cron: `purge_deleted_accounts`, `purge_inactive_anonymous`, `apply_streak_freezes`, `reset_weekly_freezes`
+- Full contracts: `supabase/README.md`. Migrations are additive: never edit a shipped file under `supabase/migrations/`.
 
 **Indexes:** puzzles(puzzle_date), puzzle_attempts(puzzle_date), puzzle_attempts(user_id), groups(invite_code), group_members(user_id)
 
@@ -128,11 +133,11 @@ Every feature under `lib/features/{feature}/` follows this structure:
 | submit-score | HTTP POST | Validate path server-side, record attempt, update streaks |
 | join-group | HTTP POST | Validate invite code, enforce 50-member limit |
 
-**All Edge Functions must:**
-- Expose `/health` endpoint returning 200 OK
-- Use structured JSON logging with correlation IDs
-- Check `is_banned` on profiles table before processing
-- Validate HMAC signature on score submissions
+**All Edge Functions must** (helpers in `supabase/functions/_shared/http.ts`):
+- Expose `/health`, use the structured `Logger` (correlation id from `x-correlation-id`)
+- Check `is_banned` / `deleted_at` via `banCheck`
+- `submit-score` verifies HMAC-SHA256(nonce from `start-puzzle`) over `date|time|hints|undos|sha256(path)`, clock plausibility (5 min), date window, and re-validates the path with `puzzle_core.validatePath`
+- `daily-puzzle` requires `PUZZLE_SEED_SALT`; generation is deterministic per date (also run by `.github/workflows/puzzles.yml` and pg_cron)
 
 ### Authentication Flow
 
@@ -244,7 +249,8 @@ myProvider.when(
 - **Share cards are client-side** (RepaintBoundary.toImage), NOT server-side Edge Function.
 - **Tables created just-in-time** — only in the story that first needs them, not all upfront.
 - **No MVP phasing** — all 126 FRs ship in v1. Production-ready from day one.
-- **Backbite algorithm** for Hamiltonian path generation — server-side only.
+- **Puzzle core** (`supabase/functions/_shared/puzzle_core.ts` and its Dart mirror `lib/features/puzzle/domain/solver/`): Warnsdorff DFS + canonical backbite for the reference path, pruned solver proving exactly ONE solution, waypoints chosen to enforce uniqueness (fewer clues = harder). Keep both implementations in sync; `fixtures/puzzle_parity.json` is the parity test.
+- **Weekday difficulty:** Mon/Tue 5x5 easy, Wed/Thu 6x6 medium, Fri/Sat 7x7 hard, Sun 8x8 expert (UTC).
 - **Celebration animation:** 800ms total (200ms grid ripple + 600ms confetti burst). Reduced motion: green glow on grid border.
 - **Pre-permission screen** before OS notification dialog — shown after first puzzle completion.
 - **Group max 50 members.** Invite codes are 6-char alphanumeric.
@@ -288,4 +294,4 @@ supabase start  # Local development
 
 ---
 
-Last Updated: 2026-03-02
+Last Updated: 2026-09-09 (see `docs/superpowers/specs/2026-09-09-production-readiness-design.md` and `docs/RELEASE_RUNBOOK.md`)

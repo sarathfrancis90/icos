@@ -21,7 +21,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import 'package:icos/core/constants/app_colors.dart';
-import 'package:icos/core/constants/app_sizes.dart';
 import 'package:icos/core/theme/app_theme.dart';
 import 'package:icos/features/auth/presentation/onboarding_screen.dart';
 import 'package:icos/features/home/presentation/home_screen.dart';

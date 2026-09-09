@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
+import 'grid_palette.dart';
 
 /// Premium snake renderer using overlapping circles with radial gradients.
 ///
@@ -19,9 +19,13 @@ class SnakeRenderer {
     this.idleBlinkProgress = -1.0,
     this.tongueProgress = -1.0,
     this.invalidLungeOffset = Offset.zero,
+    this.palette = GridPalette.standard,
   });
 
   final double cellSize;
+
+  /// Colours (standard or colorblind palette).
+  final GridPalette palette;
   final double glowBreathValue;
   final double eatingProgress;
   final int eatingSegmentIndex;
@@ -189,7 +193,7 @@ class SnakeRenderer {
     }
 
     final glowPaint = Paint()
-      ..color = AppColors.snakeGlowOuter.withValues(alpha: breathAlpha)
+      ..color = palette.snakeGlowOuter.withValues(alpha: breathAlpha)
       ..strokeWidth = bodyWidth + 18
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
@@ -212,7 +216,7 @@ class SnakeRenderer {
     }
 
     final glowPaint = Paint()
-      ..color = AppColors.snakeGlowInner.withValues(alpha: breathAlpha)
+      ..color = palette.snakeGlowInner.withValues(alpha: breathAlpha)
       ..strokeWidth = bodyWidth + 6
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
@@ -257,12 +261,12 @@ class SnakeRenderer {
       final baseColor = _snakeColorAt(t);
       final highlightColor = Color.lerp(
         baseColor,
-        AppColors.snakeSegmentHighlight,
+        palette.snakeSegmentHighlight,
         0.4,
       )!;
       final shadowColor = Color.lerp(
         baseColor,
-        AppColors.snakeSegmentShadow,
+        palette.snakeSegmentShadow,
         0.5,
       )!;
 
@@ -316,7 +320,7 @@ class SnakeRenderer {
 
       final scalePaint = Paint()
         ..color =
-            AppColors.snakeSegmentShadow.withValues(alpha: 0.12 + 0.08 * t)
+            palette.snakeSegmentShadow.withValues(alpha: 0.12 + 0.08 * t)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2
         ..strokeCap = StrokeCap.round;
@@ -357,7 +361,7 @@ class SnakeRenderer {
 
       final highlightPaint = Paint()
         ..color =
-            AppColors.snakeBellyHighlight.withValues(alpha: 0.08 + 0.06 * t)
+            palette.snakeBellyHighlight.withValues(alpha: 0.08 + 0.06 * t)
         ..strokeWidth = cellSize * 0.04
         ..strokeCap = StrokeCap.round
         ..style = PaintingStyle.stroke;
@@ -401,7 +405,7 @@ class SnakeRenderer {
     // Bright glow at bulge position
     final bulgePaint = Paint()
       ..color =
-          AppColors.snakeHeadBright.withValues(alpha: 0.35 * bulgeIntensity)
+          palette.snakeHeadBright.withValues(alpha: 0.35 * bulgeIntensity)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
     canvas.drawCircle(point, bulgeRadius, bulgePaint);
 
@@ -440,7 +444,7 @@ class SnakeRenderer {
       final r = tailRadius * (1.0 - tt * 0.6);
       final p = Offset.lerp(tailEnd, tip, tt)!;
       final paint = Paint()
-        ..color = AppColors.snakeBodyEnd.withValues(alpha: 1.0 - tt * 0.4);
+        ..color = palette.snakeBodyEnd.withValues(alpha: 1.0 - tt * 0.4);
       canvas.drawCircle(p, r, paint);
     }
   }
@@ -487,7 +491,7 @@ class SnakeRenderer {
 
     // Head neon glow
     final headGlowPaint = Paint()
-      ..color = AppColors.snakeGlowInner.withValues(
+      ..color = palette.snakeGlowInner.withValues(
           alpha: 0.20 + glowBreathValue * 0.10)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
       ..style = PaintingStyle.fill;
@@ -504,9 +508,9 @@ class SnakeRenderer {
       Offset(-headRadius * 0.2, -headRadius * 0.25),
       headRadius * 2.0,
       [
-        AppColors.snakeHeadHighlight,
-        AppColors.snakeHeadBright,
-        AppColors.snakeBodyStart,
+        palette.snakeHeadHighlight,
+        palette.snakeHeadBright,
+        palette.snakeBodyStart,
       ],
       [0.0, 0.4, 1.0],
     );
@@ -527,7 +531,7 @@ class SnakeRenderer {
 
     // Central ridge line
     final ridgePaint = Paint()
-      ..color = AppColors.snakeBodyMid.withValues(alpha: 0.4)
+      ..color = palette.snakeBodyMid.withValues(alpha: 0.4)
       ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
@@ -539,7 +543,7 @@ class SnakeRenderer {
 
     // Nostrils
     final nostrilPaint = Paint()
-      ..color = AppColors.snakeBodyMid.withValues(alpha: 0.5);
+      ..color = palette.snakeBodyMid.withValues(alpha: 0.5);
     final nostrilX = headRadius * 0.75 * jawLengthScale;
     canvas.drawCircle(
       Offset(nostrilX, -headRadius * 0.18),
@@ -597,12 +601,12 @@ class SnakeRenderer {
 
       // Eye glow halo
       final eyeGlowPaint = Paint()
-        ..color = AppColors.snakeHeadBright.withValues(alpha: 0.15)
+        ..color = palette.snakeHeadBright.withValues(alpha: 0.15)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
       canvas.drawCircle(eyeCenter, eyeRadius * 1.3, eyeGlowPaint);
 
       // Eye sclera
-      final eyeWhitePaint = Paint()..color = AppColors.snakeEye;
+      final eyeWhitePaint = Paint()..color = palette.snakeEye;
       canvas.drawCircle(eyeCenter, eyeRadius, eyeWhitePaint);
 
       // Slit pupil (vertical ellipse)
@@ -610,7 +614,7 @@ class SnakeRenderer {
         eyeCenter.dx + pupilWidth * 0.15,
         eyeCenter.dy,
       );
-      final pupilPaint = Paint()..color = AppColors.snakePupil;
+      final pupilPaint = Paint()..color = palette.snakePupil;
       canvas.drawOval(
         Rect.fromCenter(
           center: pupilCenter,
@@ -651,7 +655,7 @@ class SnakeRenderer {
             eyeCenter.dx + eyeRadius * 1.1,
             eyeCenter.dy - eyeRadius * 1.1 + eyeRadius * 2.2 * lidClose,
           ));
-          final lidPaint = Paint()..color = AppColors.snakeHeadBright;
+          final lidPaint = Paint()..color = palette.snakeHeadBright;
           canvas.drawCircle(eyeCenter, eyeRadius + 1, lidPaint);
           canvas.restore();
         }
@@ -662,7 +666,7 @@ class SnakeRenderer {
   /// Crown scales at the back of the head.
   void _drawCrownScales(Canvas canvas, double headRadius) {
     final crownPaint = Paint()
-      ..color = AppColors.snakeHeadHighlight.withValues(alpha: 0.25);
+      ..color = palette.snakeHeadHighlight.withValues(alpha: 0.25);
 
     for (int i = -1; i <= 1; i++) {
       final y = i * headRadius * 0.28;
@@ -684,7 +688,7 @@ class SnakeRenderer {
     final forkSpread = tongueLen * 0.25;
 
     final tonguePaint = Paint()
-      ..color = AppColors.snakeTongue
+      ..color = palette.snakeTongue
       ..strokeWidth = 1.8
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
@@ -713,7 +717,7 @@ class SnakeRenderer {
   // ─── Color Utilities ──────────────────────────────────────────
 
   Color _snakeColorAt(double t) {
-    const colors = AppColors.snakeGradientColors;
+    final colors = palette.snakeGradientColors;
     if (colors.length < 2) return colors.first;
 
     final segCount = colors.length - 1;

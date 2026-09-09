@@ -11,6 +11,8 @@ class GameControls extends StatelessWidget {
     required this.onUndo,
     required this.onReset,
     required this.onHint,
+    this.hintThinking = false,
+    this.readOnly = false,
     super.key,
   });
 
@@ -19,11 +21,19 @@ class GameControls extends StatelessWidget {
   final VoidCallback onReset;
   final VoidCallback onHint;
 
+  /// Solver is running: the hint button reads "Thinking…" and is disabled.
+  final bool hintThinking;
+
+  /// Replay of a finished puzzle: every control is disabled.
+  final bool readOnly;
+
   @override
   Widget build(BuildContext context) {
-    final isPlaying = gameState.status == GameStatus.playing;
-    final canUseHint = gameState.status == GameStatus.playing ||
-        gameState.status == GameStatus.notStarted;
+    final isPlaying = !readOnly && gameState.status == GameStatus.playing;
+    final canUseHint = !readOnly &&
+        !hintThinking &&
+        (gameState.status == GameStatus.playing ||
+            gameState.status == GameStatus.notStarted);
     final hasPath = gameState.path.isNotEmpty;
 
     return Padding(
@@ -51,7 +61,7 @@ class GameControls extends StatelessWidget {
           Expanded(
             flex: 3,
             child: _OutlinedPillButton(
-              label: 'Hint',
+              label: hintThinking ? 'Thinking…' : 'Hint',
               badgeCount: gameState.hintsUsed,
               onPressed: canUseHint ? onHint : null,
             ),

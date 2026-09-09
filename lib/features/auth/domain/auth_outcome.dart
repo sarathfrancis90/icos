@@ -34,9 +34,16 @@ class AuthRedirected extends AuthOutcome {
 /// Supabase requires the user to confirm the new email before the account
 /// becomes usable with that email.
 class AuthEmailConfirmationRequired extends AuthOutcome {
-  const AuthEmailConfirmationRequired({required this.email});
+  const AuthEmailConfirmationRequired({
+    required this.email,
+    this.fromSignUp = false,
+  });
 
   final String email;
+
+  /// True when produced by a fresh `signUp` (resend uses `OtpType.signup`);
+  /// false for a guest upgrade via `updateUser` (`OtpType.emailChange`).
+  final bool fromSignUp;
 }
 
 /// The email / OAuth identity already belongs to another account. The UI

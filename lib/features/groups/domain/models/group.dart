@@ -167,7 +167,7 @@ sealed class WeeklyLeaderboardEntry with _$WeeklyLeaderboardEntry {
 @freezed
 sealed class GroupFeedEvent with _$GroupFeedEvent {
   const factory GroupFeedEvent({
-    required String id,
+    @JsonKey(fromJson: _asString) required String id,
     required String groupId,
     required String userId,
     @JsonKey(fromJson: _asStringOrNull) String? puzzleDate,

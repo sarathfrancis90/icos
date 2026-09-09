@@ -50,7 +50,7 @@ Future<bool> handleAuthOutcome(
       );
       return false;
 
-    case AuthEmailConfirmationRequired(:final email):
+    case AuthEmailConfirmationRequired(:final email, :final fromSignUp):
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
@@ -65,7 +65,7 @@ Future<bool> handleAuthOutcome(
               onPressed: () {
                 ref
                     .read(authNotifierProvider.notifier)
-                    .resendConfirmation(email);
+                    .resendConfirmation(email, fromSignUp: fromSignUp);
                 Navigator.of(context).pop();
               },
               child: const Text('Resend'),

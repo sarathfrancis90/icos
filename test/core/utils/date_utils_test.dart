@@ -184,4 +184,108 @@ void main() {
       expect(result.isBefore(now) || result.isAtSameMomentAs(now), isTrue);
     });
   });
+
+  group('weekStartOf', () {
+    // 2026-09-07 is a Monday, 2026-09-13 a Sunday.
+    test('Monday 00:00:00 UTC maps to itself', () {
+      final monday = DateTime.utc(2026, 9, 7);
+      expect(monday.weekday, DateTime.monday);
+      expect(AppDateUtils.weekStartOf(monday), DateTime.utc(2026, 9, 7));
+    });
+
+    test('Sunday 23:59:59 UTC maps to the Monday six days earlier', () {
+      final sunday = DateTime.utc(2026, 9, 13, 23, 59, 59);
+      expect(sunday.weekday, DateTime.sunday);
+      expect(AppDateUtils.weekStartOf(sunday), DateTime.utc(2026, 9, 7));
+    });
+
+    test('Monday 00:00:00 minus one second belongs to the previous week', () {
+      final justBefore = DateTime.utc(2026, 9, 7).subtract(
+        const Duration(seconds: 1),
+      );
+      expect(AppDateUtils.weekStartOf(justBefore), DateTime.utc(2026, 8, 31));
+    });
+
+    test('mid-week time is truncated to Monday midnight', () {
+      final wednesday = DateTime.utc(2026, 9, 9, 15, 42, 7);
+      final start = AppDateUtils.weekStartOf(wednesday);
+      expect(start, DateTime.utc(2026, 9, 7));
+      expect(start.isUtc, isTrue);
+      expect(start.hour, 0);
+    });
+
+    test('local times are converted to UTC first', () {
+      final local = DateTime.utc(2026, 9, 13, 23, 30).toLocal();
+      expect(AppDateUtils.weekStartOf(local), DateTime.utc(2026, 9, 7));
+    });
+
+    test('crosses month and year boundaries', () {
+      // 2027-01-01 is a Friday; its week starts Monday 2026-12-28.
+      expect(
+        AppDateUtils.weekStartOf(DateTime.utc(2027, 1, 1, 12)),
+        DateTime.utc(2026, 12, 28),
+      );
+    });
+  });
+
+  group('dateNDaysAgo', () {
+    final from = DateTime.utc(2026, 9, 9, 0, 0, 1);
+
+    test('0 is the same day', () {
+      expect(AppDateUtils.dateNDaysAgo(0, from: from), '2026-09-09');
+    });
+
+    test('1 is yesterday even one second after midnight UTC', () {
+      expect(AppDateUtils.dateNDaysAgo(1, from: from), '2026-09-08');
+    });
+
+    test('negative values go forward', () {
+      expect(AppDateUtils.dateNDaysAgo(-1, from: from), '2026-09-10');
+    });
+
+    test('crosses month boundaries', () {
+      expect(
+        AppDateUtils.dateNDaysAgo(1, from: DateTime.utc(2026, 3, 1)),
+        '2026-02-28',
+      );
+    });
+
+    test('crosses year boundaries', () {
+      expect(
+        AppDateUtils.dateNDaysAgo(1, from: DateTime.utc(2027, 1, 1)),
+        '2026-12-31',
+      );
+    });
+
+    test('recentDates excludes today and is newest first', () {
+      final dates = AppDateUtils.recentDates(3, from: from);
+      expect(dates, ['2026-09-08', '2026-09-07', '2026-09-06']);
+    });
+  });
+
+  group('isTodayOrTomorrowUtc / daysAgo', () {
+    final now = DateTime.utc(2026, 9, 9, 23, 59, 59);
+
+    test('today and tomorrow are allowed, others are not', () {
+      expect(AppDateUtils.isTodayOrTomorrowUtc('2026-09-09', now: now), isTrue);
+      expect(AppDateUtils.isTodayOrTomorrowUtc('2026-09-10', now: now), isTrue);
+      expect(AppDateUtils.isTodayOrTomorrowUtc('2026-09-08', now: now), isFalse);
+      expect(AppDateUtils.isTodayOrTomorrowUtc('2026-09-11', now: now), isFalse);
+    });
+
+    test('daysAgo counts whole UTC days', () {
+      expect(AppDateUtils.daysAgo('2026-09-09', now: now), 0);
+      expect(AppDateUtils.daysAgo('2026-09-02', now: now), 7);
+      expect(AppDateUtils.daysAgo('2026-09-01', now: now), 8);
+    });
+
+    test('weekdayOf uses UTC weekday', () {
+      expect(AppDateUtils.weekdayOf('2026-09-07'), DateTime.monday);
+      expect(AppDateUtils.weekdayOf('2026-09-13'), DateTime.sunday);
+    });
+
+    test('formatDateHuman', () {
+      expect(AppDateUtils.formatDateHuman('2026-09-09'), 'Wed, 9 Sep');
+    });
+  });
 }

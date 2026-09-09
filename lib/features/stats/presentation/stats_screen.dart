@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/utils/date_utils.dart';
+import '../../practice/providers/practice_provider.dart';
 import '../domain/models/streak.dart';
 import '../providers/stats_provider.dart';
 import 'widgets/streak_calendar.dart';
@@ -17,6 +18,7 @@ class StatsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overviewAsync = ref.watch(statsOverviewProvider);
     final historyAsync = ref.watch(solveHistoryProvider);
+    final practiceStats = ref.watch(practiceStatsNotifierProvider);
 
     return SafeArea(
       child: RefreshIndicator(
@@ -39,6 +41,8 @@ class StatsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSizes.lg),
             _buildOverviewSection(context, overviewAsync),
+            const SizedBox(height: AppSizes.sm),
+            _PracticeStatsCard(stats: practiceStats),
             const SizedBox(height: AppSizes.lg),
             _buildCalendarSection(context, overviewAsync, historyAsync),
             const SizedBox(height: AppSizes.lg),
@@ -166,9 +170,37 @@ class _StatsOverviewCards extends StatelessWidget {
   }
 
   String _freezeStatusText(StatsOverview overview) {
-    if (overview.freezeCount > 0) return '${overview.freezeCount} available';
+    if (overview.freezeCount > 0) {
+      final n = overview.freezeCount;
+      return '$n freeze${n == 1 ? '' : 's'} available this week';
+    }
     if (overview.lastFreezeUsedAt != null) return 'Used this week';
-    return '0 available';
+    return 'None left this week';
+  }
+}
+
+/// Local practice statistics (never synced).
+class _PracticeStatsCard extends StatelessWidget {
+  const _PracticeStatsCard({required this.stats});
+
+  final PracticeStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final best = [
+      for (final size in practiceSizes)
+        if (stats.bestBySize[size] != null)
+          '${size}x$size ${AppDateUtils.formatTime(stats.bestBySize[size]!)}',
+    ];
+    return _StatCard(
+      label: 'Practice',
+      value: stats.count == 0
+          ? 'No practice yet'
+          : '${stats.count} solved'
+              '${best.isEmpty ? '' : ' · best ${best.join(', ')}'}',
+      icon: Icons.fitness_center_rounded,
+      gradientColors: const [AppColors.pathAmber, AppColors.pathOrangeDeep],
+    );
   }
 }
 
@@ -321,7 +353,10 @@ class _StatCard extends StatelessWidget {
                 Text(label, style: theme.textTheme.bodySmall),
                 Text(
                   value,
-                  style: theme.textTheme.headlineMedium?.copyWith(
+                  style: (value.length > 12
+                          ? theme.textTheme.titleMedium
+                          : theme.textTheme.headlineMedium)
+                      ?.copyWith(
                     fontFeatures: [const FontFeature.tabularFigures()],
                   ),
                 ),

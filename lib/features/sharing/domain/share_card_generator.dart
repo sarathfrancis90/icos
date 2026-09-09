@@ -30,16 +30,21 @@ class ShareCardGenerator {
     required String difficulty,
     required bool underPar,
     List<List<bool>>? gridFilled,
+    String? dateLabel,
+    int? streak,
   }) {
-    final today = AppDateUtils.todayUtc();
+    final label = dateLabel ?? AppDateUtils.todayUtc();
     final timeStr = AppDateUtils.formatTime(timeSeconds);
     final hintStr = hintsUsed == 0 ? 'No hints' : '$hintsUsed hint${hintsUsed > 1 ? 's' : ''}';
 
     final buffer = StringBuffer()
-      ..writeln('Icos $today')
+      ..writeln('Icos $label')
       ..writeln('${gridSize}x$gridSize ${difficulty[0].toUpperCase()}${difficulty.substring(1)}')
       ..writeln('$timeStr · $hintStr')
       ..writeln(underPar ? '⭐ Under Par!' : '✅ Solved!');
+    if (streak != null && streak > 0) {
+      buffer.writeln('🔥 $streak day streak');
+    }
 
     // Emoji grid representation
     if (gridFilled != null) {

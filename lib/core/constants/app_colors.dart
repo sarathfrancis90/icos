@@ -138,12 +138,68 @@ abstract final class AppColors {
   static const lightFilledCell = Color(0xFFDBEAFE);
 
   // ─── Colorblind Palettes ─────────────────────────────────────────
+  // Okabe–Ito based. Each mode pairs a path hue with a contrasting
+  // waypoint hue that stays distinguishable under that deficiency; pattern
+  // overlays (hatching / rings) are added on top so colour is never the
+  // only cue.
   static const deuteranopiaPath = Color(0xFF0072B2);
   static const deuteranopiaWaypoint = Color(0xFFE69F00);
   static const protanopiaPath = Color(0xFF56B4E9);
   static const protanopiaWaypoint = Color(0xFFD55E00);
   static const tritanopiaPath = Color(0xFF009E73);
   static const tritanopiaWaypoint = Color(0xFFCC79A7);
+
+  /// Deuteranopia: blue path, orange waypoints.
+  static const cbDeutSnakeGradient = [
+    Color(0xFF003F6B),
+    Color(0xFF00568A),
+    deuteranopiaPath,
+    Color(0xFF3399DD),
+    Color(0xFF66B8EE),
+  ];
+  static const cbDeutHeadHighlight = Color(0xFFBFE4FF);
+  static const cbDeutGlow = Color(0x600072B2);
+  static const cbDeutWaypointFill = deuteranopiaWaypoint;
+  static const cbDeutWaypointStart = Color(0xFFB87A00);
+  static const cbDeutFilledDark = Color(0xFF0F2A44);
+  static const cbDeutFilledLight = Color(0xFF16406A);
+
+  /// Protanopia: sky-blue path, yellow waypoints.
+  static const cbProtSnakeGradient = [
+    Color(0xFF1B5E8C),
+    Color(0xFF2F7FB5),
+    protanopiaPath,
+    Color(0xFF7FC8F0),
+    Color(0xFFA8DDF7),
+  ];
+  static const cbProtHeadHighlight = Color(0xFFDDF2FC);
+  static const cbProtGlow = Color(0x6056B4E9);
+  static const cbProtWaypointFill = Color(0xFFF0E442);
+  static const cbProtWaypointStart = Color(0xFFC9BC1E);
+  static const cbProtFilledDark = Color(0xFF12344A);
+  static const cbProtFilledLight = Color(0xFF1B4F6E);
+
+  /// Tritanopia: red path, teal waypoints.
+  static const cbTritSnakeGradient = [
+    Color(0xFF7A1414),
+    Color(0xFFA11E1E),
+    Color(0xFFD62828),
+    Color(0xFFE85D5D),
+    Color(0xFFF28C8C),
+  ];
+  static const cbTritHeadHighlight = Color(0xFFFFD1D1);
+  static const cbTritGlow = Color(0x60D62828);
+  static const cbTritWaypointFill = tritanopiaPath;
+  static const cbTritWaypointStart = Color(0xFF006B4E);
+  static const cbTritFilledDark = Color(0xFF3A1414);
+  static const cbTritFilledLight = Color(0xFF5A1E1E);
+
+  /// Highlight for the "wrong cell" hint (backtrack to here).
+  static const wrongCell = Color(0xFFEF4444);
+  static const wrongCellTritanopia = Color(0xFFCC79A7);
+
+  /// Pattern overlay stroke used in colorblind modes.
+  static const patternOverlay = Color(0x59FFFFFF);
 
   // ─── Convenience gradients ───────────────────────────────────────
   static const purpleButtonGradient = LinearGradient(
