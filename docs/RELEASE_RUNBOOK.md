@@ -9,6 +9,20 @@ recurs per release.
 
 ---
 
+
+> **Status 2026-09-09:** The Supabase project **`icos`** (ref `pdvgddvubxldjnemdkok`, us-east-1,
+> org "Francis Org") is LIVE with all 20 migrations applied, all 5 edge functions deployed,
+> `PUZZLE_SEED_SALT` set, Vault entries (`project_url`, `service_role_key`) created, anonymous
+> sign-ins + email/password enabled (email confirmations currently OFF for testing — turn them on
+> in `supabase/config.toml` `[auth.email] enable_confirmations = true` and `supabase config push`
+> before launch), the app-scheme redirect `io.supabase.icos://login-callback` registered, and
+> 16 days of puzzles seeded (2026-09-08 → 2026-09-23). `.env.development` / `.env.production`
+> already point at it. Migrations were applied through the Supabase MCP, so before the first
+> `supabase db push` run `supabase link --project-ref pdvgddvubxldjnemdkok` and then
+> `supabase migration repair --status applied <version>` for each file in `supabase/migrations/`
+> (or `supabase migration list` to compare). Google / Apple OAuth providers are NOT configured yet
+> (sections 3 and 5 below). Firebase is not configured (optional).
+
 ## 0. Prerequisites (local machine)
 
 - [ ] macOS with Xcode 16+ and Command Line Tools (`xcode-select --install`)
