@@ -108,13 +108,13 @@ class MyGroups extends _$MyGroups {
     final current = state.valueOrNull ?? const <Group>[];
     final others = current.where((g) => g.id != group.id);
     state = AsyncValue.data([group, ...others]);
-    ref.invalidate(groupDetailProvider(group.id));
+    // groupDetailProvider watches this list, so it refreshes on its own.
+    // Invalidating it from here creates a Riverpod circular dependency.
   }
 
   void _removeLocal(String groupId) {
     final current = state.valueOrNull ?? const <Group>[];
     state = AsyncValue.data(current.where((g) => g.id != groupId).toList());
-    ref.invalidate(groupDetailProvider(groupId));
   }
 }
 
