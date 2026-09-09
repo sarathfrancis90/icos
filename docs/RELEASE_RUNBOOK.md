@@ -11,7 +11,7 @@ recurs per release.
 
 
 > **Status 2026-09-09:** The Supabase project **`icos`** (ref `pdvgddvubxldjnemdkok`, us-east-1,
-> org "Francis Org") is LIVE with all 20 migrations applied, all 5 edge functions deployed,
+> org "Francis Org") is LIVE with all 21 migrations applied, all 5 edge functions deployed,
 > `PUZZLE_SEED_SALT` set, Vault entries (`project_url`, `service_role_key`) created, anonymous
 > sign-ins + email/password enabled (email confirmations currently OFF for testing — turn them on
 > in `supabase/config.toml` `[auth.email] enable_confirmations = true` and `supabase config push`
