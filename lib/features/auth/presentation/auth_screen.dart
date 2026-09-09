@@ -95,7 +95,7 @@ class AuthScreen extends ConsumerWidget {
                 Text(
                   subtitle,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  style: AppTheme.darkTheme.textTheme.bodyLarge?.copyWith(
                     color: AppColors.textSecondaryDark,
                   ),
                 ),
@@ -198,7 +198,7 @@ class AuthScreen extends ConsumerWidget {
                       hasSession && isGuest
                           ? 'Not now'
                           : AppStrings.continueAsGuest,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      style: AppTheme.darkTheme.textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondaryDark,
                       ),
                     ),

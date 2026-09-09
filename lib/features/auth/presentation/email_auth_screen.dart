@@ -68,7 +68,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                 children: [
                   Text(
                     _isSignUp ? 'Create Account' : 'Welcome Back',
-                    style: Theme.of(context).textTheme.displayMedium,
+                    style: AppTheme.darkTheme.textTheme.displayMedium,
                   ),
                   const SizedBox(height: AppSizes.xs),
                   Text(
@@ -81,7 +81,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                               ? 'Signing in to an existing account replaces '
                                     'your guest progress on this device'
                               : 'Sign in to continue your streak'),
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    style: AppTheme.darkTheme.textTheme.bodyLarge?.copyWith(
                       color: AppColors.textSecondaryDark,
                     ),
                   ),
@@ -211,7 +211,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                           Expanded(
                             child: Text(
                               _errorMessage!,
-                              style: Theme.of(context).textTheme.bodyMedium
+                              style: AppTheme.darkTheme.textTheme.bodyMedium
                                   ?.copyWith(color: AppColors.error),
                             ),
                           ),
@@ -258,7 +258,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                                 )
                               : Text(
                                   _isSignUp ? 'Create Account' : 'Sign In',
-                                  style: Theme.of(context).textTheme.titleMedium
+                                  style: AppTheme.darkTheme.textTheme.titleMedium
                                       ?.copyWith(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w700,
@@ -278,7 +278,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                         _isSignUp
                             ? 'Already have an account?'
                             : "Don't have an account?",
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        style: AppTheme.darkTheme.textTheme.bodyMedium?.copyWith(
                           color: AppColors.textSecondaryDark,
                         ),
                       ),
@@ -292,7 +292,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                         },
                         child: Text(
                           _isSignUp ? 'Sign In' : 'Sign Up',
-                          style: Theme.of(context).textTheme.labelLarge
+                          style: AppTheme.darkTheme.textTheme.labelLarge
                               ?.copyWith(color: AppColors.purpleLight),
                         ),
                       ),
