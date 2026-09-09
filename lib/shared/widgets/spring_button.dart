@@ -101,14 +101,23 @@ class _SpringButtonState extends State<SpringButton>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: _onTapDown,
-      onTapUp: _onTapUp,
-      onTapCancel: _onTapCancel,
-      behavior: HitTestBehavior.opaque,
-      child: Transform.scale(
-        scale: _currentScale,
-        child: widget.child,
+    // GestureDetector only exposes a semantic tap action for `onTap`; this
+    // widget drives the press animation from tapDown/tapUp, so declare the
+    // button explicitly for VoiceOver / TalkBack / UI automation.
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: widget.enabled && widget.onPressed != null,
+      onTap: widget.onPressed,
+      child: GestureDetector(
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        behavior: HitTestBehavior.opaque,
+        child: Transform.scale(
+          scale: _currentScale,
+          child: widget.child,
+        ),
       ),
     );
   }

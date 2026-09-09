@@ -255,7 +255,12 @@ class _OnboardingPageState extends State<_OnboardingPage>
           const SizedBox(height: AppSizes.xl),
           Text(
             widget.title,
-            style: Theme.of(context).textTheme.headlineLarge,
+            // Onboarding always renders on the dark backdrop, so pin the
+            // title colour instead of inheriting the (possibly light) theme.
+            style: Theme.of(context)
+                .textTheme
+                .headlineLarge
+                ?.copyWith(color: AppColors.textPrimaryDark),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSizes.md),
