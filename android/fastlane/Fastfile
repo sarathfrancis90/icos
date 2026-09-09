@@ -1,22 +1,52 @@
 default_platform(:android)
 
+AAB_PATH = "../build/app/outputs/bundle/release/app-release.aab".freeze
+MAPPING_PATH = "../build/app/outputs/mapping/release/mapping.txt".freeze
+
 platform :android do
-  desc "Deploy to Google Play Internal Testing"
-  lane :internal do
-    upload_to_play_store(
-      track: "internal",
-      aab: "../build/app/outputs/bundle/release/app-release.aab",
+  # Shared options for every upload lane. Uploads the AAB built by
+  # `flutter build appbundle --release` plus the R8 mapping file so Play can
+  # deobfuscate crash reports. Store listing/images are managed in the console.
+  def upload_opts(track)
+    {
+      track: track,
+      aab: AAB_PATH,
+      mapping: (File.exist?(MAPPING_PATH) ? MAPPING_PATH : nil),
+      release_status: "completed",
       skip_upload_metadata: true,
       skip_upload_images: true,
-      skip_upload_screenshots: true
-    )
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: false,
+      skip_upload_apk: true
+    }.compact
   end
 
-  desc "Promote Internal to Production"
-  lane :promote_to_production do
+  desc "Upload the release AAB to the Internal testing track"
+  lane :internal do
+    upload_to_play_store(upload_opts("internal"))
+  end
+
+  desc "Upload the release AAB to the Closed testing (beta) track"
+  lane :beta do
+    upload_to_play_store(upload_opts("beta"))
+  end
+
+  desc "Upload the release AAB directly to Production"
+  lane :production do
+    upload_to_play_store(upload_opts("production"))
+  end
+
+  desc "Promote the current Internal build to Production (no rebuild). Pass from:beta to promote from Closed testing."
+  lane :promote_to_production do |options|
     upload_to_play_store(
-      track: "internal",
+      track: options.fetch(:from, "internal"),
       track_promote_to: "production",
+      track_promote_release_status: "completed",
+      skip_upload_aab: true,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
       skip_upload_changelogs: false
     )
   end

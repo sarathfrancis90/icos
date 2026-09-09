@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/utils/app_error.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../core/utils/text_sanitizer.dart';
 import '../../providers/profile_provider.dart';
 
 class EditNameDialog extends ConsumerStatefulWidget {
@@ -23,14 +23,6 @@ class _EditNameDialogState extends ConsumerState<EditNameDialog> {
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
 
-  // Placeholder profanity filter - words that should not be allowed.
-  static const _blockedWords = [
-    'admin',
-    'moderator',
-    'icos',
-    'support',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -43,37 +35,16 @@ class _EditNameDialogState extends ConsumerState<EditNameDialog> {
     super.dispose();
   }
 
-  String? _validateName(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Display name cannot be empty';
-    }
-
-    final trimmed = value.trim();
-
-    if (trimmed.length > AppSizes.maxDisplayNameLength) {
-      return 'Max ${AppSizes.maxDisplayNameLength} characters';
-    }
-
-    if (trimmed.length < 2) {
-      return 'Must be at least 2 characters';
-    }
-
-    final lower = trimmed.toLowerCase();
-    for (final word in _blockedWords) {
-      if (lower.contains(word)) {
-        return 'This name is not allowed';
-      }
-    }
-
-    return null;
-  }
+  String? _validateName(String? value) => validateName(value ?? '');
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
 
-    final name = _controller.text.trim();
+    // Persist the sanitised form (invisible chars stripped, whitespace
+    // collapsed) — the server applies the same rules.
+    final name = sanitizeDisplayName(_controller.text);
     final result = await ref
         .read(profileNotifierProvider.notifier)
         .updateDisplayName(name);
@@ -100,11 +71,14 @@ class _EditNameDialogState extends ConsumerState<EditNameDialog> {
         child: TextFormField(
           controller: _controller,
           autofocus: true,
-          maxLength: AppSizes.maxDisplayNameLength,
+          maxLength: kMaxDisplayNameLength,
           textCapitalization: TextCapitalization.words,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           validator: _validateName,
           decoration: const InputDecoration(
             hintText: 'Enter display name',
+            helperText:
+                '$kMinDisplayNameLength–$kMaxDisplayNameLength characters',
             counterText: '',
           ),
           onFieldSubmitted: (_) => _save(),

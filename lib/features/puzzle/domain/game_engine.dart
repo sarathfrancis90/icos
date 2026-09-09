@@ -1,5 +1,8 @@
+import 'dart:collection';
+
 import 'models/game_state.dart';
 import 'models/puzzle.dart';
+import 'solver/puzzle_core.dart';
 
 class GameEngine {
   GameEngine(this._puzzle);
@@ -215,42 +218,20 @@ class GameEngine {
     return addToPath(state, row, col);
   }
 
-  /// Get a hint: find the next cell to move to that leads to a valid solution.
-  /// Uses recursive backtracking to verify the move leads to a solvable state.
+  /// Next cell to move to, or `null` if the current path cannot be completed
+  /// (or the puzzle is already complete). See [getHintResult] for the richer
+  /// verdict that distinguishes a wrong move from "no hint".
   GridPosition? getHint(GameState state) {
-    if (state.path.isEmpty) {
-      // Must start at the first waypoint
-      final firstWp = _puzzle.waypoints.first;
-      return GridPosition(row: firstWp.row, col: firstWp.col);
-    }
-
-    final last = state.path.last;
-    final directions = [
-      [0, 1],
-      [1, 0],
-      [0, -1],
-      [-1, 0],
-    ];
-
-    // Try each adjacent cell and verify it leads to a valid solution via backtracking
-    for (final dir in directions) {
-      final nr = last.row + dir[0];
-      final nc = last.col + dir[1];
-      if (!canMoveToCell(state, nr, nc)) continue;
-
-      // Build a trial state with this move
-      final trialState = addToPath(state, nr, nc);
-
-      // Check if this move leads to a solvable state
-      if (_canSolveFromState(trialState)) {
-        return GridPosition(row: nr, col: nc);
-      }
-    }
-
-    return null;
+    final result = getHintResult(state);
+    return result.type == HintType.nextCell ? result.cell : null;
   }
 
-  /// Use a hint: find the next cell and return updated state with hint highlighted.
+  /// Solver-backed hint verdict for the current path.
+  HintResult getHintResult(GameState state) => computeHint(_puzzle, state.path);
+
+  /// Use a hint: highlight the next cell and count the hint. Returns the
+  /// state unchanged when no forward hint is available (wrong move or done);
+  /// callers wanting to surface the wrong cell should use [getHintResult].
   GameState useHint(GameState state) {
     final hint = getHint(state);
     if (hint == null) return state;
@@ -258,41 +239,6 @@ class GameEngine {
       hintCell: hint,
       hintsUsed: state.hintsUsed + 1,
     );
-  }
-
-  /// Recursive backtracking solver to check if the current state can lead to a solution.
-  bool _canSolveFromState(GameState state) {
-    // Check if already solved
-    if (isSolved(state)) return true;
-
-    // Calculate how many cells we need to fill
-    final totalCells = _puzzle.gridSize * _puzzle.gridSize;
-    final wallCount = _puzzle.walls.length;
-    final requiredCells = totalCells - wallCount;
-
-    // If we've filled all cells but it's not solved, this path is invalid
-    if (state.path.length >= requiredCells) return false;
-
-    final last = state.path.last;
-    final directions = [
-      [0, 1],
-      [1, 0],
-      [0, -1],
-      [-1, 0],
-    ];
-
-    for (final dir in directions) {
-      final nr = last.row + dir[0];
-      final nc = last.col + dir[1];
-      if (!canMoveToCell(state, nr, nc)) continue;
-
-      final nextState = addToPath(state, nr, nc);
-      if (_canSolveFromState(nextState)) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   Waypoint? _findWaypointAt(int row, int col) {
@@ -304,5 +250,131 @@ class GameEngine {
 
   List<List<CellState>> _copyGrid(List<List<CellState>> grid) {
     return grid.map((row) => [...row]).toList();
+  }
+}
+
+enum HintType { nextCell, wrongCell, none }
+
+/// Outcome of [computeHint].
+class HintResult {
+  const HintResult._(this.type, this.cell);
+
+  const HintResult.nextCell(GridPosition cell) : this._(HintType.nextCell, cell);
+  const HintResult.wrongCell(GridPosition cell)
+      : this._(HintType.wrongCell, cell);
+  const HintResult.none() : this._(HintType.none, null);
+
+  final HintType type;
+
+  /// The cell to move to next ([HintType.nextCell]) or the first cell where
+  /// the path went wrong ([HintType.wrongCell]). `null` for [HintType.none].
+  final GridPosition? cell;
+
+  @override
+  bool operator ==(Object other) =>
+      other is HintResult && other.type == type && other.cell == cell;
+
+  @override
+  int get hashCode => Object.hash(type, cell);
+
+  @override
+  String toString() => 'HintResult(${type.name}, $cell)';
+}
+
+/// Node budget for the fallback "can this path still be completed?" solve.
+const int _kPrefixSolveBudget = 60000;
+
+/// Pure hint computation, safe to run inside `Isolate.run`.
+///
+/// Solves the puzzle (the solution is cached per puzzle in a small LRU) and:
+/// * returns [HintType.nextCell] with the cell following `path` when `path`
+///   is a prefix of the solution;
+/// * otherwise, if the path can still be completed (only possible for
+///   non-unique puzzles), returns the next cell of such a completion;
+/// * otherwise returns [HintType.wrongCell] with the first cell at which the
+///   path diverges from the solution;
+/// * returns [HintType.none] when the puzzle is unsolvable, the path is
+///   already complete, or the solver budget was exhausted.
+///
+/// Pass a precomputed `solution` (from [solvePuzzle]) to skip the solve.
+HintResult computeHint(
+  Puzzle puzzle,
+  List<GridPosition> path, {
+  List<GridPosition>? solution,
+}) {
+  final size = puzzle.gridSize;
+  final solved = solution ?? solvePuzzle(puzzle);
+  if (solved == null) return const HintResult.none();
+  if (path.length >= solved.length) return const HintResult.none();
+
+  var divergence = -1;
+  for (var i = 0; i < path.length; i++) {
+    if (path[i] != solved[i]) {
+      divergence = i;
+      break;
+    }
+  }
+  if (divergence < 0) return HintResult.nextCell(solved[path.length]);
+
+  // Not a prefix of the cached solution. For puzzles with several solutions
+  // the player may still be on a valid line, so try completing their path.
+  final res = solvePuzzleModel(
+    puzzle,
+    limit: 1,
+    nodeBudget: _kPrefixSolveBudget,
+    prefix: path,
+  );
+  if (res.count == 1) {
+    final alt = positionsFromIndices(size, res.solutions.first);
+    _SolutionCache.put(puzzle, alt);
+    return HintResult.nextCell(alt[path.length]);
+  }
+  return HintResult.wrongCell(path[divergence]);
+}
+
+/// Solves the puzzle and returns its solution path, or `null` if it has none
+/// (or the solver budget was exhausted). Cached per puzzle in a small LRU.
+///
+/// Pure; suitable for `Isolate.run(() => solvePuzzle(puzzle))`. Note that the
+/// cache is per-isolate, so a solution computed in a short-lived isolate
+/// should be passed back into [computeHint] via its `solution` parameter.
+List<GridPosition>? solvePuzzle(Puzzle puzzle, {int nodeBudget = 300000}) {
+  final cached = _SolutionCache.get(puzzle);
+  if (cached != null) return cached;
+  final res = solvePuzzleModel(puzzle, limit: 1, nodeBudget: nodeBudget);
+  if (res.count < 1) return null;
+  final solution = positionsFromIndices(puzzle.gridSize, res.solutions.first);
+  _SolutionCache.put(puzzle, solution);
+  return solution;
+}
+
+/// Small LRU keyed by puzzle id plus a content fingerprint so that puzzles
+/// that reuse an id (tests, practice mode) never collide.
+class _SolutionCache {
+  static const int capacity = 4;
+  static final LinkedHashMap<String, List<GridPosition>> _entries =
+      LinkedHashMap<String, List<GridPosition>>();
+
+  static String _key(Puzzle p) {
+    final walls = p.walls.map((w) => '${w.row},${w.col}').join(';');
+    final wps = p.waypoints.map((w) => '${w.order}:${w.row},${w.col}').join(';');
+    return '${p.id}|${p.gridSize}|$walls|$wps';
+  }
+
+  static List<GridPosition>? get(Puzzle p) {
+    final key = _key(p);
+    final value = _entries.remove(key);
+    if (value == null) return null;
+    _entries[key] = value;
+    return value;
+  }
+
+  static void put(Puzzle p, List<GridPosition> solution) {
+    final key = _key(p);
+    _entries.remove(key);
+    _entries[key] = List<GridPosition>.unmodifiable(solution);
+    while (_entries.length > capacity) {
+      _entries.remove(_entries.keys.first);
+    }
   }
 }

@@ -68,15 +68,17 @@
 				<string>Editor</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<string>com.googleusercontent.apps.876802621972-oti80nkrl3ej684irm296qeuinfndhbn</string>
+					<!-- Google Sign-In reversed iOS client ID. Replace the placeholder with
+					     the REVERSED_CLIENT_ID from your iOS OAuth client in Google Cloud
+					     Console (see docs/RELEASE_RUNBOOK.md). -->
+					<string>com.googleusercontent.apps.REPLACE_WITH_IOS_CLIENT_ID</string>
 				</array>
 			</dict>
 		</array>
+		<!-- iPhone: portrait only. iPad keeps all orientations (see ~ipad key). -->
 		<key>UISupportedInterfaceOrientations</key>
 		<array>
 			<string>UIInterfaceOrientationPortrait</string>
-			<string>UIInterfaceOrientationLandscapeLeft</string>
-			<string>UIInterfaceOrientationLandscapeRight</string>
 		</array>
 		<key>UISupportedInterfaceOrientations~ipad</key>
 		<array>
@@ -86,6 +88,14 @@
 			<string>UIInterfaceOrientationLandscapeRight</string>
 		</array>
 		<key>UIStatusBarHidden</key>
+		<false/>
+		<!-- Firebase Cloud Messaging background delivery -->
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>remote-notification</string>
+		</array>
+		<!-- Only standard HTTPS/TLS is used; skips the export compliance prompt. -->
+		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
 	</dict>
 </plist>

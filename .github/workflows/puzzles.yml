@@ -1,0 +1,34 @@
+name: Generate daily puzzles
+
+# Keeps a 14-day buffer of puzzles in Supabase. Runs shortly after the UTC
+# rollover; safe to re-run (generation is deterministic per date + salt).
+on:
+  schedule:
+    - cron: '20 0 * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'How many days ahead to (re)generate'
+        required: false
+        default: '14'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Generate puzzles
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PUZZLE_SEED_SALT: ${{ secrets.PUZZLE_SEED_SALT }}
+        run: |
+          deno run -A scripts/generate_puzzles.ts daily \
+            --days "${{ inputs.days || '14' }}" \
+            --salt "$PUZZLE_SEED_SALT"

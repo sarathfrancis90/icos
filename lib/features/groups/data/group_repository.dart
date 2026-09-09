@@ -1,240 +1,370 @@
-import 'dart:convert';
-import 'dart:math';
+import 'dart:io';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/constants/app_sizes.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
+import '../domain/invite_code.dart';
 import '../domain/models/group.dart';
+import 'group_parsers.dart';
 
+/// Data access for groups, membership, leaderboards, the activity feed and
+/// content reports.
+///
+/// Every mutation goes through a server-side RPC or edge function so that
+/// invite codes, `member_count`, admin transfer and soft-delete are enforced
+/// by the database, never by the client. All methods return
+/// `Result<T, AppError>` and never throw.
 class GroupRepository {
   static const _groupsTable = 'groups';
   static const _groupMembersTable = 'group_members';
+  static const _groupFeedTable = 'group_feed';
+  static const _reportsTable = 'reports';
 
-  /// Creates a new group and adds the current user as admin.
+  static const groupColumns = 'id, name, description, invite_code, admin_id, '
+      'member_count, max_members, is_active, created_at';
+  static const memberColumns =
+      'id, group_id, user_id, role, joined_at, profiles(display_name, avatar_url)';
+  static const feedColumns = '*, profiles(display_name, avatar_url)';
+
+  /// Default page size for the activity feed.
+  static const defaultFeedLimit = 50;
+
+  SupabaseClient get _client => SupabaseService.client;
+
+  String? get _userId => SupabaseService.auth.currentUser?.id;
+
+  // ─── Group lifecycle ───────────────────────────────────────────────
+
+  /// Creates a group via the `create_group` RPC. The server sanitises the
+  /// name, generates the invite code and adds the caller as admin.
   Future<Result<Group, AppError>> createGroup({
     required String name,
     required String description,
-  }) async {
-    try {
-      final userId = SupabaseService.auth.currentUser?.id;
-      if (userId == null) {
-        return const Result.failure(AppError.auth('You must be signed in to create a group'));
+  }) {
+    return _guard(() async {
+      if (_userId == null) {
+        throw const AppErrorException(
+          AppError.auth('You must be signed in to create a group'),
+        );
       }
-
-      final inviteCode = _generateInviteCode();
-
-      final response = await SupabaseService.client
-          .from(_groupsTable)
-          .insert({
-            'name': name,
-            'description': description,
-            'invite_code': inviteCode,
-            'admin_id': userId,
-            'member_count': 1,
-            'max_members': AppSizes.maxGroupMembers,
-            'is_active': true,
-          })
-          .select()
-          .single();
-
-      // Add creator as admin member
-      await SupabaseService.client.from(_groupMembersTable).insert({
-        'group_id': response['id'],
-        'user_id': userId,
-        'role': 'admin',
-      });
-
-      return Result.success(Group.fromJson(response));
-    } on PostgrestException catch (e) {
-      return Result.failure(AppError.database(e.message));
-    } catch (e) {
-      return Result.failure(AppError.unknown(e.toString()));
-    }
-  }
-
-  /// Joins a group using an invite code via Edge Function.
-  Future<Result<Group, AppError>> joinGroup(String inviteCode) async {
-    try {
-      final userId = SupabaseService.auth.currentUser?.id;
-      if (userId == null) {
-        return const Result.failure(AppError.auth('You must be signed in to join a group'));
-      }
-
-      final response = await SupabaseService.functions.invoke(
-        'join-group',
-        body: {'invite_code': inviteCode.toUpperCase()},
+      final response = await _client.rpc<dynamic>(
+        'create_group',
+        params: {
+          'p_name': name.trim(),
+          'p_description': description.trim(),
+        },
       );
-
-      if (response.status != 200) {
-        final body = jsonDecode(response.data as String) as Map<String, dynamic>;
-        final message = body['error'] as String? ?? 'Failed to join group';
-        return Result.failure(AppError.validation(message));
-      }
-
-      final body = jsonDecode(response.data as String) as Map<String, dynamic>;
-      final group = Group.fromJson(body['group'] as Map<String, dynamic>);
-      return Result.success(group);
-    } on FunctionException catch (e) {
-      return Result.failure(AppError.network(e.toString()));
-    } catch (e) {
-      return Result.failure(AppError.unknown(e.toString()));
-    }
+      return GroupParsers.parseGroupRow(response);
+    });
   }
 
-  /// Leaves a group. Removes membership and decrements member count.
-  Future<Result<void, AppError>> leaveGroup(String groupId) async {
-    try {
-      final userId = SupabaseService.auth.currentUser?.id;
-      if (userId == null) {
-        return const Result.failure(AppError.auth('You must be signed in'));
+  /// Joins a group via the `join-group` edge function.
+  ///
+  /// `ALREADY_MEMBER` is treated as success (the existing group is fetched).
+  Future<Result<Group, AppError>> joinGroup(String inviteCode) {
+    return _guard(() async {
+      final validation = InviteCode.validate(inviteCode);
+      if (validation != null) {
+        throw AppErrorException(AppError.validation(validation));
       }
+      if (_userId == null) {
+        throw const AppErrorException(
+          AppError.auth('You must be signed in to join a group'),
+        );
+      }
+      final code = InviteCode.normalize(inviteCode);
 
-      await SupabaseService.client
-          .from(_groupMembersTable)
-          .delete()
-          .eq('group_id', groupId)
-          .eq('user_id', userId);
+      try {
+        final response = await SupabaseService.functions.invoke(
+          'join-group',
+          body: {'invite_code': code},
+        );
+        if (response.status < 200 || response.status >= 300) {
+          final failure =
+              GroupParsers.parseJoinGroupError(response.status, response.data);
+          throw AppErrorException(failure.error);
+        }
+        return GroupParsers.parseJoinGroupResponse(response.data);
+      } on FunctionException catch (e) {
+        final failure = GroupParsers.parseJoinGroupError(e.status, e.details);
+        if (failure.code == JoinGroupErrorCode.alreadyMember) {
+          final existing = failure.groupId != null
+              ? await _fetchGroup(failure.groupId!)
+              : await _fetchGroupByInviteCode(code);
+          if (existing != null) return existing;
+        }
+        throw AppErrorException(failure.error);
+      }
+    });
+  }
 
-      await SupabaseService.client.rpc<void>('decrement_group_member_count', params: {
+  /// Leaves the group via the `leave_group` RPC (admin leaving auto-transfers
+  /// or deactivates server-side).
+  Future<Result<void, AppError>> leaveGroup(String groupId) {
+    return _guard(() => _rpcVoid('leave_group', {'p_group_id': groupId}));
+  }
+
+  /// Admin-only: removes [userId] from the group.
+  Future<Result<void, AppError>> removeMember({
+    required String groupId,
+    required String userId,
+  }) {
+    return _guard(
+      () => _rpcVoid('remove_group_member', {
         'p_group_id': groupId,
-      });
-
-      return const Result.success(null);
-    } on PostgrestException catch (e) {
-      return Result.failure(AppError.database(e.message));
-    } catch (e) {
-      return Result.failure(AppError.unknown(e.toString()));
-    }
+        'p_user_id': userId,
+      }),
+    );
   }
 
-  /// Fetches all groups the current user belongs to.
-  Future<Result<List<Group>, AppError>> getMyGroups() async {
-    try {
-      final userId = SupabaseService.auth.currentUser?.id;
-      if (userId == null) {
-        return const Result.failure(AppError.auth('You must be signed in'));
-      }
+  /// Admin-only: hands admin rights to [newAdminId].
+  Future<Result<void, AppError>> transferAdmin({
+    required String groupId,
+    required String newAdminId,
+  }) {
+    return _guard(
+      () => _rpcVoid('transfer_group_admin', {
+        'p_group_id': groupId,
+        'p_new_admin_id': newAdminId,
+      }),
+    );
+  }
 
-      final memberRows = await SupabaseService.client
+  /// Admin-only: soft-deletes the group (`is_active = false`).
+  Future<Result<void, AppError>> deleteGroup(String groupId) {
+    return _guard(() => _rpcVoid('delete_group', {'p_group_id': groupId}));
+  }
+
+  // ─── Reads ─────────────────────────────────────────────────────────
+
+  /// Active groups the current user belongs to, newest first.
+  Future<Result<List<Group>, AppError>> getMyGroups() {
+    return _guard(() async {
+      final userId = _userId;
+      if (userId == null) return const <Group>[];
+
+      final memberRows = await _client
           .from(_groupMembersTable)
           .select('group_id')
           .eq('user_id', userId);
+      final groupIds = memberRows
+          .map((row) => row['group_id']?.toString())
+          .whereType<String>()
+          .toList();
+      if (groupIds.isEmpty) return const <Group>[];
 
-      if (memberRows.isEmpty) {
-        return const Result.success([]);
-      }
-
-      final groupIds =
-          memberRows.map((row) => row['group_id'] as String).toList();
-
-      final groupRows = await SupabaseService.client
+      final groupRows = await _client
           .from(_groupsTable)
-          .select()
+          .select(groupColumns)
           .inFilter('id', groupIds)
           .eq('is_active', true)
           .order('created_at', ascending: false);
-
-      final groups = groupRows.map((row) => Group.fromJson(row)).toList();
-      return Result.success(groups);
-    } on PostgrestException catch (e) {
-      // If it's an RLS error for a new user, return empty list
+      return groupRows.map(Group.fromJson).toList();
+    }, onDatabaseError: (e) {
+      // A brand-new user with no memberships can hit RLS before the
+      // profile row exists; treat as "no groups" rather than an error.
       if (e.code == '42501' || e.code == 'PGRST301') {
-        return const Result.success([]);
+        return const Result.success(<Group>[]);
       }
-      return Result.failure(AppError.database(e.message));
-    } catch (e) {
-      return Result.failure(AppError.network(e.toString()));
-    }
+      return null;
+    });
   }
 
-  /// Fetches members of a group with profile data.
-  Future<Result<List<GroupMember>, AppError>> getGroupMembers(
-    String groupId,
-  ) async {
-    try {
-      final response = await SupabaseService.client
+  /// A single active group the user can see (membership enforced by RLS).
+  Future<Result<Group, AppError>> getGroup(String groupId) {
+    return _guard(() async {
+      final group = await _fetchGroup(groupId);
+      if (group == null) {
+        throw const AppErrorException(AppError.notFound('Group not found'));
+      }
+      return group;
+    });
+  }
+
+  Future<Result<List<GroupMember>, AppError>> getGroupMembers(String groupId) {
+    return _guard(() async {
+      final rows = await _client
           .from(_groupMembersTable)
-          .select('*, profiles(display_name, avatar_url)')
+          .select(memberColumns)
           .eq('group_id', groupId)
           .order('joined_at', ascending: true);
-
-      final members = response.map((row) {
-        final profile = row['profiles'] as Map<String, dynamic>?;
-        return GroupMember.fromJson({
-          ...row,
-          'display_name': profile?['display_name'],
-          'avatar_url': profile?['avatar_url'],
-        });
-      }).toList();
-
-      return Result.success(members);
-    } on PostgrestException catch (e) {
-      return Result.failure(AppError.database(e.message));
-    } catch (e) {
-      return Result.failure(AppError.network(e.toString()));
-    }
+      return GroupParsers.parseMembers(rows);
+    });
   }
 
-  /// Fetches the daily leaderboard for a group using an RPC call.
-  Future<Result<List<GroupLeaderboardEntry>, AppError>>
-      getGroupDailyLeaderboard(String groupId, String date) async {
-    try {
-      final response = await SupabaseService.client.rpc<List<dynamic>>(
+  /// `get_group_daily_leaderboard(p_group_id, p_puzzle_date)`.
+  Future<Result<List<GroupLeaderboardEntry>, AppError>> getGroupDailyLeaderboard(
+    String groupId,
+    String puzzleDate,
+  ) {
+    return _guard(() async {
+      final response = await _client.rpc<dynamic>(
         'get_group_daily_leaderboard',
         params: {
           'p_group_id': groupId,
-          'p_date': date,
+          'p_puzzle_date': puzzleDate,
         },
       );
-
-      final entries = response
-          .map((row) =>
-              GroupLeaderboardEntry.fromJson(row as Map<String, dynamic>))
-          .toList();
-
-      return Result.success(entries);
-    } on PostgrestException catch (e) {
-      return Result.failure(AppError.database(e.message));
-    } catch (e) {
-      return Result.failure(AppError.network(e.toString()));
-    }
+      return GroupParsers.parseDailyLeaderboard(response);
+    });
   }
 
-  /// Fetches the weekly leaderboard for a group using an RPC call.
-  Future<Result<List<GroupLeaderboardEntry>, AppError>>
-      getGroupWeeklyLeaderboard(String groupId, String weekStart) async {
-    try {
-      final response = await SupabaseService.client.rpc<List<dynamic>>(
+  /// `get_group_weekly_leaderboard(p_group_id, p_week_start)`.
+  Future<Result<List<WeeklyLeaderboardEntry>, AppError>>
+      getGroupWeeklyLeaderboard(String groupId, String weekStart) {
+    return _guard(() async {
+      final response = await _client.rpc<dynamic>(
         'get_group_weekly_leaderboard',
         params: {
           'p_group_id': groupId,
           'p_week_start': weekStart,
         },
       );
+      return GroupParsers.parseWeeklyLeaderboard(response);
+    });
+  }
 
-      final entries = response
-          .map((row) =>
-              GroupLeaderboardEntry.fromJson(row as Map<String, dynamic>))
-          .toList();
+  /// Most recent [limit] activity events for the group, newest first.
+  Future<Result<List<GroupFeedEvent>, AppError>> getGroupFeed(
+    String groupId, {
+    int limit = defaultFeedLimit,
+  }) {
+    return _guard(() async {
+      final rows = await _client
+          .from(_groupFeedTable)
+          .select(feedColumns)
+          .eq('group_id', groupId)
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return GroupParsers.parseFeed(rows);
+    });
+  }
 
-      return Result.success(entries);
+  // ─── Reports ───────────────────────────────────────────────────────
+
+  Future<Result<void, AppError>> reportUser({
+    required String userId,
+    required String reason,
+    String details = '',
+  }) {
+    return _insertReport({'reported_user_id': userId}, reason, details);
+  }
+
+  Future<Result<void, AppError>> reportGroup({
+    required String groupId,
+    required String reason,
+    String details = '',
+  }) {
+    return _insertReport({'reported_group_id': groupId}, reason, details);
+  }
+
+  Future<Result<void, AppError>> _insertReport(
+    Map<String, dynamic> target,
+    String reason,
+    String details,
+  ) {
+    return _guard(() async {
+      final reporterId = _userId;
+      if (reporterId == null) {
+        throw const AppErrorException(
+          AppError.auth('You must be signed in to report'),
+        );
+      }
+      await _client.from(_reportsTable).insert({
+        'reporter_id': reporterId,
+        ...target,
+        'reason': reason,
+        'details': details.trim(),
+      });
+    });
+  }
+
+  // ─── Internals ─────────────────────────────────────────────────────
+
+  Future<Group?> _fetchGroup(String groupId) async {
+    final row = await _client
+        .from(_groupsTable)
+        .select(groupColumns)
+        .eq('id', groupId)
+        .maybeSingle();
+    return row == null ? null : Group.fromJson(row);
+  }
+
+  Future<Group?> _fetchGroupByInviteCode(String code) async {
+    final row = await _client
+        .from(_groupsTable)
+        .select(groupColumns)
+        .eq('invite_code', code)
+        .maybeSingle();
+    return row == null ? null : Group.fromJson(row);
+  }
+
+  Future<void> _rpcVoid(String fn, Map<String, dynamic> params) async {
+    if (_userId == null) {
+      throw const AppErrorException(AppError.auth('You must be signed in'));
+    }
+    await _client.rpc<dynamic>(fn, params: params);
+  }
+
+  /// Runs [body], translating every failure mode into an [AppError].
+  Future<Result<T, AppError>> _guard<T>(
+    Future<T> Function() body, {
+    Result<T, AppError>? Function(PostgrestException e)? onDatabaseError,
+  }) async {
+    try {
+      return Result.success(await body());
+    } on AppErrorException catch (e) {
+      return Result.failure(e.error);
     } on PostgrestException catch (e) {
-      return Result.failure(AppError.database(e.message));
+      final override = onDatabaseError?.call(e);
+      if (override != null) return override;
+      return Result.failure(_mapPostgrest(e));
+    } on AuthException catch (e) {
+      return Result.failure(AppError.auth(e.message));
+    } on FunctionException catch (e) {
+      return Result.failure(
+        AppError.network('Service unavailable (${e.status})'),
+      );
+    } on SocketException {
+      return const Result.failure(AppError.network('No connection'));
+    } on FormatException catch (e) {
+      return Result.failure(AppError.unknown(e.message));
     } catch (e) {
-      return Result.failure(AppError.network(e.toString()));
+      final text = e.toString();
+      if (text.contains('SocketException') ||
+          text.contains('ClientException') ||
+          text.contains('Failed host lookup')) {
+        return const Result.failure(AppError.network('No connection'));
+      }
+      return Result.failure(AppError.unknown(text));
     }
   }
 
-  /// Generates a 6-character uppercase alphanumeric invite code.
-  String _generateInviteCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = Random.secure();
-    return List.generate(
-      AppSizes.inviteCodeLength,
-      (_) => chars[random.nextInt(chars.length)],
-    ).join();
+  /// Surfaces `RAISE EXCEPTION` messages from the group RPCs (profanity,
+  /// length, not-admin, group full) as validation errors so the UI can show
+  /// the server's wording verbatim.
+  static AppError _mapPostgrest(PostgrestException e) {
+    final code = e.code ?? '';
+    if (code == 'P0001' || code.startsWith('P00')) {
+      return AppError.validation(e.message);
+    }
+    if (code == '42501') {
+      return const AppError.auth('You do not have permission to do that');
+    }
+    if (code == 'PGRST116') {
+      return const AppError.notFound('Group not found');
+    }
+    return AppError.database(e.message);
   }
+}
+
+/// Internal carrier so `_guard` can unwrap a pre-built [AppError].
+class AppErrorException implements Exception {
+  const AppErrorException(this.error);
+  final AppError error;
+
+  @override
+  String toString() => 'AppErrorException($error)';
 }

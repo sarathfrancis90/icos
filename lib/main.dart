@@ -7,6 +7,9 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/services/analytics_service.dart';
+import 'core/services/audio_service.dart';
+import 'core/services/notification_service.dart';
 import 'core/services/storage_service.dart';
 import 'core/services/supabase_service.dart';
 
@@ -30,6 +33,7 @@ Future<void> main() async {
 
   // Initialize services
   await StorageService.initialize();
+  await AnalyticsService.initialize();
   await SupabaseService.initialize();
 
   // Auto sign in anonymously if no session exists
@@ -42,6 +46,11 @@ Future<void> main() async {
       // Offline or timeout — continue without auth
     }
   }
+
+  // Notifications (local reminders + optional FCM); never throws.
+  await NotificationService.initialize();
+  // Pre-load sound effects.
+  await AudioService.instance.initialize();
 
   // Remove splash screen
   FlutterNativeSplash.remove();

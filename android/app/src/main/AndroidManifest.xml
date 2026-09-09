@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Network access for Supabase, Firebase and OAuth. Required in the main
+         manifest: the debug/profile manifests only merge it into dev builds. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Runtime permission for notifications on Android 13+ (API 33). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Haptic feedback during path drawing and celebrations. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:label="Icos"
         android:name="${applicationName}"

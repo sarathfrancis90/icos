@@ -1,0 +1,8 @@
+# fastlane match configuration — certificates and provisioning profiles are
+# stored encrypted in a private git repo. See docs/RELEASE_RUNBOOK.md.
+git_url(ENV["MATCH_GIT_URL"])
+storage_mode("git")
+type("appstore")
+app_identifier(["com.icos.icos"])
+# Never create/renew certificates from CI; run `fastlane match appstore` locally.
+readonly(ENV["CI"] == "true")

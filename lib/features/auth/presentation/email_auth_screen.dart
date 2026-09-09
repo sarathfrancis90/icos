@@ -5,9 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../providers/auth_provider.dart';
+import 'widgets/auth_outcome_handler.dart';
 
 class EmailAuthScreen extends ConsumerStatefulWidget {
-  const EmailAuthScreen({super.key});
+  const EmailAuthScreen({super.key, this.initialSignUp = true});
+
+  /// When false the form opens in "sign in" mode.
+  final bool initialSignUp;
 
   @override
   ConsumerState<EmailAuthScreen> createState() => _EmailAuthScreenState();
@@ -18,7 +22,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  bool _isSignUp = true;
+  late bool _isSignUp = widget.initialSignUp;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
@@ -34,12 +38,19 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isGuest = ref.watch(isGuestProvider);
+    final hasSession = ref.watch(authNotifierProvider).valueOrNull != null;
+    final guestUpgrade = hasSession && isGuest;
+
+    listenForAuthFlowMessages(context, ref);
+
     return Scaffold(
       backgroundColor: AppColors.deepBlack,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/auth'),
         ),
       ),
       body: SafeArea(
@@ -57,8 +68,14 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                 const SizedBox(height: AppSizes.xs),
                 Text(
                   _isSignUp
-                      ? 'Sign up with your email to save progress'
-                      : 'Sign in to continue your streak',
+                      ? (guestUpgrade
+                          ? 'Add an email and password to keep your guest '
+                              'progress on every device'
+                          : 'Sign up with your email to save progress')
+                      : (guestUpgrade
+                          ? 'Signing in to an existing account replaces '
+                              'your guest progress on this device'
+                          : 'Sign in to continue your streak'),
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: AppColors.textSecondaryDark,
                       ),
@@ -70,8 +87,8 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
-                  textInputAction:
-                      TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
+                  textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     hintText: 'you@example.com',
@@ -94,6 +111,11 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  autofillHints: [
+                    _isSignUp
+                        ? AutofillHints.newPassword
+                        : AutofillHints.password,
+                  ],
                   textInputAction:
                       _isSignUp ? TextInputAction.next : TextInputAction.done,
                   decoration: InputDecoration(
@@ -106,6 +128,8 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                             ? Icons.visibility_off_rounded
                             : Icons.visibility_rounded,
                       ),
+                      tooltip:
+                          _obscurePassword ? 'Show password' : 'Hide password',
                       onPressed: () =>
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
@@ -119,8 +143,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                     }
                     return null;
                   },
-                  onFieldSubmitted:
-                      _isSignUp ? null : (_) => _submit(),
+                  onFieldSubmitted: _isSignUp ? null : (_) => _submit(),
                 ),
 
                 // Confirm password (sign-up only)
@@ -139,8 +162,11 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                               ? Icons.visibility_off_rounded
                               : Icons.visibility_rounded,
                         ),
+                        tooltip:
+                            _obscureConfirm ? 'Show password' : 'Hide password',
                         onPressed: () => setState(
-                            () => _obscureConfirm = !_obscureConfirm),
+                          () => _obscureConfirm = !_obscureConfirm,
+                        ),
                       ),
                     ),
                     validator: (value) {
@@ -162,18 +188,24 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                       color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                       border: Border.all(
-                          color: AppColors.error.withValues(alpha: 0.3)),
+                        color: AppColors.error.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline,
-                            color: AppColors.error, size: 20),
+                        const Icon(
+                          Icons.error_outline,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
                         const SizedBox(width: AppSizes.sm),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.error),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: AppColors.error),
                           ),
                         ),
                       ],
@@ -188,45 +220,47 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                   button: true,
                   label: _isSignUp ? 'Create Account' : 'Sign In',
                   child: GestureDetector(
-                  onTap: _isLoading ? null : _submit,
-                  child: Container(
-                    height: 52,
-                    decoration: BoxDecoration(
-                      gradient: _isLoading
-                          ? null
-                          : AppColors.purpleButtonGradient,
-                      color: _isLoading ? AppColors.cellBackground : null,
-                      borderRadius: BorderRadius.circular(26),
-                      boxShadow: _isLoading
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: AppColors.purpleGlow,
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
+                    onTap: _isLoading ? null : _submit,
+                    child: Container(
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient:
+                            _isLoading ? null : AppColors.purpleButtonGradient,
+                        color: _isLoading ? AppColors.cellBackground : null,
+                        borderRadius: BorderRadius.circular(26),
+                        boxShadow: _isLoading
+                            ? null
+                            : const [
+                                BoxShadow(
+                                  color: AppColors.purpleGlow,
+                                  blurRadius: 12,
+                                  offset: Offset(0, 4),
+                                ),
+                              ],
+                      ),
+                      child: Center(
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : Text(
+                                _isSignUp ? 'Create Account' : 'Sign In',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                               ),
-                            ],
-                    ),
-                    child: Center(
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : Text(
-                              _isSignUp ? 'Create Account' : 'Sign In',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+                      ),
                     ),
                   ),
-                ),
                 ),
                 const SizedBox(height: AppSizes.lg),
 
@@ -252,9 +286,10 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                       },
                       child: Text(
                         _isSignUp ? 'Sign In' : 'Sign Up',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: AppColors.purpleLight,
-                        ),
+                        style:
+                            Theme.of(context).textTheme.labelLarge?.copyWith(
+                                  color: AppColors.purpleLight,
+                                ),
                       ),
                     ),
                   ],
@@ -275,49 +310,34 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
       _errorMessage = null;
     });
 
-    try {
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final notifier = ref.read(authNotifierProvider.notifier);
 
-      if (_isSignUp) {
-        await ref
-            .read(authNotifierProvider.notifier)
-            .signUpWithEmail(email, password);
-      } else {
-        await ref
-            .read(authNotifierProvider.notifier)
-            .signInWithEmail(email, password);
-      }
+    final outcome = _isSignUp
+        ? await notifier.signUpWithEmail(email, password)
+        : await notifier.signInWithEmail(email, password);
 
-      if (mounted) {
-        context.go('/');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = _friendlyError(e.toString());
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
+    if (!mounted) return;
 
-  String _friendlyError(String error) {
-    if (error.contains('Invalid login credentials')) {
-      return 'Invalid email or password. Please try again.';
+    // Inline error for plain failures; dialogs / navigation for the rest.
+    if (outcome is AuthFailure) {
+      setState(() {
+        _errorMessage = outcome.message;
+        _isLoading = false;
+      });
+      return;
     }
-    if (error.contains('User already registered')) {
-      return 'An account with this email already exists. Try signing in.';
+
+    final done = await handleAuthOutcome(
+      context,
+      ref,
+      outcome,
+      emailForExisting: email,
+      passwordForExisting: password,
+    );
+    if (mounted && !done) {
+      setState(() => _isLoading = false);
     }
-    if (error.contains('Email not confirmed')) {
-      return 'Please check your email to confirm your account.';
-    }
-    if (error.contains('rate limit')) {
-      return 'Too many attempts. Please wait a moment.';
-    }
-    return 'Something went wrong. Please try again.';
   }
 }

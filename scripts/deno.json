@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "fallback": "deno run -A generate_puzzles.ts fallback",
+    "verify": "deno run -A generate_puzzles.ts verify",
+    "fixtures": "deno run -A generate_puzzles.ts fixtures",
+    "daily": "deno run -A generate_puzzles.ts daily",
+    "test": "deno test -A ../supabase/functions/_shared/"
+  },
+  "lint": { "rules": { "tags": ["recommended"] } },
+  "fmt": { "lineWidth": 100 }
+}

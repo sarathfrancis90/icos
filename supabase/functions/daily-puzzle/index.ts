@@ -1,286 +1,198 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// daily-puzzle: generate (or return) the deterministic puzzle for a date.
+//
+// POST { date?: "YYYY-MM-DD" }   (default: tomorrow UTC)
+// Auth: Authorization bearer == SUPABASE_SERVICE_ROLE_KEY (cron/backfill, any date)
+//       OR a valid user JWT (today or tomorrow UTC only).
+// Idempotent: if the puzzle already exists it is returned with status "exists".
+//
+// 200 { status: "exists",  puzzle_date, puzzle }
+// 201 { status: "created", puzzle_date, puzzle }
+// 400 { error, code }  401/403  500 { error, code }
+//
+// The reference solution is stored in puzzle_solutions (service-role only) and is
+// NEVER included in the response.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import {
+  addDays,
+  adminClient,
+  banCheck,
+  compareDates,
+  correlationIdFrom,
+  CORRELATION_HEADER,
+  errorFields,
+  errorResponse,
+  getUser,
+  handleCommon,
+  isIsoDate,
+  json,
+  Logger,
+  readJson,
+  requireServiceRole,
+  utcToday,
+} from "../_shared/http.ts";
+import { generatePuzzle, seedFor, weekdayDifficulty } from "../_shared/puzzle_core.ts";
 
-// Backbite algorithm for Hamiltonian path generation
-function generateHamiltonianPath(
-  gridSize: number,
-  walls: { row: number; col: number }[],
-): { row: number; col: number }[] | null {
-  const totalCells = gridSize * gridSize - walls.length;
-  const wallSet = new Set(walls.map((w) => `${w.row},${w.col}`));
+const FN = "daily-puzzle";
+const NODE_BUDGET = 2_000_000;
 
-  // Initialize with a single cell
-  const getNeighbors = (
-    row: number,
-    col: number,
-  ): { row: number; col: number }[] => {
-    const dirs = [
-      [-1, 0],
-      [1, 0],
-      [0, -1],
-      [0, 1],
-    ];
-    return dirs
-      .map(([dr, dc]) => ({ row: row + dr, col: col + dc }))
-      .filter(
-        (p) =>
-          p.row >= 0 &&
-          p.row < gridSize &&
-          p.col >= 0 &&
-          p.col < gridSize &&
-          !wallSet.has(`${p.row},${p.col}`),
-      );
-  };
-
-  // Start from a random non-wall cell
-  let startRow: number, startCol: number;
-  do {
-    startRow = Math.floor(Math.random() * gridSize);
-    startCol = Math.floor(Math.random() * gridSize);
-  } while (wallSet.has(`${startRow},${startCol}`));
-
-  let path: { row: number; col: number }[] = [
-    { row: startRow, col: startCol },
-  ];
-  const maxIterations = totalCells * 200;
-
-  for (let iter = 0; iter < maxIterations; iter++) {
-    if (path.length >= totalCells) break;
-
-    const tail = path[path.length - 1];
-    const neighbors = getNeighbors(tail.row, tail.col).filter(
-      (n) => !path.some((p) => p.row === n.row && p.col === n.col),
-    );
-
-    if (neighbors.length > 0) {
-      // Extend path
-      const next = neighbors[Math.floor(Math.random() * neighbors.length)];
-      path.push(next);
-    } else {
-      // Backbite: remove from tail end and try to reconnect
-      const head = path[0];
-      const headNeighbors = getNeighbors(head.row, head.col).filter(
-        (n) =>
-          path.some((p) => p.row === n.row && p.col === n.col) &&
-          !(n.row === path[1]?.row && n.col === path[1]?.col),
-      );
-
-      if (headNeighbors.length > 0) {
-        const target =
-          headNeighbors[Math.floor(Math.random() * headNeighbors.length)];
-        const targetIdx = path.findIndex(
-          (p) => p.row === target.row && p.col === target.col,
-        );
-
-        // Reverse the path from start to target, making target the new head
-        path = [...path.slice(0, targetIdx + 1).reverse(), ...path.slice(targetIdx + 1)];
-      }
-    }
-  }
-
-  return path.length >= totalCells ? path : null;
+interface PublicPuzzleRow {
+  id: string;
+  puzzle_date: string;
+  grid_size: number;
+  waypoints: unknown;
+  walls: unknown;
+  difficulty: string;
+  par_time_seconds: number;
+  difficulty_score: number | null;
+  seed_version: number;
+  created_at: string;
 }
 
-function generatePuzzle(gridSize: number, difficulty: string) {
-  // Determine number of walls based on difficulty
-  const wallCount =
-    difficulty === "easy"
-      ? 0
-      : difficulty === "medium"
-        ? Math.floor(gridSize * 0.3)
-        : difficulty === "hard"
-          ? Math.floor(gridSize * 0.5)
-          : Math.floor(gridSize * 0.6);
+const PUBLIC_COLUMNS =
+  "id, puzzle_date, grid_size, waypoints, walls, difficulty, par_time_seconds, difficulty_score, seed_version, created_at";
 
-  // Generate random walls
-  const walls: { row: number; col: number }[] = [];
-  const usedCells = new Set<string>();
+Deno.serve(async (req: Request): Promise<Response> => {
+  const common = handleCommon(req, FN);
+  if (common) return common;
 
-  for (let i = 0; i < wallCount; i++) {
-    let row: number, col: number;
-    let attempts = 0;
-    do {
-      row = Math.floor(Math.random() * gridSize);
-      col = Math.floor(Math.random() * gridSize);
-      attempts++;
-    } while (usedCells.has(`${row},${col}`) && attempts < 100);
+  const correlationId = correlationIdFrom(req);
+  const log = new Logger(FN, correlationId);
+  const ok = (body: unknown, status = 200) =>
+    json(body, status, { [CORRELATION_HEADER]: correlationId });
 
-    if (!usedCells.has(`${row},${col}`)) {
-      walls.push({ row, col });
-      usedCells.add(`${row},${col}`);
-    }
-  }
-
-  // Generate Hamiltonian path
-  let path: { row: number; col: number }[] | null = null;
-  let retries = 0;
-  while (!path && retries < 50) {
-    path = generateHamiltonianPath(gridSize, walls);
-    retries++;
-    if (!path && retries >= 50) {
-      // Reduce walls and retry
-      walls.pop();
-      retries = 0;
-    }
-  }
-
-  if (!path) {
-    throw new Error("Failed to generate puzzle");
-  }
-
-  // Select waypoints along the path
-  const numWaypoints =
-    difficulty === "easy"
-      ? 3
-      : difficulty === "medium"
-        ? 3
-        : difficulty === "hard"
-          ? 4
-          : 5;
-
-  const waypoints: { order: number; row: number; col: number }[] = [];
-  // First waypoint is always the start
-  waypoints.push({ order: 1, row: path[0].row, col: path[0].col });
-
-  // Distribute remaining waypoints evenly along the path
-  const spacing = Math.floor(path.length / numWaypoints);
-  for (let i = 1; i < numWaypoints - 1; i++) {
-    const idx = i * spacing;
-    waypoints.push({ order: i + 1, row: path[idx].row, col: path[idx].col });
-  }
-
-  // Last waypoint is always the end
-  waypoints.push({
-    order: numWaypoints,
-    row: path[path.length - 1].row,
-    col: path[path.length - 1].col,
-  });
-
-  // Generate solution hash (hash of the path coordinates)
-  const pathStr = path.map((p) => `${p.row},${p.col}`).join("|");
-  const solutionHash = btoa(pathStr).slice(0, 32);
-
-  // Par time based on grid size and difficulty
-  const basePar = gridSize * gridSize * 2;
-  const parMultiplier =
-    difficulty === "easy"
-      ? 1.5
-      : difficulty === "medium"
-        ? 1.3
-        : difficulty === "hard"
-          ? 1.1
-          : 1.0;
-  const parTimeSeconds = Math.round(basePar * parMultiplier);
-
-  return {
-    gridSize,
-    waypoints,
-    walls,
-    solutionHash,
-    difficulty,
-    parTimeSeconds,
-  };
-}
-
-serve(async (req: Request) => {
-  // Handle CORS
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  // Health check
-  const url = new URL(req.url);
-  if (url.pathname.endsWith("/health")) {
-    return new Response(JSON.stringify({ status: "ok" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  if (req.method !== "POST") {
+    return errorResponse(405, "Method not allowed", "METHOD_NOT_ALLOWED", correlationId);
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    const salt = Deno.env.get("PUZZLE_SEED_SALT");
+    if (!salt) {
+      log.error("PUZZLE_SEED_SALT is not configured; refusing to generate");
+      return errorResponse(500, "Server misconfigured", "MISSING_SEED_SALT", correlationId);
+    }
 
-    // Generate puzzle for tomorrow
-    const tomorrow = new Date();
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-    const puzzleDate = tomorrow.toISOString().split("T")[0];
+    const admin = adminClient();
 
-    // Check if puzzle already exists
-    const { data: existing } = await supabase
-      .from("puzzles")
-      .select("id")
-      .eq("puzzle_date", puzzleDate)
-      .maybeSingle();
+    // ---- auth ---------------------------------------------------------------
+    const isService = requireServiceRole(req);
+    let userId: string | null = null;
+    if (!isService) {
+      const user = await getUser(req);
+      if (!user) {
+        return errorResponse(401, "Unauthorized", "UNAUTHORIZED", correlationId);
+      }
+      const gate = await banCheck(admin, user.id);
+      if (!gate.ok) {
+        log.warn("caller rejected", { user_id: user.id, code: gate.code });
+        return errorResponse(gate.status, gate.message, gate.code, correlationId);
+      }
+      userId = user.id;
+    }
 
-    if (existing) {
-      return new Response(
-        JSON.stringify({ message: "Puzzle already exists for " + puzzleDate }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    // ---- input --------------------------------------------------------------
+    const body = await readJson(req);
+    if (body === null) {
+      return errorResponse(400, "Body must be a JSON object", "INVALID_JSON", correlationId);
+    }
+    const today = utcToday();
+    const tomorrow = addDays(today, 1);
+    const date = body.date === undefined || body.date === null ? tomorrow : body.date;
+    if (!isIsoDate(date)) {
+      return errorResponse(400, "date must be YYYY-MM-DD", "INVALID_DATE", correlationId);
+    }
+    if (!isService && date !== today && date !== tomorrow) {
+      log.warn("user requested out-of-window date", { user_id: userId, date });
+      return errorResponse(
+        403,
+        "Only today's or tomorrow's puzzle can be requested",
+        "DATE_NOT_ALLOWED",
+        correlationId,
       );
     }
-
-    // Determine difficulty based on day of week (Mon=easy, Sun=expert)
-    const dayOfWeek = tomorrow.getUTCDay(); // 0=Sun, 1=Mon, ...
-    const dayIndex = dayOfWeek === 0 ? 7 : dayOfWeek;
-
-    let gridSize: number;
-    let difficulty: string;
-
-    if (dayIndex <= 2) {
-      gridSize = 5;
-      difficulty = "easy";
-    } else if (dayIndex <= 4) {
-      gridSize = 6;
-      difficulty = "medium";
-    } else if (dayIndex <= 6) {
-      gridSize = 7;
-      difficulty = "hard";
-    } else {
-      gridSize = 8;
-      difficulty = "expert";
+    if (isService && compareDates(date, "2026-01-01") < 0) {
+      return errorResponse(400, "date is before launch", "INVALID_DATE", correlationId);
     }
 
-    const puzzle = generatePuzzle(gridSize, difficulty);
+    const lg = log.child({ date, caller: isService ? "service_role" : "user", user_id: userId });
 
-    const { error } = await supabase.from("puzzles").insert({
-      puzzle_date: puzzleDate,
-      grid_size: puzzle.gridSize,
-      waypoints: puzzle.waypoints,
-      walls: puzzle.walls,
-      solution_hash: puzzle.solutionHash,
-      difficulty: puzzle.difficulty,
-      par_time_seconds: puzzle.parTimeSeconds,
+    // ---- idempotency --------------------------------------------------------
+    const existing = await fetchPublic(admin, date);
+    if (existing) {
+      lg.info("puzzle already exists");
+      return ok({ status: "exists", puzzle_date: date, puzzle: existing }, 200);
+    }
+
+    // ---- generate -----------------------------------------------------------
+    const { gridSize, difficulty } = weekdayDifficulty(date);
+    const seed = seedFor(date, salt);
+    const t0 = performance.now();
+    const generated = generatePuzzle({ size: gridSize, difficulty, seed, nodeBudget: NODE_BUDGET });
+    const genMs = Math.round(performance.now() - t0);
+    lg.info("puzzle generated", {
+      grid_size: generated.gridSize,
+      difficulty: generated.difficulty,
+      walls: generated.walls.length,
+      waypoints: generated.waypoints.length,
+      difficulty_score: generated.difficultyScore,
+      gen_ms: genMs,
     });
 
-    if (error) throw error;
+    const { data: inserted, error: insertError } = await admin
+      .from("puzzles")
+      .insert({
+        puzzle_date: date,
+        grid_size: generated.gridSize,
+        waypoints: generated.waypoints,
+        walls: generated.walls,
+        difficulty: generated.difficulty,
+        par_time_seconds: generated.parTimeSeconds,
+        difficulty_score: generated.difficultyScore,
+        seed_version: 2,
+      })
+      .select(PUBLIC_COLUMNS)
+      .single();
 
-    return new Response(
-      JSON.stringify({
-        message: "Puzzle generated for " + puzzleDate,
-        difficulty,
-        gridSize,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 201,
-      },
-    );
-  } catch (error) {
-    console.error("Error generating puzzle:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to generate puzzle" }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      },
-    );
+    if (insertError) {
+      // 23505 = unique_violation: a concurrent call won the race; return theirs.
+      if (insertError.code === "23505") {
+        const winner = await fetchPublic(admin, date);
+        if (winner) {
+          lg.info("lost insert race; returning existing puzzle");
+          return ok({ status: "exists", puzzle_date: date, puzzle: winner }, 200);
+        }
+      }
+      lg.error("puzzle insert failed", { db_error: insertError.message, db_code: insertError.code });
+      return errorResponse(500, "Failed to store puzzle", "INSERT_FAILED", correlationId);
+    }
+
+    const puzzle = inserted as PublicPuzzleRow;
+    const { error: solError } = await admin
+      .from("puzzle_solutions")
+      .insert({ puzzle_id: puzzle.id, path: generated.referencePath });
+    if (solError) {
+      // Without a stored solution the puzzle is unusable for hints; roll back.
+      lg.error("solution insert failed; rolling back puzzle", { db_error: solError.message });
+      await admin.from("puzzles").delete().eq("id", puzzle.id);
+      return errorResponse(500, "Failed to store solution", "INSERT_FAILED", correlationId);
+    }
+
+    lg.info("puzzle stored", { puzzle_id: puzzle.id });
+    return ok({ status: "created", puzzle_date: date, puzzle }, 201);
+  } catch (err) {
+    log.error("unhandled error", errorFields(err));
+    return errorResponse(500, "Internal server error", "INTERNAL", correlationId);
   }
 });
+
+async function fetchPublic(
+  admin: ReturnType<typeof adminClient>,
+  date: string,
+): Promise<PublicPuzzleRow | null> {
+  const { data, error } = await admin
+    .from("puzzles")
+    .select(PUBLIC_COLUMNS)
+    .eq("puzzle_date", date)
+    .maybeSingle();
+  if (error) throw new Error(`puzzle lookup failed: ${error.message}`);
+  return (data as PublicPuzzleRow | null) ?? null;
+}

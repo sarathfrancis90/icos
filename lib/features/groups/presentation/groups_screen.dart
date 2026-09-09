@@ -5,20 +5,32 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/services/supabase_service.dart';
 import '../domain/models/group.dart';
 import '../providers/groups_provider.dart';
+import 'widgets/account_required_card.dart';
+import 'widgets/create_group_dialog.dart';
+import 'widgets/group_ui.dart';
+import 'widgets/join_group_dialog.dart';
 
 class GroupsScreen extends ConsumerWidget {
   const GroupsScreen({super.key});
 
+  static const emptyMessage =
+      'Create or join a group to compete\nwith friends and family';
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(groupsSessionProvider);
     final groupsAsync = ref.watch(myGroupsProvider);
+    final hasGroups = groupsAsync.valueOrNull?.isNotEmpty == true;
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSizes.lg),
+        padding: const EdgeInsetsDirectional.only(
+          start: AppSizes.lg,
+          end: AppSizes.lg,
+          top: AppSizes.lg,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -26,25 +38,23 @@ class GroupsScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Groups',
+                  AppStrings.navGroups,
                   style: Theme.of(context).textTheme.displayMedium,
                 ),
-                if (groupsAsync.valueOrNull?.isNotEmpty == true)
+                if (session.canUseGroups && hasGroups)
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _GlassIconButton(
                         icon: Icons.add_rounded,
                         tooltip: AppStrings.createGroup,
-                        onPressed: () =>
-                            _showCreateGroupDialog(context, ref),
+                        onPressed: () => _create(context, ref),
                       ),
                       const SizedBox(width: AppSizes.sm),
                       _GlassIconButton(
                         icon: Icons.group_add_rounded,
                         tooltip: AppStrings.joinGroup,
-                        onPressed: () =>
-                            _showJoinGroupDialog(context, ref),
+                        onPressed: () => _join(context, ref),
                       ),
                     ],
                   ),
@@ -52,43 +62,23 @@ class GroupsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSizes.md),
             Expanded(
-              child: groupsAsync.when(
-                data: (groups) {
-                  if (groups.isEmpty) {
-                    return _EmptyState(
-                      onCreateGroup: () =>
-                          _showCreateGroupDialog(context, ref),
-                      onJoinGroup: () =>
-                          _showJoinGroupDialog(context, ref),
-                    );
-                  }
-                  return _GroupsList(groups: groups);
-                },
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: AppColors.purpleLight),
-                ),
-                error: (error, _) => Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        AppStrings.errorGeneric,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
+              child: !session.canUseGroups
+                  ? const AccountRequiredCard()
+                  : AsyncRefreshList<Group>(
+                      value: groupsAsync,
+                      onRefresh: () =>
+                          ref.read(myGroupsProvider.notifier).refresh(),
+                      padding: const EdgeInsetsDirectional.only(
+                        bottom: AppSizes.lg,
                       ),
-                      const SizedBox(height: AppSizes.md),
-                      SizedBox(
-                        width: 160,
-                        child: OutlinedButton(
-                          onPressed: () =>
-                              ref.invalidate(myGroupsProvider),
-                          child: const Text('Retry'),
-                        ),
+                      itemBuilder: (context, group, _) =>
+                          _GroupCard(group: group),
+                      errorMessage: AppStrings.errorGeneric,
+                      empty: _EmptyState(
+                        onCreateGroup: () => _create(context, ref),
+                        onJoinGroup: () => _join(context, ref),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             ),
           ],
         ),
@@ -96,174 +86,45 @@ class GroupsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _showCreateGroupDialog(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(AppStrings.createGroup),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Group Name',
-                  hintText: 'Enter a group name',
-                ),
-                maxLength: AppSizes.maxGroupNameLength,
-                textCapitalization: TextCapitalization.words,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a group name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppSizes.sm),
-              TextFormField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description (optional)',
-                  hintText: 'What is this group about?',
-                ),
-                maxLines: 2,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() == true) {
-                Navigator.of(context).pop(true);
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      final group = await ref.read(myGroupsProvider.notifier).createGroup(
-            name: nameController.text.trim(),
-            description: descriptionController.text.trim(),
-          );
-      if (group != null && context.mounted) {
-        context.push('/groups/${group.id}');
-      }
+  Future<void> _create(BuildContext context, WidgetRef ref) async {
+    if (!_requireAccount(context, ref)) return;
+    final group = await showCreateGroupDialog(context);
+    if (group != null && context.mounted) {
+      context.push('/groups/${group.id}');
     }
-
-    nameController.dispose();
-    descriptionController.dispose();
   }
 
-  Future<void> _showJoinGroupDialog(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    // Check anonymous status directly via Supabase (not via provider) to
-    // avoid _dependents.isEmpty assertion from provider rebuild during dialog.
-    final isAnon = SupabaseService.auth.currentUser?.isAnonymous ?? true;
-    if (isAnon) {
-      _showUpgradePrompt(context);
-      return;
+  Future<void> _join(BuildContext context, WidgetRef ref) async {
+    if (!_requireAccount(context, ref)) return;
+    final group = await showJoinGroupDialog(context);
+    if (group != null && context.mounted) {
+      context.push('/groups/${group.id}');
     }
-
-    final codeController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(AppStrings.joinGroup),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: codeController,
-            decoration: const InputDecoration(
-              labelText: AppStrings.groupInviteCode,
-              hintText: 'Enter 6-character code',
-            ),
-            maxLength: AppSizes.inviteCodeLength,
-            textCapitalization: TextCapitalization.characters,
-            validator: (value) {
-              if (value == null || value.trim().length != AppSizes.inviteCodeLength) {
-                return 'Please enter a ${AppSizes.inviteCodeLength}-character invite code';
-              }
-              return null;
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() == true) {
-                Navigator.of(context).pop(true);
-              }
-            },
-            child: const Text('Join'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      final group = await ref
-          .read(myGroupsProvider.notifier)
-          .joinGroup(codeController.text.trim());
-      if (group != null && context.mounted) {
-        context.push('/groups/${group.id}');
-      } else if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to join group. Check the invite code and try again.'),
-          ),
-        );
-      }
-    }
-
-    codeController.dispose();
   }
 
-  void _showUpgradePrompt(BuildContext context) {
+  bool _requireAccount(BuildContext context, WidgetRef ref) {
+    if (ref.read(groupsSessionProvider).canUseGroups) return true;
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Account Required'),
+        title: const Text(AppStrings.accountRequired),
         content: const Text(AppStrings.linkAccountPrompt),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () {
               Navigator.of(context).pop();
               context.push('/auth');
             },
-            child: const Text(AppStrings.signIn),
+            child: const Text(AccountRequiredCard.ctaLabel),
           ),
         ],
       ),
     );
+    return false;
   }
 }
 
@@ -280,24 +141,31 @@ class _GlassIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Semantics(
       button: true,
       label: tooltip,
       child: Tooltip(
         message: tooltip,
-        child: GestureDetector(
-          onTap: onPressed,
-          child: Container(
-            width: AppSizes.minTouchTarget,
-            height: AppSizes.minTouchTarget,
-            decoration: BoxDecoration(
-              color: AppColors.elevatedSurface,
-              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-              border: Border.all(
-                color: AppColors.cellBorder.withValues(alpha: 0.5),
+        child: Material(
+          color: isDark ? AppColors.elevatedSurface : AppColors.lightSurface,
+          borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+            child: Container(
+              width: AppSizes.minTouchTarget,
+              height: AppSizes.minTouchTarget,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                border: Border.all(
+                  color: isDark
+                      ? AppColors.cellBorder.withValues(alpha: 0.5)
+                      : AppColors.lightGridLine,
+                ),
               ),
+              child: Icon(icon, size: 20, color: secondaryTextColor(context)),
             ),
-            child: Icon(icon, size: 20, color: AppColors.textSecondaryDark),
           ),
         ),
       ),
@@ -340,16 +208,18 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: AppSizes.md),
           Text(
-            'Create or join a group to compete\nwith friends and family',
+            GroupsScreen.emptyMessage,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondaryDark,
+                  color: secondaryTextColor(context),
                 ),
           ),
           const SizedBox(height: AppSizes.lg),
           SizedBox(
             width: 200,
-            child: ElevatedButton(
+            height: AppSizes.minTouchTarget + 4,
+            child: FilledButton(
+              key: const Key('groups_empty_create'),
               onPressed: onCreateGroup,
               child: const Text(AppStrings.createGroup),
             ),
@@ -357,7 +227,9 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: AppSizes.sm),
           SizedBox(
             width: 200,
+            height: AppSizes.minTouchTarget + 4,
             child: OutlinedButton(
+              key: const Key('groups_empty_join'),
               onPressed: onJoinGroup,
               child: const Text(AppStrings.joinGroup),
             ),
@@ -368,73 +240,63 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _GroupsList extends StatelessWidget {
-  const _GroupsList({required this.groups});
+class _GroupCard extends StatelessWidget {
+  const _GroupCard({required this.group});
 
-  final List<Group> groups;
+  final Group group;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final surface = GroupSurface.of(context);
+    final members = '${group.memberCount} member${group.memberCount == 1 ? '' : 's'}';
 
-    return ListView.builder(
-      itemCount: groups.length,
-      itemBuilder: (context, index) {
-        final group = groups[index];
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Container(
-          margin: const EdgeInsetsDirectional.only(bottom: AppSizes.sm),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.cardSurface : AppColors.lightSurface,
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            border: Border.all(
-              color: isDark
-                  ? AppColors.cellBorder.withValues(alpha: 0.3)
-                  : AppColors.lightGridLine,
-            ),
+    return Semantics(
+      button: true,
+      label: '${group.name}, $members',
+      child: Container(
+        margin: const EdgeInsetsDirectional.only(bottom: AppSizes.sm),
+        decoration: surface.decoration(),
+        child: ListTile(
+          contentPadding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSizes.md,
+            vertical: AppSizes.sm,
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsetsDirectional.symmetric(
-              horizontal: AppSizes.md,
-              vertical: AppSizes.sm,
-            ),
-            title: Text(
-              group.name,
-              style: theme.textTheme.titleMedium,
-            ),
-            subtitle: group.description.isNotEmpty
-                ? Text(
-                    group.description,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall,
-                  )
-                : null,
-            trailing: Row(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          ),
+          title: Text(group.name, style: theme.textTheme.titleMedium),
+          subtitle: group.description.isNotEmpty
+              ? Text(
+                  group.description,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                )
+              : null,
+          trailing: ExcludeSemantics(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   Icons.people_rounded,
                   size: 16,
-                  color: AppColors.textTertiaryDark,
+                  color: secondaryTextColor(context),
                 ),
                 const SizedBox(width: AppSizes.xs),
-                Text(
-                  '${group.memberCount}',
-                  style: theme.textTheme.bodySmall,
-                ),
+                Text('${group.memberCount}', style: theme.textTheme.bodySmall),
                 const SizedBox(width: AppSizes.sm),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   size: 20,
-                  color: AppColors.textTertiaryDark,
+                  color: secondaryTextColor(context),
                 ),
               ],
             ),
-            onTap: () => context.push('/groups/${group.id}'),
           ),
-        );
-      },
+          onTap: () => context.push('/groups/${group.id}'),
+        ),
+      ),
     );
   }
 }

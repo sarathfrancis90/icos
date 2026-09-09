@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.41.3'
 
 jobs:
   deploy-ios:
@@ -13,6 +17,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
           cache: true
 
@@ -26,29 +31,82 @@ jobs:
           cat > .env.production << EOF
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_IOS_CLIENT_ID=${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+          FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_ANDROID_API_KEY=${{ secrets.FIREBASE_ANDROID_API_KEY }}
+          FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID }}
+          FIREBASE_IOS_API_KEY=${{ secrets.FIREBASE_IOS_API_KEY }}
+          FIREBASE_IOS_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID }}
           EOF
+          cp .env.example .env.development
+
+      - name: Write GoogleService-Info.plist (optional)
+        env:
+          GOOGLE_SERVICE_INFO_PLIST_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+        run: |
+          if [ -n "$GOOGLE_SERVICE_INFO_PLIST_BASE64" ]; then
+            echo "$GOOGLE_SERVICE_INFO_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "GoogleService-Info.plist written"
+          else
+            echo "GOOGLE_SERVICE_INFO_PLIST_BASE64 not set; skipping"
+          fi
+
+      - name: Inject Google reversed client ID into Info.plist
+        env:
+          GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+        run: |
+          if [ -n "$GOOGLE_IOS_CLIENT_ID" ]; then
+            # GOOGLE_IOS_CLIENT_ID is "<id>.apps.googleusercontent.com"; the URL
+            # scheme is the reversed form "com.googleusercontent.apps.<id>".
+            REVERSED="com.googleusercontent.apps.${GOOGLE_IOS_CLIENT_ID%%.apps.googleusercontent.com}"
+            sed -i '' "s|com.googleusercontent.apps.REPLACE_WITH_IOS_CLIENT_ID|$REVERSED|" ios/Runner/Info.plist
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Install CocoaPods
-        run: cd ios && pod install
+        run: cd ios && pod install --repo-update
 
-      - name: Decode App Store Connect API Key
+      - name: Decode App Store Connect API key
         run: echo "${{ secrets.ASC_KEY_P8_BASE64 }}" | base64 --decode > ios/AuthKey.p8
 
-      - name: Build IPA
-        run: |
-          flutter build ipa \
-            --release \
-            --obfuscate \
-            --split-debug-info=build/ios/symbols \
-            --dart-define-from-file=.env.production
-
-      - name: Deploy to TestFlight
+      # fastlane beta = match -> flutter build ios --no-codesign -> gym (archive
+      # + sign once) -> TestFlight. Do not add a separate `flutter build ipa`.
+      - name: Build and upload to TestFlight
         env:
+          CI: 'true'
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ITC_TEAM_ID: ${{ secrets.APPLE_ITC_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_KEY_PATH: "../ios/AuthKey.p8"
+          ASC_KEY_PATH: ${{ github.workspace }}/ios/AuthKey.p8
+          FASTLANE_SKIP_UPDATE_CHECK: 'true'
         run: |
           cd ios
           bundle exec fastlane beta
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-${{ github.ref_name }}
+          if-no-files-found: error
+          retention-days: 90
+          path: |
+            build/ios/ipa/Runner.ipa
+            build/ios/ipa/*.dSYM.zip
+            build/ios/symbols/
+
+      - name: Clean up secrets
+        if: always()
+        run: rm -f ios/AuthKey.p8 .env.production ios/Runner/GoogleService-Info.plist

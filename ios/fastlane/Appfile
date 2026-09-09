@@ -1,4 +1,4 @@
 app_identifier("com.icos.icos")
-apple_id("sarathfrancis90@icloud.com")
-# itc_team_id("YOUR_ITC_TEAM_ID")  # Set after first App Store Connect login
-# team_id("YOUR_TEAM_ID")           # Set after first Apple Developer Portal login
+apple_id(ENV["APPLE_ID"])            # Apple Developer account email
+team_id(ENV["APPLE_TEAM_ID"])        # Developer Portal team ID (10 chars)
+itc_team_id(ENV["APPLE_ITC_TEAM_ID"])# App Store Connect team ID (numeric)

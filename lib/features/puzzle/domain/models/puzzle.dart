@@ -13,7 +13,7 @@ abstract class Puzzle with _$Puzzle {
     required List<Wall> walls,
     required String difficulty,
     required int parTimeSeconds,
-    String? solutionHash,
+    int? difficultyScore,
   }) = _Puzzle;
 
   factory Puzzle.fromJson(Map<String, dynamic> json) => _$PuzzleFromJson(json);

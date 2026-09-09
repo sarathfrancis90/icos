@@ -49,6 +49,19 @@ dependencies:
 
   # Audio
   audioplayers: ^6.1.0
+  sign_in_with_apple: ^8.1.0
+  google_sign_in: ^7.2.0
+  url_launcher: ^6.3.2
+  package_info_plus: ^9.0.1
+  in_app_review: ^2.0.12
+  flutter_local_notifications: ^22.3.0
+  timezone: ^0.11.1
+  firebase_core: ^4.14.0
+  firebase_crashlytics: ^5.3.0
+  firebase_analytics: ^12.5.0
+  firebase_messaging: ^16.6.0
+  qr_flutter: ^4.1.0
+  flutter_timezone: ^5.1.0
 
 dev_dependencies:
   flutter_test:

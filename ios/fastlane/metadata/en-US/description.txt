@@ -1,0 +1,11 @@
+Icos is a daily path-drawing puzzle. Every day, everyone in the world gets the same grid: connect the numbered waypoints in order with one continuous line that fills every cell.
+
+- One new puzzle every day at midnight UTC
+- Difficulty ramps through the week: easy 5x5 on Monday, tough 8x8 on Sunday
+- Build a streak and protect it with a weekly streak freeze
+- Create private groups, invite friends with a 6-character code and race on daily and weekly leaderboards
+- Play offline: puzzles are cached ahead of time and results sync when you are back online
+- Share your solve card without spoiling the puzzle
+- Colour-blind palettes, dynamic type and full VoiceOver support
+
+No ads. No sign-up wall: play as a guest and create an account later to keep your progress across devices.

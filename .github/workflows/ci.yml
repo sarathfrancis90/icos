@@ -2,26 +2,61 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
   push:
-    branches: [main]
+    branches: ['**']
+
+env:
+  FLUTTER_VERSION: '3.41.3'
 
 jobs:
-  test:
+  flutter:
+    name: Analyze, test, debug APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
           cache: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # pubspec.yaml bundles .env.development and .env.production as assets, so
+      # both must exist even for analyze/test. Placeholder values only.
+      - name: Create env files from .env.example
+        run: |
+          cp .env.example .env.development
+          cp .env.example .env.production
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Analyze code
-        run: flutter analyze --fatal-infos
+      - name: Generate code (riverpod, freezed, json_serializable)
+        run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Run tests
+      - name: Analyze
+        run: flutter analyze --fatal-warnings
+
+      - name: Test
         run: flutter test --coverage
+
+      - name: Build smoke check (debug APK)
+        run: flutter build apk --debug
+
+  deno:
+    name: Edge function tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Deno tests (shared puzzle core)
+        run: deno test -A supabase/functions/_shared/
