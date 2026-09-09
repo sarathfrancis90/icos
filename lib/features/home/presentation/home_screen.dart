@@ -311,7 +311,8 @@ class _PuzzleCard extends StatelessWidget {
 
                   Text(
                     AppStrings.puzzleTitle,
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    // Card surface is always dark; use the dark text style.
+                    style: AppTheme.darkTheme.textTheme.headlineMedium,
                   ),
                   const SizedBox(height: AppSizes.sm),
 

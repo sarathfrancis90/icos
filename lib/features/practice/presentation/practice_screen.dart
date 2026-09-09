@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../shared/widgets/animated_background.dart';
@@ -33,93 +34,98 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
   Widget build(BuildContext context) {
     final stats = ref.watch(practiceStatsNotifierProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.deepBlack,
-      appBar: AppBar(
-        title: const Text('Practice'),
-        backgroundColor: Colors.transparent,
-      ),
-      body: Stack(
-        children: [
-          const Positioned.fill(child: AnimatedBackground()),
-          SafeArea(
-            child: ListView(
-              padding: const EdgeInsetsDirectional.all(AppSizes.lg),
-              children: [
-                Text(
-                  'Unlimited puzzles, generated on your device. Practice '
-                  'solves never affect your streak or leaderboards.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondaryDark,
-                      ),
-                ),
-                const SizedBox(height: AppSizes.lg),
-                const _SectionLabel('Grid size'),
-                const SizedBox(height: AppSizes.sm),
-                Wrap(
-                  spacing: AppSizes.sm,
-                  children: [
-                    for (final size in practiceSizes)
-                      _ChoiceChip(
-                        label: '${size}x$size',
-                        selected: _size == size,
-                        onTap: () => setState(() => _size = size),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSizes.lg),
-                const _SectionLabel('Difficulty'),
-                const SizedBox(height: AppSizes.sm),
-                Wrap(
-                  spacing: AppSizes.sm,
-                  children: [
-                    for (final d in practiceDifficulties)
-                      _ChoiceChip(
-                        label: '${d[0].toUpperCase()}${d.substring(1)}',
-                        selected: _difficulty == d,
-                        onTap: () => setState(() => _difficulty = d),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSizes.xl),
-                SpringButton(
-                  onPressed: _start,
-                  child: Container(
-                    key: const Key('practice-start'),
-                    width: double.infinity,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      gradient: AppColors.purpleButtonGradient,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: AppColors.purpleGlow,
-                          blurRadius: 16,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
+    // Always-dark screen (matches the puzzle screen); pin the theme so the
+    // AppBar and text stay legible when the system theme is light.
+    return Theme(
+      data: AppTheme.darkTheme,
+      child: Scaffold(
+        backgroundColor: AppColors.deepBlack,
+        appBar: AppBar(
+          title: const Text('Practice'),
+          backgroundColor: Colors.transparent,
+        ),
+        body: Stack(
+          children: [
+            const Positioned.fill(child: AnimatedBackground()),
+            SafeArea(
+              child: ListView(
+                padding: const EdgeInsetsDirectional.all(AppSizes.lg),
+                children: [
+                  Text(
+                    'Unlimited puzzles, generated on your device. Practice '
+                    'solves never affect your streak or leaderboards.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondaryDark,
                     ),
-                    child: const Center(
-                      child: Text(
-                        'Start practice',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
+                  ),
+                  const SizedBox(height: AppSizes.lg),
+                  const _SectionLabel('Grid size'),
+                  const SizedBox(height: AppSizes.sm),
+                  Wrap(
+                    spacing: AppSizes.sm,
+                    children: [
+                      for (final size in practiceSizes)
+                        _ChoiceChip(
+                          label: '${size}x$size',
+                          selected: _size == size,
+                          onTap: () => setState(() => _size = size),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSizes.lg),
+                  const _SectionLabel('Difficulty'),
+                  const SizedBox(height: AppSizes.sm),
+                  Wrap(
+                    spacing: AppSizes.sm,
+                    children: [
+                      for (final d in practiceDifficulties)
+                        _ChoiceChip(
+                          label: '${d[0].toUpperCase()}${d.substring(1)}',
+                          selected: _difficulty == d,
+                          onTap: () => setState(() => _difficulty = d),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSizes.xl),
+                  SpringButton(
+                    onPressed: _start,
+                    child: Container(
+                      key: const Key('practice-start'),
+                      width: double.infinity,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.purpleButtonGradient,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: AppColors.purpleGlow,
+                            blurRadius: 16,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Start practice',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSizes.xl),
-                const _SectionLabel('Your practice stats'),
-                const SizedBox(height: AppSizes.sm),
-                _PracticeStatsCard(stats: stats),
-              ],
+                  const SizedBox(height: AppSizes.xl),
+                  const _SectionLabel('Your practice stats'),
+                  const SizedBox(height: AppSizes.sm),
+                  _PracticeStatsCard(stats: stats),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -135,9 +141,9 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: AppColors.textPrimaryDark,
-            fontWeight: FontWeight.w700,
-          ),
+        color: AppColors.textPrimaryDark,
+        fontWeight: FontWeight.w700,
+      ),
     );
   }
 }

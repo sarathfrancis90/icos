@@ -25,7 +25,7 @@ const _attemptColumns =
 
 class PuzzleRepository {
   PuzzleRepository({EdgeInvoker? invoker})
-      : _invoke = invoker ?? supabaseEdgeInvoke;
+    : _invoke = invoker ?? supabaseEdgeInvoke;
 
   final EdgeInvoker _invoke;
 
@@ -82,7 +82,11 @@ class PuzzleRepository {
       if (response.status != 200 && response.status != 201) {
         AppLogger.warn(
           'daily-puzzle failed',
-          data: {'date': date, 'status': response.status, 'code': response.code},
+          data: {
+            'date': date,
+            'status': response.status,
+            'code': response.code,
+          },
         );
         return null;
       }
@@ -109,8 +113,9 @@ class PuzzleRepository {
 
   Future<Result<Puzzle, AppError>> _loadFallbackPuzzle(String date) async {
     try {
-      final jsonString =
-          await rootBundle.loadString('assets/puzzles/fallback_puzzles.json');
+      final jsonString = await rootBundle.loadString(
+        'assets/puzzles/fallback_puzzles.json',
+      );
       final puzzles = (jsonDecode(jsonString) as List<dynamic>)
           .cast<Map<String, dynamic>>();
       final index = selectFallbackIndex(date, puzzles);
@@ -155,6 +160,27 @@ class PuzzleRepository {
   }
 
   /// Completed attempts for dates in `[from, to]` (inclusive, ISO strings).
+  /// Dates in [from, to] (inclusive, YYYY-MM-DD) that have a puzzle row on the
+  /// server. Used by the archive so we never list days that cannot be played.
+  Future<Result<List<String>, AppError>> getAvailableDates({
+    required String from,
+    required String to,
+  }) async {
+    try {
+      final rows = await SupabaseService.client
+          .from('puzzles')
+          .select('puzzle_date')
+          .gte('puzzle_date', from)
+          .lte('puzzle_date', to)
+          .order('puzzle_date', ascending: false);
+      return Result.success([for (final r in rows) r['puzzle_date'] as String]);
+    } on PostgrestException catch (e) {
+      return Result.failure(AppError.database(e.message));
+    } catch (e) {
+      return Result.failure(AppError.network(e.toString()));
+    }
+  }
+
   Future<Result<List<SubmissionResult>, AppError>> getOwnAttempts(
     String userId, {
     required String from,
@@ -170,9 +196,7 @@ class PuzzleRepository {
           .lte('puzzle_date', to)
           .order('puzzle_date', ascending: false)
           .timeout(const Duration(seconds: 10));
-      return Result.success([
-        for (final row in rows) attemptRowToResult(row),
-      ]);
+      return Result.success([for (final row in rows) attemptRowToResult(row)]);
     } on PostgrestException catch (e) {
       return Result.failure(AppError.database(e.message));
     } catch (e) {
@@ -198,7 +222,7 @@ class PuzzleRepository {
       ],
       completedAt:
           DateTime.tryParse(row['completed_at'] as String? ?? '')?.toUtc() ??
-              DateTime.now().toUtc(),
+          DateTime.now().toUtc(),
       isArchive: row['is_archive'] as bool? ?? false,
     );
   }

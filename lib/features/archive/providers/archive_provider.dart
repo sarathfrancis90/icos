@@ -29,7 +29,21 @@ class ArchiveEntry {
 @riverpod
 Future<List<ArchiveEntry>> archiveEntries(Ref ref) async {
   ref.watch(submissionResultsVersionProvider);
-  final dates = AppDateUtils.recentDates(archiveDays);
+  var dates = AppDateUtils.recentDates(archiveDays);
+
+  // Only list days that actually have a puzzle on the server. If the lookup
+  // fails (offline), keep the full range so cached puzzles stay reachable.
+  final available = await ref
+      .read(puzzleRepositoryProvider)
+      .getAvailableDates(from: dates.last, to: dates.first);
+  if (available case Success(data: final serverDates)) {
+    final set = serverDates.toSet();
+    final filtered = [
+      for (final d in dates)
+        if (set.contains(d)) d,
+    ];
+    if (filtered.isNotEmpty) dates = filtered;
+  }
 
   final merged = <String, SubmissionResult>{};
   for (final date in dates) {
@@ -39,11 +53,9 @@ Future<List<ArchiveEntry>> archiveEntries(Ref ref) async {
 
   final userId = ref.read(authSessionProvider).userId;
   if (userId != null) {
-    final server = await ref.read(puzzleRepositoryProvider).getOwnAttempts(
-          userId,
-          from: dates.last,
-          to: dates.first,
-        );
+    final server = await ref
+        .read(puzzleRepositoryProvider)
+        .getOwnAttempts(userId, from: dates.last, to: dates.first);
     if (server case Success(data: final rows)) {
       for (final row in rows) {
         final local = merged[row.date];
