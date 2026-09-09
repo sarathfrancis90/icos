@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/utils/date_utils.dart';
@@ -31,15 +32,16 @@ class HomeScreen extends ConsumerWidget {
       if (next is AsyncData<SubmissionResult?> && next.value == null) {
         final streak = ref.read(streakProvider).valueOrNull?.currentStreak ?? 0;
         unawaited(
-          NotificationService.scheduleStreakReminder(currentStreak: streak)
-              .catchError((Object _) {}),
+          NotificationService.scheduleStreakReminder(
+            currentStreak: streak,
+          ).catchError((Object _) {}),
         );
       }
     });
 
     final result = resultAsync.valueOrNull;
-    final streak = result?.streak?.currentStreak ??
-        streakAsync.valueOrNull?.currentStreak;
+    final streak =
+        result?.streak?.currentStreak ?? streakAsync.valueOrNull?.currentStreak;
 
     return SafeArea(
       child: Padding(
@@ -57,8 +59,8 @@ class HomeScreen extends ConsumerWidget {
               child: Text(
                 AppStrings.appName,
                 style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                      color: Colors.white, // masked by shader
-                    ),
+                  color: Colors.white, // masked by shader
+                ),
               ),
             ),
             const SizedBox(height: AppSizes.xs),
@@ -67,12 +69,11 @@ class HomeScreen extends ConsumerWidget {
                 Text(
                   AppStrings.appTagline,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondaryDark,
-                      ),
+                    color: AppColors.textSecondaryDark,
+                  ),
                 ),
                 const Spacer(),
-                if (streak != null && streak > 0)
-                  _StreakBadge(streak: streak),
+                if (streak != null && streak > 0) _StreakBadge(streak: streak),
               ],
             ),
             const SizedBox(height: AppSizes.lg),
@@ -93,16 +94,16 @@ class HomeScreen extends ConsumerWidget {
                       onShare: result == null
                           ? null
                           : () => shareResultFromHome(
-                                context,
-                                result: result,
-                                gridSize: puzzle.gridSize,
-                                difficulty: puzzle.difficulty,
-                                parTimeSeconds: puzzle.parTimeSeconds,
-                                walls: [
-                                  for (final w in puzzle.walls) [w.row, w.col],
-                                ],
-                                streak: streak,
-                              ),
+                              context,
+                              result: result,
+                              gridSize: puzzle.gridSize,
+                              difficulty: puzzle.difficulty,
+                              parTimeSeconds: puzzle.parTimeSeconds,
+                              walls: [
+                                for (final w in puzzle.walls) [w.row, w.col],
+                              ],
+                              streak: streak,
+                            ),
                     ),
                     loading: () => const _PuzzleCardSkeleton(),
                     error: (error, _) => _PuzzleCard(
@@ -117,14 +118,14 @@ class HomeScreen extends ConsumerWidget {
                       onShare: result == null
                           ? null
                           : () => shareResultFromHome(
-                                context,
-                                result: result,
-                                gridSize: 5,
-                                difficulty: 'easy',
-                                parTimeSeconds: 60,
-                                walls: const [],
-                                streak: streak,
-                              ),
+                              context,
+                              result: result,
+                              gridSize: 5,
+                              difficulty: 'easy',
+                              parTimeSeconds: 60,
+                              walls: const [],
+                              streak: streak,
+                            ),
                     ),
                   ),
                   const SizedBox(height: AppSizes.md),
@@ -185,7 +186,9 @@ class _StreakBadge extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.streakGold.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(AppSizes.radiusXl),
-          border: Border.all(color: AppColors.streakGold.withValues(alpha: 0.4)),
+          border: Border.all(
+            color: AppColors.streakGold.withValues(alpha: 0.4),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -238,136 +241,142 @@ class _PuzzleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final solved = result != null;
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: AppSizes.contentMaxWidth),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.cardSurface,
-                AppColors.elevatedSurface.withValues(alpha: 0.7),
+    // The card surface is always dark, so pin its text to the dark text theme
+    // regardless of the ambient (possibly light) theme.
+    return Theme(
+      data: Theme.of(context).copyWith(textTheme: AppTheme.darkTheme.textTheme),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppSizes.contentMaxWidth),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.cardSurface,
+                  AppColors.elevatedSurface.withValues(alpha: 0.7),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+              border: Border.all(
+                color: solved
+                    ? AppColors.success.withValues(alpha: 0.5)
+                    : AppColors.cellBorder.withValues(alpha: 0.4),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.purpleGlow.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
               ],
             ),
-            borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-            border: Border.all(
-              color: solved
-                  ? AppColors.success.withValues(alpha: 0.5)
-                  : AppColors.cellBorder.withValues(alpha: 0.4),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.purpleGlow.withValues(alpha: 0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsetsDirectional.all(AppSizes.lg + 4),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Grid icon with glow
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: solved
-                          ? const [AppColors.success, AppColors.successDim]
-                          : const [
-                              AppColors.pathAmber,
-                              AppColors.pathOrangeDeep,
-                            ],
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: solved
-                            ? AppColors.success.withValues(alpha: 0.4)
-                            : AppColors.pathGlowOrange,
-                        blurRadius: 20,
-                        spreadRadius: 2,
+            child: Padding(
+              padding: const EdgeInsetsDirectional.all(AppSizes.lg + 4),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Grid icon with glow
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: solved
+                            ? const [AppColors.success, AppColors.successDim]
+                            : const [
+                                AppColors.pathAmber,
+                                AppColors.pathOrangeDeep,
+                              ],
                       ),
-                    ],
-                  ),
-                  child: Icon(
-                    solved ? Icons.check_rounded : Icons.grid_4x4_rounded,
-                    size: 40,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: AppSizes.md + 4),
-
-                Text(
-                  AppStrings.puzzleTitle,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: AppSizes.sm),
-
-                // Stats row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _InfoTag(
-                      icon: Icons.grid_view_rounded,
-                      label: '${gridSize}x$gridSize',
-                    ),
-                    const SizedBox(width: AppSizes.sm),
-                    _InfoTag(
-                      icon: Icons.speed_rounded,
-                      label: difficulty[0].toUpperCase() +
-                          difficulty.substring(1),
-                    ),
-                    const SizedBox(width: AppSizes.sm),
-                    _InfoTag(
-                      icon: Icons.timer_outlined,
-                      label: AppDateUtils.formatTimeHuman(parTime),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSizes.lg + 4),
-
-                if (solved)
-                  _SolvedSummary(result: result!)
-                else if (resultLoading)
-                  const _PuzzleActionSkeleton(),
-
-                if (solved) ...[
-                  const SizedBox(height: AppSizes.md),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _OutlinedAction(
-                          key: const Key('home-view'),
-                          label: 'View',
-                          icon: Icons.visibility_rounded,
-                          onPressed: onView,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: solved
+                              ? AppColors.success.withValues(alpha: 0.4)
+                              : AppColors.pathGlowOrange,
+                          blurRadius: 20,
+                          spreadRadius: 2,
                         ),
+                      ],
+                    ),
+                    child: Icon(
+                      solved ? Icons.check_rounded : Icons.grid_4x4_rounded,
+                      size: 40,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: AppSizes.md + 4),
+
+                  Text(
+                    AppStrings.puzzleTitle,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: AppSizes.sm),
+
+                  // Stats row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _InfoTag(
+                        icon: Icons.grid_view_rounded,
+                        label: '${gridSize}x$gridSize',
                       ),
                       const SizedBox(width: AppSizes.sm),
-                      Expanded(
-                        child: _GradientAction(
-                          key: const Key('home-share'),
-                          label: 'Share',
-                          icon: Icons.share_rounded,
-                          onPressed: onShare ?? () {},
-                        ),
+                      _InfoTag(
+                        icon: Icons.speed_rounded,
+                        label:
+                            difficulty[0].toUpperCase() +
+                            difficulty.substring(1),
+                      ),
+                      const SizedBox(width: AppSizes.sm),
+                      _InfoTag(
+                        icon: Icons.timer_outlined,
+                        label: AppDateUtils.formatTimeHuman(parTime),
                       ),
                     ],
                   ),
-                ] else if (!resultLoading)
-                  _GradientAction(
-                    key: const Key('home-play'),
-                    label: 'Play',
-                    onPressed: onPlay,
-                    height: 56,
-                    fontSize: 18,
-                  ),
-              ],
+                  const SizedBox(height: AppSizes.lg + 4),
+
+                  if (solved)
+                    _SolvedSummary(result: result!)
+                  else if (resultLoading)
+                    const _PuzzleActionSkeleton(),
+
+                  if (solved) ...[
+                    const SizedBox(height: AppSizes.md),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _OutlinedAction(
+                            key: const Key('home-view'),
+                            label: 'View',
+                            icon: Icons.visibility_rounded,
+                            onPressed: onView,
+                          ),
+                        ),
+                        const SizedBox(width: AppSizes.sm),
+                        Expanded(
+                          child: _GradientAction(
+                            key: const Key('home-share'),
+                            label: 'Share',
+                            icon: Icons.share_rounded,
+                            onPressed: onShare ?? () {},
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (!resultLoading)
+                    _GradientAction(
+                      key: const Key('home-play'),
+                      label: 'Play',
+                      onPressed: onPlay,
+                      height: 56,
+                      fontSize: 18,
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -608,9 +617,7 @@ class _InfoTag extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.elevatedSurface,
         borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-        border: Border.all(
-          color: AppColors.cellBorder.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -659,7 +666,9 @@ class _PuzzleCardSkeleton extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.cardSurface,
             borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-            border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
+            border: Border.all(
+              color: AppColors.cellBorder.withValues(alpha: 0.3),
+            ),
           ),
           child: Padding(
             padding: const EdgeInsetsDirectional.all(AppSizes.lg),

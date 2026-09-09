@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../practice/providers/practice_provider.dart';
 import '../domain/models/streak.dart';
@@ -40,13 +41,27 @@ class StatsScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.displayMedium,
             ),
             const SizedBox(height: AppSizes.lg),
-            _buildOverviewSection(context, overviewAsync),
-            const SizedBox(height: AppSizes.sm),
-            _PracticeStatsCard(stats: practiceStats),
-            const SizedBox(height: AppSizes.lg),
-            _buildCalendarSection(context, overviewAsync, historyAsync),
-            const SizedBox(height: AppSizes.lg),
-            _buildTimeDistribution(context, historyAsync),
+            // Stat cards use the always-dark card surface; pin their text to
+            // the dark text theme so they stay legible in the light theme.
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(textTheme: AppTheme.darkTheme.textTheme),
+              child: Builder(
+                builder: (context) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildOverviewSection(context, overviewAsync),
+                    const SizedBox(height: AppSizes.sm),
+                    _PracticeStatsCard(stats: practiceStats),
+                    const SizedBox(height: AppSizes.lg),
+                    _buildCalendarSection(context, overviewAsync, historyAsync),
+                    const SizedBox(height: AppSizes.lg),
+                    _buildTimeDistribution(context, historyAsync),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: AppSizes.xxl),
           ],
         ),
@@ -77,33 +92,33 @@ class StatsScreen extends ConsumerWidget {
 
     return switch (historyAsync) {
       AsyncData(:final value) => Container(
-          decoration: BoxDecoration(
-            color: AppColors.cardSurface,
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            border: Border.all(
-              color: AppColors.cellBorder.withValues(alpha: 0.3),
-            ),
-          ),
-          padding: const EdgeInsetsDirectional.all(AppSizes.md),
-          child: StreakCalendar(
-            solveHistory: value,
-            currentStreak: currentStreak,
+        decoration: BoxDecoration(
+          color: AppColors.cardSurface,
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          border: Border.all(
+            color: AppColors.cellBorder.withValues(alpha: 0.3),
           ),
         ),
+        padding: const EdgeInsetsDirectional.all(AppSizes.md),
+        child: StreakCalendar(
+          solveHistory: value,
+          currentStreak: currentStreak,
+        ),
+      ),
       AsyncError(:final error) => _ErrorCard(message: error.toString()),
       _ => Container(
-          decoration: BoxDecoration(
-            color: AppColors.cardSurface,
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          ),
-          padding: const EdgeInsetsDirectional.all(AppSizes.md),
-          child: const SizedBox(
-            height: 200,
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.purpleLight),
-            ),
+        decoration: BoxDecoration(
+          color: AppColors.cardSurface,
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        ),
+        padding: const EdgeInsetsDirectional.all(AppSizes.md),
+        child: const SizedBox(
+          height: 200,
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.purpleLight),
           ),
         ),
+      ),
     };
   }
 
@@ -197,7 +212,7 @@ class _PracticeStatsCard extends StatelessWidget {
       value: stats.count == 0
           ? 'No practice yet'
           : '${stats.count} solved'
-              '${best.isEmpty ? '' : ' · best ${best.join(', ')}'}',
+                '${best.isEmpty ? '' : ' · best ${best.join(', ')}'}',
       icon: Icons.fitness_center_rounded,
       gradientColors: const [AppColors.pathAmber, AppColors.pathOrangeDeep],
     );
@@ -205,10 +220,7 @@ class _PracticeStatsCard extends StatelessWidget {
 }
 
 class _StreakHero extends StatelessWidget {
-  const _StreakHero({
-    required this.currentStreak,
-    required this.longestStreak,
-  });
+  const _StreakHero({required this.currentStreak, required this.longestStreak});
 
   final int currentStreak;
   final int longestStreak;
@@ -221,9 +233,7 @@ class _StreakHero extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(
-          color: AppColors.cellBorder.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsetsDirectional.all(AppSizes.md),
       child: Row(
@@ -260,11 +270,7 @@ class _StreakHero extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            width: 1,
-            height: 80,
-            color: AppColors.cellBorder,
-          ),
+          Container(width: 1, height: 80, color: AppColors.cellBorder),
           Expanded(
             child: Column(
               children: [
@@ -324,9 +330,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(
-          color: AppColors.cellBorder.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsetsDirectional.all(AppSizes.md),
       child: Row(
@@ -353,12 +357,13 @@ class _StatCard extends StatelessWidget {
                 Text(label, style: theme.textTheme.bodySmall),
                 Text(
                   value,
-                  style: (value.length > 12
-                          ? theme.textTheme.titleMedium
-                          : theme.textTheme.headlineMedium)
-                      ?.copyWith(
-                    fontFeatures: [const FontFeature.tabularFigures()],
-                  ),
+                  style:
+                      (value.length > 12
+                              ? theme.textTheme.titleMedium
+                              : theme.textTheme.headlineMedium)
+                          ?.copyWith(
+                            fontFeatures: [const FontFeature.tabularFigures()],
+                          ),
                 ),
               ],
             ),
@@ -460,10 +465,7 @@ class _SolveTimeDistribution extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Solve Time Distribution',
-            style: theme.textTheme.titleMedium,
-          ),
+          Text('Solve Time Distribution', style: theme.textTheme.titleMedium),
           const SizedBox(height: AppSizes.md),
           ...buckets.entries.map((entry) {
             final ratio = entry.value / maxCount;
