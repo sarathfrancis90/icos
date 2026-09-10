@@ -27,7 +27,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   ];
 
   static const _descriptions = [
-    'Guide the snake through the grid, eating numbered waypoints in order while filling every cell. Feed the path!',
+    'Draw one continuous line through every cell, visiting the numbered waypoints in order. One line. Every cell.',
     'A new puzzle every day at midnight UTC. Same puzzle for everyone worldwide. Difficulty scales Monday to Sunday.',
     'Create or join groups to see daily and weekly leaderboards. Challenge your friends and family!',
   ];

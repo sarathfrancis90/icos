@@ -18,7 +18,7 @@ void main() {
 
         expect(find.text('Welcome to Icos'), findsOneWidget);
         expect(
-          find.textContaining('Guide the snake'),
+          find.textContaining('Draw one continuous line'),
           findsOneWidget,
         );
       });

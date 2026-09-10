@@ -10,7 +10,7 @@ appId: com.icos.game
 
 # -- Home Screen --
 - assertVisible: "Icos"
-- assertVisible: "Feed the Path"
+- assertVisible: "One line. Every cell."
 - takeScreenshot: 03_home/home_screen_full
 
 # -- Puzzle Card --
