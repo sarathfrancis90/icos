@@ -10,7 +10,7 @@ recurs per release.
 ---
 
 
-> **Status 2026-09-09:** The Supabase project **`icos`** (ref `pdvgddvubxldjnemdkok`, us-east-1,
+> **Status 2026-09-10:** The game was renamed to **Icos** (bundle id `com.icos.game`, auth scheme `io.supabase.icos`, deep-link host `icos.app`). The Supabase project is still named **`icos`** in the dashboard (rename it under Project Settings, General); everything else is live: ref `pdvgddvubxldjnemdkok`, us-east-1,
 > org "Francis Org") is LIVE with all 21 migrations applied, all 5 edge functions deployed,
 > `PUZZLE_SEED_SALT` set, Vault entries (`project_url`, `service_role_key`) created, anonymous
 > sign-ins + email/password enabled (email confirmations currently OFF for testing — turn them on
