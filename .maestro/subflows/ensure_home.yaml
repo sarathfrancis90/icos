@@ -1,6 +1,6 @@
 # Reusable subflow: Get past onboarding to home screen
 # App auto-signs in as anonymous, so no auth screen needed.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

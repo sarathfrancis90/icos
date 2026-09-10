@@ -1,6 +1,6 @@
 # Flow 07: Groups Screen
 # Verifies groups screen empty state, Create Group and Join Group dialogs.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

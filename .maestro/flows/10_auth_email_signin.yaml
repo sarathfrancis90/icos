@@ -1,6 +1,6 @@
 # Flow 10: Auth - Email Form Visual Audit
 # Tests the email auth form fields, validation states, toggle between modes.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

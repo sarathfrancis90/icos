@@ -67,7 +67,7 @@
 -dontwarn com.google.gson.**
 
 # --- App code -------------------------------------------------------------
--keep class com.icos.icos.** { *; }
+-keep class com.icos.game.** { *; }
 
 # --- Misc -----------------------------------------------------------------
 # javax.* referenced by some transitive libs on older SDKs.

@@ -1,6 +1,6 @@
 default_platform(:ios)
 
-APP_ID = "com.icos.icos".freeze
+APP_ID = "com.icos.game".freeze
 REPO_ROOT = File.expand_path("../..", __dir__).freeze
 
 platform :ios do

@@ -1,6 +1,6 @@
 # Reusable subflow: Navigate to a bottom tab
 # Usage: runFlow with env.TAB_NAME = "Home" | "Groups" | "Statistics" | "Profile"
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

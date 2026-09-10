@@ -1,6 +1,6 @@
 # Flow 09: Auth - Create Account Flow
 # Tests navigating to the auth screen from Profile > Create Account.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

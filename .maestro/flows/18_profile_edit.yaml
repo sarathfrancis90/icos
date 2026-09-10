@@ -1,6 +1,6 @@
 # Flow 18: Profile Settings Interactions
 # Tests all interactive settings: toggles, theme cycling, delete dialog.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

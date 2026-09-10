@@ -1,6 +1,6 @@
 # Flow 08: Profile Screen
 # Full audit of profile screen: avatar, guest state, settings, app info.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

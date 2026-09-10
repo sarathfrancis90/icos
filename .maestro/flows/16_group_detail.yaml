@@ -1,7 +1,7 @@
 # Flow 16: Group Detail Screen
 # Note: Fresh guest has no groups, so this captures the empty state.
 # The group detail tabs are only reachable with existing group membership.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

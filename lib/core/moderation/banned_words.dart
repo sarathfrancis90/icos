@@ -194,8 +194,9 @@ abstract final class ProfanityFilter {
     for (final word in words) {
       if (reservedWords.contains(word)) return true;
     }
-    // "icos" anywhere (e.g. "icosbot") is also impersonation.
-    return normalized.contains('icos');
+    // Names that *start* with the brand (e.g. "icosbot", "icos official")
+    // impersonate us; a substring match would wrongly block "Nicos".
+    return normalized.startsWith('icos');
   }
 
   /// True when the text is blocked for any reason (profanity or reserved).

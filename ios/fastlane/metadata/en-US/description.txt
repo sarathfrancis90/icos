@@ -1,11 +1,18 @@
-Icos is a daily path-drawing puzzle. Every day, everyone in the world gets the same grid: connect the numbered waypoints in order with one continuous line that fills every cell.
+Icos is a daily path puzzle. Draw one continuous line through every cell of the grid, visiting the numbered waypoints in order, without lifting your finger. Every puzzle has exactly one solution.
 
-- One new puzzle every day at midnight UTC
-- Difficulty ramps through the week: easy 5x5 on Monday, tough 8x8 on Sunday
-- Build a streak and protect it with a weekly streak freeze
-- Create private groups, invite friends with a 6-character code and race on daily and weekly leaderboards
-- Play offline: puzzles are cached ahead of time and results sync when you are back online
-- Share your solve card without spoiling the puzzle
-- Colour-blind palettes, dynamic type and full VoiceOver support
+THE ORIGINAL PATH PUZZLE
+In 1857 the mathematician William Rowan Hamilton invented the Icosian game: find a route that visits every point exactly once. Icos brings that idea to your phone with a fresh grid every day.
 
-No ads. No sign-up wall: play as a guest and create an account later to keep your progress across devices.
+ONE PUZZLE A DAY, FOR EVERYONE
+The same puzzle for every player worldwide. Easy on Monday, expert by Sunday. Build a streak, earn a weekly streak freeze, and compare times with friends.
+
+PLAY WITH FRIENDS
+Create a group, share a six-letter invite code or QR, and race on daily and weekly leaderboards. A live activity feed shows when your friends solve.
+
+PRACTICE AND ARCHIVE
+Unlimited practice puzzles generated on your device, plus the last 30 days of dailies.
+
+MADE FOR EVERYONE
+Colorblind palettes with pattern overlays, full VoiceOver and TalkBack support, tap-to-play as an alternative to dragging, light and dark themes, and offline play with automatic sync.
+
+No account needed to play. Create one to keep your streak across devices and join groups.

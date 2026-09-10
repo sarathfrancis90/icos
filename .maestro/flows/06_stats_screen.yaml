@@ -1,6 +1,6 @@
 # Flow 06: Stats Screen
 # Verifies all stats elements: streaks, calendar, time distribution.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

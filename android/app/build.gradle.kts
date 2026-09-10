@@ -23,7 +23,7 @@ if (hasReleaseKeystore) {
 val allowDebugSigning = System.getenv("ALLOW_DEBUG_SIGNING") == "true"
 
 android {
-    namespace = "com.icos.icos"
+    namespace = "com.icos.game"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -39,7 +39,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.icos.icos"
+        applicationId = "com.icos.game"
         // Android 6.0 (Marshmallow). Required by firebase_messaging / google_sign_in
         // and gives us runtime permissions + modern TLS. Do not rely on the Flutter
         // default here; it changes between Flutter releases.

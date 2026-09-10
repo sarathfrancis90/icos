@@ -1,6 +1,6 @@
 # Flow 03: Home Screen
 # Verifies the home screen renders with puzzle card and all elements.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

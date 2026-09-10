@@ -1,6 +1,6 @@
 # Flow 13: Dark Theme - Full Visual Audit
 # Ensures dark theme is applied and screenshots every screen.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

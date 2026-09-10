@@ -1,5 +1,5 @@
 # Reusable subflow: Continue as guest if auth screen appears
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

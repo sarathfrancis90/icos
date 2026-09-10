@@ -1,6 +1,6 @@
 # Flow 17: Error & Empty States Audit
 # Captures all empty/loading states across the app for a fresh user.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

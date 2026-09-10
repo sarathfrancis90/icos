@@ -1,4 +1,4 @@
-app_identifier("com.icos.icos")
+app_identifier("com.icos.game")
 apple_id(ENV["APPLE_ID"])            # Apple Developer account email
 team_id(ENV["APPLE_TEAM_ID"])        # Developer Portal team ID (10 chars)
 itc_team_id(ENV["APPLE_ITC_TEAM_ID"])# App Store Connect team ID (numeric)

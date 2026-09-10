@@ -1,6 +1,6 @@
 # Icos Release Runbook
 
-Every manual step required to ship Icos (`com.icos.icos`) to the App Store and
+Every manual step required to ship Icos (`com.icos.game`) to the App Store and
 Google Play, in the order to do them. Automated steps live in `.github/workflows/`,
 `android/fastlane/` and `ios/fastlane/`; this document covers only what a human must do.
 
@@ -84,7 +84,7 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
   - Enable **Anonymous sign-ins**
   - **Email**: enable; disable "Confirm email" only if you want frictionless upgrade (recommended: keep confirmation on)
   - **Google**: Client ID = the *Web* client ID, Client secret = its secret (from step 5); add the iOS client ID to *Authorized Client IDs*
-  - **Apple**: Services ID + Team ID + Key ID + private key (`.p8`) from step 3; also list the bundle id `com.icos.icos` in *Authorized Client IDs*
+  - **Apple**: Services ID + Team ID + Key ID + private key (`.p8`) from step 3; also list the bundle id `com.icos.game` in *Authorized Client IDs*
 - [ ] **(once)** Authentication > URL Configuration > *Redirect URLs*: add `io.supabase.icos://login-callback` and `https://icos.app/*`
 - [ ] **(once)** Database > Replication (Realtime): enable the `group_feed` table (and any other table the client subscribes to)
 - [ ] **(once)** Copy **Project URL** and **anon key** (Project Settings > API) into `.env.production` locally and into GitHub secrets `SUPABASE_URL` / `SUPABASE_ANON_KEY`; copy the **service_role** key into `SUPABASE_SERVICE_ROLE_KEY` (GitHub only, never in the app)
@@ -99,11 +99,11 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 ## 3. Apple Developer + App Store Connect
 
 - [ ] **(once)** Enrol in the Apple Developer Program (Individual or Organisation). Note the **Team ID** (Membership page, 10 chars) -> secret `APPLE_TEAM_ID`
-- [ ] **(once)** Certificates, IDs & Profiles > Identifiers > **App ID** `com.icos.icos` (explicit) with capabilities:
+- [ ] **(once)** Certificates, IDs & Profiles > Identifiers > **App ID** `com.icos.game` (explicit) with capabilities:
   - Associated Domains
   - Push Notifications
   - Sign in with Apple
-- [ ] **(once)** Identifiers > **Services ID** (e.g. `com.icos.icos.signin`) with Sign in with Apple enabled;
+- [ ] **(once)** Identifiers > **Services ID** (e.g. `com.icos.game.signin`) with Sign in with Apple enabled;
       configure it with domain `<PROJECT_REF>.supabase.co` and return URL `https://<PROJECT_REF>.supabase.co/auth/v1/callback`
 - [ ] **(once)** Keys > **Sign in with Apple key** (`.p8`): note Key ID; upload to Supabase Apple provider (step 2)
 - [ ] **(once)** Keys > **APNs key** (`.p8`, "Apple Push Notifications service"): upload to Firebase > Project settings > Cloud Messaging > Apple app configuration (step 5). Skip if not using push
@@ -112,7 +112,7 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
       - Key ID -> secret `ASC_KEY_ID`
       - Issuer ID -> secret `ASC_ISSUER_ID`
       - `base64 -i AuthKey_XXXX.p8 | pbcopy` -> secret `ASC_KEY_P8_BASE64`
-- [ ] **(once)** App Store Connect > Apps > **+ New App**: iOS, name *Icos*, primary language English (U.S.), bundle ID `com.icos.icos`, SKU `icos-ios`.
+- [ ] **(once)** App Store Connect > Apps > **+ New App**: iOS, name *Icos*, primary language English (U.S.), bundle ID `com.icos.game`, SKU `icos-ios`.
       Note the **ITC team ID** (visible in the URL of https://appstoreconnect.apple.com/access/users or via `fastlane spaceship`) -> secret `APPLE_ITC_TEAM_ID`. Your Apple account email -> secret `APPLE_ID`
 - [ ] **(once)** Code signing via **match**:
   ```bash
@@ -206,8 +206,8 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 - [ ] **(once)** Google Cloud Console > APIs & Services > OAuth consent screen: External, app name Icos, support email, privacy policy URL, scopes `email`, `profile`, `openid`; publish (verification not needed for these scopes)
 - [ ] **(once)** Credentials > Create OAuth client ID:
   - **Web application** (used by Supabase and as Android `serverClientId`): authorised redirect URI `https://<PROJECT_REF>.supabase.co/auth/v1/callback` -> `GOOGLE_WEB_CLIENT_ID` (+ secret for Supabase)
-  - **Android**: package `com.icos.icos`, SHA-1 of **both** the upload key (`keytool -list -v -keystore ~/icos-upload-keystore.jks -alias upload`) and the Play App Signing key (Play Console > App signing) — create one client per fingerprint
-  - **iOS**: bundle ID `com.icos.icos` -> `GOOGLE_IOS_CLIENT_ID`
+  - **Android**: package `com.icos.game`, SHA-1 of **both** the upload key (`keytool -list -v -keystore ~/icos-upload-keystore.jks -alias upload`) and the Play App Signing key (Play Console > App signing) — create one client per fingerprint
+  - **iOS**: bundle ID `com.icos.game` -> `GOOGLE_IOS_CLIENT_ID`
 - [ ] Put the two IDs into `.env.production` locally and GitHub secrets `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`
 
 ---
@@ -217,8 +217,8 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 Skip this section entirely if you launch without Firebase; leave the `FIREBASE_*` secrets empty.
 
 - [ ] **(once)** https://console.firebase.google.com > Add project (you can reuse the Google Cloud project from step 5 so the OAuth clients are shared)
-- [ ] **(once)** Add **Android app** `com.icos.icos` with both SHA-1/SHA-256 fingerprints; download `google-services.json` -> `android/app/google-services.json` locally (git-ignored) and secret `GOOGLE_SERVICES_JSON_BASE64`
-- [ ] **(once)** Add **iOS app** `com.icos.icos`; download `GoogleService-Info.plist` -> `ios/Runner/GoogleService-Info.plist` locally (git-ignored, must also be added to the Runner target in Xcode if you build locally) and secret `GOOGLE_SERVICE_INFO_PLIST_BASE64`
+- [ ] **(once)** Add **Android app** `com.icos.game` with both SHA-1/SHA-256 fingerprints; download `google-services.json` -> `android/app/google-services.json` locally (git-ignored) and secret `GOOGLE_SERVICES_JSON_BASE64`
+- [ ] **(once)** Add **iOS app** `com.icos.game`; download `GoogleService-Info.plist` -> `ios/Runner/GoogleService-Info.plist` locally (git-ignored, must also be added to the Runner target in Xcode if you build locally) and secret `GOOGLE_SERVICE_INFO_PLIST_BASE64`
 - [ ] **(once)** Copy Project settings values into `.env.production` / secrets: `FIREBASE_PROJECT_ID`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_ANDROID_API_KEY`, `FIREBASE_ANDROID_APP_ID`, `FIREBASE_IOS_API_KEY`, `FIREBASE_IOS_APP_ID`
 - [ ] **(once)** Cloud Messaging > Apple app configuration > upload the APNs key from step 3
 - [ ] **(once)** Crashlytics > enable for both apps (first crash report activates the dashboard)
@@ -248,7 +248,7 @@ cd ios && bundle exec fastlane beta
 
 Test deep links on a device:
 ```bash
-adb shell am start -a android.intent.action.VIEW -d "https://icos.app/join/ABC123" com.icos.icos
+adb shell am start -a android.intent.action.VIEW -d "https://icos.app/join/ABC123" com.icos.game
 xcrun simctl openurl booted "https://icos.app/join/ABC123"
 ```
 

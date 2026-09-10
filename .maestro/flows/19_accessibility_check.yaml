@@ -1,6 +1,6 @@
 # Flow 19: Layout Integrity & Stress Test
 # Verifies layouts don't break with rapid navigation and scrolling.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

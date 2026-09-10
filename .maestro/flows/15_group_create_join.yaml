@@ -1,6 +1,6 @@
 # Flow 15: Group Create & Join Dialogs
 # Tests group creation and join dialog forms.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

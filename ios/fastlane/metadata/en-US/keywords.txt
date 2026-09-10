@@ -1,1 +1,1 @@
-puzzle,daily,path,logic,brain,grid,zip,friends,streak,leaderboard
+puzzle,daily,path,grid,logic,brain,hamiltonian,zip,streak,friends

@@ -1,6 +1,6 @@
 # Flow 01: Onboarding - First Launch Experience
 # Verifies all 3 onboarding pages render correctly with proper content.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

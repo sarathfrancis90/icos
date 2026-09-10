@@ -1,6 +1,6 @@
 # Maestro Visual E2E Audit - Icos
 # Run: maestro test --test-output-dir=maestro-screenshots .maestro/
-appId: com.icos.icos
+appId: com.icos.game
 
 flows:
   - "flows/*"

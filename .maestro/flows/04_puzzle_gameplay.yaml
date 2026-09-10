@@ -1,6 +1,6 @@
 # Flow 04: Puzzle Gameplay
 # Tests the core puzzle experience: grid rendering, waypoints, walls, controls.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

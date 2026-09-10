@@ -1,6 +1,6 @@
 # Flow 11: OAuth Buttons Visual Check
 # Verifies Google and Apple OAuth buttons render correctly on auth screen.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

@@ -1,4 +1,4 @@
 # Path to the Play Console service-account JSON. Relative to android/ when run
 # locally; CI writes it from the PLAY_STORE_CREDENTIALS secret.
 json_key_file(ENV.fetch("PLAY_STORE_JSON_KEY", "play-store-credentials.json"))
-package_name("com.icos.icos")
+package_name("com.icos.game")

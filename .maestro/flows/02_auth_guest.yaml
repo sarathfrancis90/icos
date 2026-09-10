@@ -1,6 +1,6 @@
 # Flow 02: Anonymous Auto-Login
 # Verifies the app auto-signs in anonymously after onboarding.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

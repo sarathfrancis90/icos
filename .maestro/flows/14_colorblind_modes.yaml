@@ -1,6 +1,6 @@
 # Flow 14: Colorblind Mode Visual Audit
 # Tests all 3 colorblind palettes on the puzzle screen.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 

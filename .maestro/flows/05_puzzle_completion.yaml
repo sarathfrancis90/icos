@@ -1,6 +1,6 @@
 # Flow 05: Puzzle Drawing & Visual States
 # Tests path drawing via taps through the grid, showcasing various game states.
-appId: com.icos.icos
+appId: com.icos.game
 
 ---
 
