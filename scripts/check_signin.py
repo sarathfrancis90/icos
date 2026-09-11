@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""Preflight for Google and Apple sign-in.
+
+Checks the parts that are easy to get wrong and silent when wrong: whether
+Supabase actually has the providers switched on, whether the client ids are
+real, and whether the iOS URL scheme matches the client id.
+
+Usage:
+    python3 scripts/check_signin.py [.env.production]
+Exit code is non-zero if anything required is missing.
+"""
+import json
+import plistlib
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+PLIST = ROOT / 'ios' / 'Runner' / 'Info.plist'
+OK, BAD, WARN = 'ok  ', 'FAIL', 'warn'
+failures = 0
+
+
+def line(status, label, detail=''):
+    global failures
+    if status is BAD:
+        failures += 1
+    print(f'  [{status}] {label}' + (f' — {detail}' if detail else ''))
+
+
+def env(path: Path) -> dict:
+    out = {}
+    for raw in path.read_text().splitlines():
+        s = raw.strip()
+        if s and not s.startswith('#') and '=' in s:
+            k, _, v = s.partition('=')
+            out[k.strip()] = v.strip().strip('"')
+    return out
+
+
+def supabase_providers(url: str, anon: str) -> dict:
+    req = urllib.request.Request(f'{url}/auth/v1/settings', headers={'apikey': anon})
+    with urllib.request.urlopen(req, timeout=40) as r:
+        return json.load(r).get('external', {})
+
+
+def url_schemes() -> list[str]:
+    raw = subprocess.run(['plutil', '-convert', 'xml1', '-o', '-', str(PLIST)],
+                         capture_output=True).stdout
+    data = plistlib.loads(raw)
+    out = []
+    for entry in data.get('CFBundleURLTypes', []):
+        out += entry.get('CFBundleURLSchemes', [])
+    return out
+
+
+def main() -> int:
+    cfg = env(Path(sys.argv[1] if len(sys.argv) > 1 else ROOT / '.env.production'))
+    web = cfg.get('GOOGLE_WEB_CLIENT_ID', '')
+    ios = cfg.get('GOOGLE_IOS_CLIENT_ID', '')
+
+    print('Supabase providers')
+    try:
+        ext = supabase_providers(cfg['SUPABASE_URL'], cfg['SUPABASE_ANON_KEY'])
+        line(OK if ext.get('google') else BAD, 'Google provider enabled',
+             '' if ext.get('google') else 'Auth > Sign In / Providers > Google')
+        line(OK if ext.get('apple') else BAD, 'Apple provider enabled',
+             '' if ext.get('apple') else 'Auth > Sign In / Providers > Apple')
+        line(OK if ext.get('anonymous_users') else BAD, 'Anonymous sign-in enabled')
+    except (urllib.error.URLError, KeyError) as exc:
+        line(BAD, 'could not reach Supabase', str(exc))
+
+    print('\nGoogle client ids')
+    for label, val in [('web/server client id', web), ('iOS client id', ios)]:
+        if not val:
+            line(BAD, label, 'empty')
+        elif val.startswith('REPLACE_ME'):
+            line(BAD, label, 'still the placeholder')
+        elif not val.endswith('.apps.googleusercontent.com'):
+            line(BAD, label, f'malformed: {val}')
+        else:
+            line(OK, label, val[:22] + '...')
+
+    print('\niOS URL schemes in Info.plist')
+    schemes = url_schemes()
+    line(OK if 'io.supabase.icos' in schemes else BAD,
+         'Supabase callback scheme io.supabase.icos')
+    google = [s for s in schemes if s.startswith('com.googleusercontent.apps')]
+    if not google:
+        line(WARN, 'reversed Google scheme absent',
+             'injected at build time by scripts/inject_google_url_scheme.sh')
+    elif google == ['com.googleusercontent.apps.']:
+        line(BAD, 'reversed Google scheme is a stub',
+             'built from an empty client id')
+    elif ios and google[0] != f"com.googleusercontent.apps.{ios.removesuffix('.apps.googleusercontent.com')}":
+        line(BAD, 'reversed Google scheme does not match the client id', google[0])
+    else:
+        line(OK, 'reversed Google scheme', google[0][:34] + '...')
+
+    print()
+    if failures:
+        print(f'{failures} problem(s). Google/Apple sign-in will not work until these are fixed.')
+    else:
+        print('Sign-in configuration looks complete.')
+    return 1 if failures else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

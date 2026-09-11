@@ -290,14 +290,67 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 
 ## 5. Google Cloud OAuth (Google Sign-In) — required for the Google provider
 
-- [ ] **(once)** Google Cloud Console > APIs & Services > OAuth consent screen: External, app name Icos, support email, privacy policy URL, scopes `email`, `profile`, `openid`; publish (verification not needed for these scopes)
-- [ ] **(once)** Credentials > Create OAuth client ID:
-  - **Web application** (used by Supabase and as Android `serverClientId`): authorised redirect URI `https://<PROJECT_REF>.supabase.co/auth/v1/callback` -> `GOOGLE_WEB_CLIENT_ID` (+ secret for Supabase)
-  - **Android**: package `com.icos.game`, SHA-1 of **both** the upload key (`keytool -list -v -keystore ~/icos-upload-keystore.jks -alias upload`) and the Play App Signing key (Play Console > App signing) — create one client per fingerprint
-  - **iOS**: bundle ID `com.icos.game` -> `GOOGLE_IOS_CLIENT_ID`
-- [ ] Put the two IDs into `.env.production` locally and GitHub secrets `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`
+> **Status as of 2026-09-11: not configured.** Supabase reports both the Google and
+> Apple providers as **off**, and `.env.production` has no client ids. Pressing either
+> button in the app fails with `Unsupported provider: provider is not enabled`. The app
+> code is fine; only this configuration is missing.
+>
+> Verify at any point with:
+> ```bash
+> python3 scripts/check_signin.py
+> ```
+> It checks Supabase's live provider state, the client ids, and that the iOS URL scheme
+> matches the client id. Non-zero exit means sign-in cannot work yet.
 
----
+### 5a. Google Cloud Console
+
+Create three OAuth clients under APIs & Services > Credentials, all in one project:
+
+| Type | Used for | Needs |
+|---|---|---|
+| Web application | `serverClientId` on Android, and the Client ID + Secret pasted into Supabase | Authorised redirect URI `https://pdvgddvubxldjnemdkok.supabase.co/auth/v1/callback` |
+| iOS | native iOS sign-in, and the reversed URL scheme | Bundle ID `com.icos.game` |
+| Android | native Android sign-in | Package `com.icos.game` plus the SHA-1 of **both** the upload key and the **Play app signing** key |
+
+The Android SHA-1 is the usual failure. Play re-signs every build with its own key, so a
+client registered against only the upload key fails on anything installed from Play with
+`DEVELOPER_ERROR` (status 10). Copy both fingerprints from Play Console > Test and
+release > Setup > App signing.
+
+Put the web and iOS client ids in `.env.production`:
+```
+GOOGLE_WEB_CLIENT_ID=<web client id>.apps.googleusercontent.com
+GOOGLE_IOS_CLIENT_ID=<ios client id>.apps.googleusercontent.com
+```
+and set the same two as the `GOOGLE_WEB_CLIENT_ID` / `GOOGLE_IOS_CLIENT_ID` GitHub secrets.
+
+### 5b. Supabase > Authentication > Sign In / Providers > Google
+
+- Enable it.
+- Client ID and Client Secret: the **web** client.
+- Authorised Client IDs: the **iOS** and **Android** client ids, comma separated. Native
+  sign-in sends an id token minted for those, and Supabase rejects it otherwise.
+
+### 5c. Supabase > Authentication > Sign In / Providers > Apple
+
+- Enable it.
+- Authorised Client IDs: `com.icos.game`. That alone is enough for native iOS sign-in.
+- The Services ID, Team ID, Key ID and `.p8` are only needed for the **web** flow, which
+  is what Android and any anonymous-account linking use. Create the Services ID and a
+  Sign in with Apple key in the Apple Developer portal, with return URL
+  `https://pdvgddvubxldjnemdkok.supabase.co/auth/v1/callback`.
+  Note this is a **different** key from `ios/AuthKey_9UC6PN6P9K.p8`, which is the App
+  Store Connect API key.
+
+### 5d. Redirect allowlist
+
+Supabase > Authentication > URL Configuration > Redirect URLs must include:
+```
+io.supabase.icos://login-callback
+```
+The app signs in anonymously on first launch, so every sign-in press goes through
+`linkIdentity`, which is a web redirect. Without this entry the browser opens and then
+dead-ends.
 
 ## 6. Firebase (optional — analytics, Crashlytics, push)
 
