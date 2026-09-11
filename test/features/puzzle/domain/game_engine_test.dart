@@ -1015,4 +1015,18 @@ void _retractionTests() {
     expect(result.path.length, state.path.length + 1);
     expect(result.path.last, const GridPosition(row: 1, col: 1));
   });
+
+  test('countUndo: false retracts without charging an undo', () {
+    final result = engine.handleCellTap(state, 0, 1, countUndo: false);
+
+    expect(result.path.length, 2);
+    expect(result.undosUsed, state.undosUsed);
+  });
+
+  test('countUndo: false does not affect an extension', () {
+    final result = engine.handleCellTap(state, 1, 1, countUndo: false);
+
+    expect(result.path.length, state.path.length + 1);
+    expect(result.undosUsed, state.undosUsed);
+  });
 }

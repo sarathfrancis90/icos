@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -50,20 +49,9 @@ class PathRenderer {
     }
 
     final linePath = _roundedPath(effective);
-    final shader = _gradientShader(effective);
 
     _drawGlow(canvas, linePath);
-
-    canvas.drawPath(
-      linePath,
-      Paint()
-        ..shader = shader
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..isAntiAlias = true,
-    );
+    _strokeAlongArcLength(canvas, linePath);
 
     if (palette.patterns) _drawPatternTicks(canvas, effective);
 
@@ -136,25 +124,52 @@ class PathRenderer {
     return path;
   }
 
-  /// Gradient along the dominant axis of the line so the ramp reads as
-  /// start -> head rather than as an arbitrary screen-space wash.
-  ui.Shader _gradientShader(List<Offset> pts) {
-    final from = pts.first;
-    final to = pts.last;
-    // Degenerate when the line doubles back exactly; nudge so the shader is valid.
-    final end = (to - from).distance < 1.0 ? from + const Offset(1, 1) : to;
-    return ui.Gradient.linear(
-      from,
-      end,
-      palette.pathGradient,
-      _evenStops(palette.pathGradient.length),
-    );
+  /// Colour sampled at [t] (0 = start, 1 = head) across [GridPalette.pathGradient].
+  Color _colorAt(double t) {
+    final colors = palette.pathGradient;
+    if (colors.length == 1) return colors.first;
+    final clamped = t.clamp(0.0, 1.0);
+    final scaled = clamped * (colors.length - 1);
+    final i = scaled.floor().clamp(0, colors.length - 2);
+    return Color.lerp(colors[i], colors[i + 1], scaled - i) ?? colors[i];
   }
 
-  List<double> _evenStops(int n) =>
-      [for (var i = 0; i < n; i++) n == 1 ? 0.0 : i / (n - 1)];
-
   // ─── Layers ─────────────────────────────────────────────────────────
+
+  /// Strokes the line in short pieces coloured by distance travelled.
+  ///
+  /// A single linear gradient between the first and last point collapses
+  /// whenever the head loops back near the start: the ramp would span only the
+  /// straight-line distance between the ends, clamping most of the line to the
+  /// two extreme colours. Walking the arc length keeps the ramp proportional to
+  /// how much of the path is drawn, which is what communicates progress.
+  void _strokeAlongArcLength(Canvas canvas, Path linePath) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..isAntiAlias = true;
+
+    final metrics = linePath.computeMetrics().toList();
+    final total = metrics.fold<double>(0, (sum, m) => sum + m.length);
+    if (total <= 0) return;
+
+    // ~3 pieces per cell: fine enough to read as a smooth ramp, coarse enough
+    // to stay cheap on an 8x8 board.
+    final step = math.max(cellSize / 3, 4.0);
+    var travelled = 0.0;
+
+    for (final metric in metrics) {
+      for (var d = 0.0; d < metric.length; d += step) {
+        // Overlap slightly so consecutive pieces leave no seam.
+        final end = math.min(d + step + 0.75, metric.length);
+        paint.color = _colorAt((travelled + d) / total);
+        canvas.drawPath(metric.extractPath(d, end), paint);
+      }
+      travelled += metric.length;
+    }
+  }
 
   void _drawGlow(Canvas canvas, Path linePath) {
     final breath = 0.85 + 0.15 * glowBreathValue;
@@ -163,10 +178,10 @@ class PathRenderer {
       Paint()
         ..color = palette.pathGlow
         ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth * 1.9 * breath
+        ..strokeWidth = strokeWidth * 1.55 * breath
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cellSize * 0.18)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cellSize * 0.13)
         ..isAntiAlias = true,
     );
   }

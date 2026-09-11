@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/services/audio_service.dart';
 import '../../../../core/utils/haptics.dart';
 import '../../../../core/utils/motion.dart';
+import '../../domain/game_engine.dart';
 import '../../domain/models/game_state.dart';
 import '../../domain/models/puzzle.dart';
 import 'grid_palette.dart';
@@ -17,6 +19,8 @@ class PuzzleGrid extends StatefulWidget {
     required this.gameState,
     required this.onCellTap,
     required this.onCellDrag,
+    this.onDragStart,
+    this.onDragEnd,
     this.onInvalidMove,
     this.palette = GridPalette.standard,
     this.wrongCell,
@@ -27,6 +31,12 @@ class PuzzleGrid extends StatefulWidget {
   final GameState gameState;
   final void Function(int row, int col) onCellTap;
   final void Function(int row, int col) onCellDrag;
+
+  /// Drag gesture boundaries. The owner uses them to charge one undo for a
+  /// backwards sweep rather than one per cell crossed.
+  final VoidCallback? onDragStart;
+  final VoidCallback? onDragEnd;
+
   final void Function(int row, int col)? onInvalidMove;
 
   /// Colours (standard or colorblind palette with pattern overlays).
@@ -41,6 +51,9 @@ class PuzzleGrid extends StatefulWidget {
   @override
   State<PuzzleGrid> createState() => _PuzzleGridState();
 }
+
+/// What a touch on a cell resolves to.
+enum _GridAction { extend, retract, noop, reject }
 
 class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   // ─── Path segment animation (Phase 1) ────────────────────────────
@@ -68,6 +81,17 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   // ─── Invalid-move feedback ─────────────────────────────────────
   /// Short flash on a cell the player tried to move to illegally.
   AnimationController? _invalidFlashController;
+  GridPosition? _invalidCell;
+
+  /// Clears the flash when motion is reduced and there is no controller.
+  Timer? _invalidFlashTimer;
+
+  /// A drag gesture has been started and not yet ended.
+  bool _dragging = false;
+
+  /// Rule oracle. Pure and cheap to build: it only wraps the puzzle, and keeps
+  /// the grid from re-deriving adjacency and waypoint-order rules of its own.
+  late GameEngine _engine;
 
   bool _reduceMotion = false;
 
@@ -75,13 +99,14 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
+    _engine = GameEngine(widget.gameState.puzzle);
     _previousPathLength = widget.gameState.path.length;
     _previousWaypointIndex = widget.gameState.currentWaypointIndex;
 
     _glowBreathController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: AppSizes.glowBreathCycleMs),
-    )..repeat(reverse: true);
+    );
 
     // Init hint pulse if needed
     if (widget.gameState.hintCell != null) {
@@ -94,11 +119,22 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _reduceMotion = MotionUtils.shouldReduceMotion(context);
+    // Under reduced motion the glow is a constant, so leaving the controller
+    // stopped also stops the grid repainting every frame.
+    if (_reduceMotion) {
+      _glowBreathController.stop();
+    } else if (!_glowBreathController.isAnimating) {
+      _glowBreathController.repeat(reverse: true);
+    }
   }
 
   @override
   void didUpdateWidget(covariant PuzzleGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (widget.gameState.puzzle != oldWidget.gameState.puzzle) {
+      _engine = GameEngine(widget.gameState.puzzle);
+    }
 
     final newLen = widget.gameState.path.length;
     final oldLen = _previousPathLength;
@@ -313,15 +349,49 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   // ── Invalid-move feedback ─────────────────────────────────────────
 
   /// Flash the cell the player tried to enter illegally.
-  void triggerInvalidFlash(Offset direction) {
-    if (_reduceMotion) return;
+  ///
+  /// Under reduced motion the same cell is marked, but it is held steady and
+  /// then cleared instead of fading in and out: the cue stays, the animation
+  /// goes.
+  void triggerInvalidFlash(int row, int col) {
+    _invalidFlashTimer?.cancel();
     _invalidFlashController?.dispose();
-    _invalidFlashController = AnimationController(
+    _invalidFlashController = null;
+
+    if (_reduceMotion) {
+      setState(() => _invalidCell = GridPosition(row: row, col: col));
+      _invalidFlashTimer = Timer(
+        const Duration(milliseconds: AppSizes.invalidFlashStaticMs),
+        () {
+          if (!mounted) return;
+          setState(() => _invalidCell = null);
+        },
+      );
+      return;
+    }
+
+    final controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 160),
-    )..forward().then((_) {
-        _invalidFlashController?.reverse();
+      duration: const Duration(milliseconds: AppSizes.invalidFlashMs),
+    );
+    setState(() {
+      _invalidCell = GridPosition(row: row, col: col);
+      _invalidFlashController = controller;
+    });
+    controller.forward().then((_) {
+      if (!mounted) return null;
+      return controller.reverse().then((_) {
+        if (!mounted) return;
+        setState(() => _invalidCell = null);
       });
+    });
+  }
+
+  /// 0..1 intensity of the invalid-move cue. Full strength with no controller
+  /// so the reduced-motion cue is visible.
+  double _getInvalidFlashProgress() {
+    if (_invalidCell == null) return 0.0;
+    return _invalidFlashController?.value ?? 1.0;
   }
 
   /// Width of the square grid.
@@ -351,6 +421,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     _waypointBurstController?.dispose();
     _completionRippleController?.dispose();
     _invalidFlashController?.dispose();
+    _invalidFlashTimer?.cancel();
     for (final c in _segmentControllers.values) {
       c.dispose();
     }
@@ -386,15 +457,23 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
           width: gridWidth,
           height: gridWidth,
           child: GestureDetector(
+            onPanStart: (details) {
+              if (widget.readOnly) return;
+              _dragging = true;
+              widget.onDragStart?.call();
+              // The press that starts a drag never reaches the per-cell tap
+              // targets, so treat it as the gesture's first move.
+              _dragAt(details.localPosition, size, cellSize);
+            },
             onPanUpdate: (details) {
               if (widget.readOnly) return;
-              final localPos = details.localPosition;
-              final row = (localPos.dy / cellSize).floor();
-              final col = (localPos.dx / cellSize).floor();
-              if (row >= 0 && row < size && col >= 0 && col < size) {
-                _handleCellDrag(row, col);
-              }
+              _dragAt(details.localPosition, size, cellSize);
             },
+            // A plain tap also cancels the pan recognizer, so end the gesture
+            // only if one actually started. Otherwise every tap would report a
+            // drag it never made.
+            onPanEnd: (_) => _endDrag(),
+            onPanCancel: _endDrag,
             child: CustomPaint(
               painter: _GridPainter(
                 gameState: widget.gameState,
@@ -402,13 +481,15 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
                 palette: widget.palette,
                 wrongCell: widget.wrongCell,
                 segmentProgressGetter: _getSegmentProgress,
-                glowBreathValue: _getGlowBreathValue(),
+                glowBreathValueGetter: _getGlowBreathValue,
                 cellEntryScaleGetter: _getCellEntryScale,
                 cellEntryGlowGetter: _getCellEntryGlow,
-                hintPulseValue: _getHintPulseValue(),
-                waypointBurstProgress: _getWaypointBurstProgress(),
+                hintPulseValueGetter: _getHintPulseValue,
+                waypointBurstProgressGetter: _getWaypointBurstProgress,
                 waypointBurstGridPos: _waypointBurstCenter,
-                completionRippleProgress: _getCompletionRippleProgress(),
+                completionRippleProgressGetter: _getCompletionRippleProgress,
+                invalidCell: _invalidCell,
+                invalidFlashProgressGetter: _getInvalidFlashProgress,
                 repaintNotifier: listenables.isNotEmpty
                     ? Listenable.merge(listenables)
                     : null,
@@ -444,59 +525,88 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     );
   }
 
-  void _handleCellDrag(int row, int col) {
-    if (widget.readOnly) return;
+  void _endDrag() {
+    if (!_dragging) return;
+    _dragging = false;
+    widget.onDragEnd?.call();
+  }
+
+  /// Maps a pointer position to a cell and forwards it as a drag move.
+  void _dragAt(Offset localPos, int size, double cellSize) {
+    final row = (localPos.dy / cellSize).floor();
+    final col = (localPos.dx / cellSize).floor();
+    if (row < 0 || row >= size || col < 0 || col >= size) return;
+    _handleCellDrag(row, col);
+  }
+
+  /// What touching [row], [col] means right now.
+  ///
+  /// Legality of an extension is decided by [GameEngine.canMoveToCell], which
+  /// already covers bounds, walls, adjacency, revisits, the "first cell must be
+  /// waypoint 1" rule and waypoint ordering. Asking it keeps one rulebook
+  /// between what the grid accepts and what the engine will actually apply.
+  _GridAction _classify(int row, int col) {
     final path = widget.gameState.path;
-
-    // Dragging over the head is a no-op.
-    if (path.isNotEmpty && path.last.row == row && path.last.col == col) {
-      return;
+    final index = path.indexWhere((p) => p.row == row && p.col == col);
+    if (index >= 0) {
+      return index == path.length - 1 ? _GridAction.noop : _GridAction.retract;
     }
-
-    // Walls are never draggable. Cells already on the line retract, and legal
-    // adjacent cells extend; both are resolved by the engine downstream.
-    if (widget.gameState.grid[row][col] == CellState.wall) return;
-
-    widget.onCellDrag(row, col);
+    return _engine.canMoveToCell(widget.gameState, row, col)
+        ? _GridAction.extend
+        : _GridAction.reject;
   }
 
   void _handleCellTap(int row, int col) {
     if (widget.readOnly) return;
-    final path = widget.gameState.path;
-
-    // Walls are never tappable.
-    if (widget.gameState.grid[row][col] == CellState.wall) {
-      _rejectMove(row, col);
-      return;
-    }
-
-    final indexInPath = path.indexWhere((p) => p.row == row && p.col == col);
-
-    // Tapping the head is a deliberate no-op so a stray tap cannot clear
-    // progress; any other cell on the line retracts back to it.
-    if (indexInPath >= 0) {
-      if (indexInPath == path.length - 1) return;
-      widget.onCellTap(row, col);
-      return;
-    }
-
-    // Extending: the cell must be orthogonally adjacent to the head.
-    if (path.isNotEmpty) {
-      final head = path.last;
-      final adjacent =
-          (head.row - row).abs() + (head.col - col).abs() == 1;
-      if (!adjacent) {
-        _rejectMove(row, col);
+    switch (_classify(row, col)) {
+      // Tapping the head is deliberately inert: a stray tap there must not
+      // clear progress.
+      case _GridAction.noop:
         return;
-      }
+      case _GridAction.reject:
+        _rejectMove(row, col);
+      case _GridAction.retract:
+        _retractFeedback();
+        widget.onCellTap(row, col);
+      case _GridAction.extend:
+        _stepFeedback();
+        widget.onCellTap(row, col);
     }
+  }
 
-    widget.onCellTap(row, col);
+  void _handleCellDrag(int row, int col) {
+    if (widget.readOnly) return;
+    switch (_classify(row, col)) {
+      // A finger crossing the board passes over plenty of cells it cannot
+      // enter. Flashing and buzzing at each one would be constant noise, so a
+      // rejected drag is silent; only a rejected tap gets feedback.
+      case _GridAction.noop:
+      case _GridAction.reject:
+        return;
+      case _GridAction.retract:
+        _retractFeedback();
+        widget.onCellDrag(row, col);
+      case _GridAction.extend:
+        _stepFeedback();
+        widget.onCellDrag(row, col);
+    }
+  }
+
+  void _stepFeedback() {
+    Haptics.pathStep();
+    AudioService.instance.play(SoundEffect.pathStep);
+  }
+
+  /// Retraction is an undo, so it sounds like the undo button rather than like
+  /// laying down another cell.
+  void _retractFeedback() {
+    Haptics.undo();
+    AudioService.instance.play(SoundEffect.undo);
   }
 
   /// Shared feedback for a move the rules do not allow.
   void _rejectMove(int row, int col) {
-    triggerInvalidFlash(Offset.zero);
+    triggerInvalidFlash(row, col);
     Haptics.error();
     AudioService.instance.play(SoundEffect.invalidMove);
     widget.onInvalidMove?.call(row, col);
@@ -530,13 +640,15 @@ class _GridPainter extends CustomPainter {
     required this.palette,
     this.wrongCell,
     required this.segmentProgressGetter,
-    required this.glowBreathValue,
+    required this.glowBreathValueGetter,
     required this.cellEntryScaleGetter,
     required this.cellEntryGlowGetter,
-    required this.hintPulseValue,
-    required this.waypointBurstProgress,
+    required this.hintPulseValueGetter,
+    required this.waypointBurstProgressGetter,
     this.waypointBurstGridPos,
-    required this.completionRippleProgress,
+    required this.completionRippleProgressGetter,
+    required this.invalidCell,
+    required this.invalidFlashProgressGetter,
     Listenable? repaintNotifier,
   }) : super(repaint: repaintNotifier);
 
@@ -545,13 +657,25 @@ class _GridPainter extends CustomPainter {
   final GridPalette palette;
   final GridPosition? wrongCell;
   final double Function(int index) segmentProgressGetter;
-  final double glowBreathValue;
+  /// Animated values are read through closures rather than captured as
+  /// numbers. The painter is only rebuilt when the widget rebuilds, but
+  /// [repaint] fires on every animation tick and reuses the same painter
+  /// instance, so a captured number would be stale for the whole animation.
+  final double Function() glowBreathValueGetter;
   final double Function(int row, int col) cellEntryScaleGetter;
   final double Function(int row, int col) cellEntryGlowGetter;
-  final double hintPulseValue;
-  final double waypointBurstProgress;
+  final double Function() hintPulseValueGetter;
+  final double Function() waypointBurstProgressGetter;
   final Offset? waypointBurstGridPos;
-  final double completionRippleProgress;
+  final double Function() completionRippleProgressGetter;
+  final GridPosition? invalidCell;
+  final double Function() invalidFlashProgressGetter;
+
+  double get glowBreathValue => glowBreathValueGetter();
+  double get hintPulseValue => hintPulseValueGetter();
+  double get waypointBurstProgress => waypointBurstProgressGetter();
+  double get completionRippleProgress => completionRippleProgressGetter();
+  double get invalidFlashProgress => invalidFlashProgressGetter();
 
   // Cell geometry constants
   static const double _cellInset = 2.0;
@@ -593,6 +717,41 @@ class _GridPainter extends CustomPainter {
     if (completionRippleProgress >= 0) {
       _drawCompletionRipple(canvas, size);
     }
+
+    // Rejected move, drawn last so it is legible over the line and waypoints.
+    _drawInvalidFlash(canvas);
+  }
+
+  /// Brief red wash and outline on a cell the player could not move to.
+  void _drawInvalidFlash(Canvas canvas) {
+    final cell = invalidCell;
+    if (cell == null || invalidFlashProgress <= 0.0) return;
+
+    final t = invalidFlashProgress.clamp(0.0, 1.0);
+    final rect = Rect.fromLTWH(
+      cell.col * cellSize + _cellInset,
+      cell.row * cellSize + _cellInset,
+      cellSize - _cellInset * 2,
+      cellSize - _cellInset * 2,
+    );
+    final rrect =
+        RRect.fromRectAndRadius(rect, const Radius.circular(_cellRadius));
+    final color = palette.wrongCell;
+
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = color.withValues(alpha: 0.34 * t)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cellSize * 0.14),
+    );
+    canvas.drawRRect(rrect, Paint()..color = color.withValues(alpha: 0.30 * t));
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = color.withValues(alpha: 0.95 * t)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(2.0, cellSize * 0.05),
+    );
   }
 
   /// Draws a 3D embossed/inset cell matching the reference design.
@@ -1026,13 +1185,13 @@ class _GridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GridPainter oldDelegate) {
+    // Animation ticks arrive through `repaint`; this only has to catch state
+    // the widget rebuilt for.
     return oldDelegate.gameState != gameState ||
         oldDelegate.palette != palette ||
         oldDelegate.wrongCell != wrongCell ||
-        oldDelegate.glowBreathValue != glowBreathValue ||
-        oldDelegate.hintPulseValue != hintPulseValue ||
-        oldDelegate.waypointBurstProgress != waypointBurstProgress ||
-        oldDelegate.completionRippleProgress != completionRippleProgress ||
-        oldDelegate.wrongCell != wrongCell;
+        oldDelegate.cellSize != cellSize ||
+        oldDelegate.invalidCell != invalidCell ||
+        oldDelegate.waypointBurstGridPos != waypointBurstGridPos;
   }
 }

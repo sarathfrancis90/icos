@@ -38,6 +38,10 @@ abstract final class AppSizes {
   static const int hintPulseCycleMs = 1000;
   static const int waypointBurstMs = 400;
   static const int completionRippleMs = 200;
+  /// One half of the invalid-move flash (it plays forward then reverse).
+  static const int invalidFlashMs = 140;
+  /// How long the invalid-move cue stays up when motion is reduced.
+  static const int invalidFlashStaticMs = 400;
   static const int springSettleMs = 600;
   static const int buttonPressMs = 100;
   static const int scoreCountUpMs = 1200;

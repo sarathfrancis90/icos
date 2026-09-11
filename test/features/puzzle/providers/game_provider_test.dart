@@ -388,5 +388,101 @@ void main() {
         notifier.pauseTimer();
       });
     });
+
+    group('drag gestures', () {
+      testWidgets('a drag can start the puzzle', (tester) async {
+        final container = makeContainer();
+        final notifier = container.read(gameNotifierProvider(source).notifier);
+        notifier.startGame(smallTestPuzzle);
+
+        notifier.beginDrag();
+        notifier.handleCellDrag(0, 0);
+        notifier.handleCellDrag(0, 1);
+        notifier.endDrag();
+
+        final state = container.read(gameNotifierProvider(source))!;
+        expect(state.status, GameStatus.playing);
+        expect(state.path, hasLength(2));
+        notifier.pauseTimer();
+      });
+
+      testWidgets('a backwards sweep costs one undo, not one per cell',
+          (tester) async {
+        final container = makeContainer();
+        final notifier = container.read(gameNotifierProvider(source).notifier);
+        notifier.startGame(smallTestPuzzle);
+        for (final cell in solution.take(5)) {
+          notifier.handleCellTap(cell[0], cell[1]);
+        }
+        expect(container.read(gameNotifierProvider(source))!.path, hasLength(5));
+        expect(container.read(gameNotifierProvider(source))!.undosUsed, 0);
+
+        // Sweep back over three cells within one gesture.
+        notifier.beginDrag();
+        notifier.handleCellDrag(1, 2);
+        notifier.handleCellDrag(0, 2);
+        notifier.handleCellDrag(0, 1);
+        notifier.endDrag();
+
+        final state = container.read(gameNotifierProvider(source))!;
+        expect(state.path, hasLength(2));
+        expect(state.undosUsed, 1);
+        notifier.pauseTimer();
+      });
+
+      testWidgets('a second gesture is charged its own undo', (tester) async {
+        final container = makeContainer();
+        final notifier = container.read(gameNotifierProvider(source).notifier);
+        notifier.startGame(smallTestPuzzle);
+        for (final cell in solution.take(5)) {
+          notifier.handleCellTap(cell[0], cell[1]);
+        }
+
+        notifier.beginDrag();
+        notifier.handleCellDrag(1, 2);
+        notifier.endDrag();
+        notifier.beginDrag();
+        notifier.handleCellDrag(0, 1);
+        notifier.endDrag();
+
+        final state = container.read(gameNotifierProvider(source))!;
+        expect(state.path, hasLength(2));
+        expect(state.undosUsed, 2);
+        notifier.pauseTimer();
+      });
+
+      testWidgets('a retracting tap outside any gesture still costs one undo',
+          (tester) async {
+        final container = makeContainer();
+        final notifier = container.read(gameNotifierProvider(source).notifier);
+        notifier.startGame(smallTestPuzzle);
+        for (final cell in solution.take(5)) {
+          notifier.handleCellTap(cell[0], cell[1]);
+        }
+        notifier.handleCellTap(0, 1);
+
+        final state = container.read(gameNotifierProvider(source))!;
+        expect(state.path, hasLength(2));
+        expect(state.undosUsed, 1);
+        notifier.pauseTimer();
+      });
+
+      testWidgets('canMoveToCell mirrors the engine', (tester) async {
+        final container = makeContainer();
+        final notifier = container.read(gameNotifierProvider(source).notifier);
+        notifier.startGame(smallTestPuzzle);
+
+        // Nothing placed yet: only waypoint 1 is legal.
+        expect(notifier.canMoveToCell(0, 0), isTrue);
+        expect(notifier.canMoveToCell(1, 1), isFalse);
+
+        notifier.handleCellTap(0, 0);
+        expect(notifier.canMoveToCell(0, 1), isTrue);
+        expect(notifier.canMoveToCell(1, 1), isFalse); // diagonal
+        expect(notifier.canMoveToCell(0, 0), isFalse); // revisit
+        expect(notifier.canMoveToCell(-1, 0), isFalse); // out of bounds
+        notifier.pauseTimer();
+      });
+    });
   });
 }

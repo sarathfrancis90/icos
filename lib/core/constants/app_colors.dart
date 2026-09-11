@@ -48,8 +48,10 @@ abstract final class AppColors {
   static const waypointFill = Color(0xFFFFFFFF);
   static const waypointBorder = Color(0xFFE0E0E0);
   static const waypointText = Color(0xFF1A1A1A);
-  static const waypointStartFill = Color(0xFF8D6E63); // bronze/brown for wp 1
-  static const waypointStartBorder = Color(0xFFA1887F);
+  // Waypoint 1 is white like the others so the number stays legible under
+  // the amber line; the green ring marks it as the start.
+  static const waypointStartFill = Color(0xFFFFFFFF);
+  static const waypointStartBorder = Color(0xFF22C55E);
 
   // ─── Walls ───────────────────────────────────────────────────────
   static const wallFill = Color(0xFF2E3A50);
@@ -84,7 +86,7 @@ abstract final class AppColors {
   /// Cap drawn at waypoint 1, the start of the line.
   static const pathStartCap = pathOrangeDeep;
   /// Soft bloom under the stroke.
-  static const pathGlowSoft = Color(0x33FF9100);
+  static const pathGlowSoft = Color(0x2BFF9100);
 
   static const pathGlowOrange = Color(0x60FF9100);
   static const pathGlowYellow = Color(0x60FFD740);

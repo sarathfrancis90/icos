@@ -68,6 +68,12 @@ class GameNotifier extends _$GameNotifier {
   bool _sessionRequested = false;
   bool _disposed = false;
 
+  /// A drag gesture is in flight (between [beginDrag] and [endDrag]).
+  bool _dragActive = false;
+
+  /// This drag gesture has already been charged one undo.
+  bool _dragUndoCharged = false;
+
   /// Whether the current state was loaded from a stored result (read-only
   /// replay) rather than played, so it must not be submitted again.
   bool isReplay = false;
@@ -134,18 +140,51 @@ class GameNotifier extends _$GameNotifier {
     _applyMove(newState, wasNotStarted);
   }
 
+  /// Marks the start of a drag gesture. Every retraction until [endDrag] is
+  /// treated as part of one undo.
+  void beginDrag() {
+    _dragActive = true;
+    _dragUndoCharged = false;
+  }
+
+  /// Marks the end of a drag gesture (also called on cancel).
+  void endDrag() {
+    _dragActive = false;
+  }
+
   /// Drag across [row], [col]. Dragging backwards over the line retracts to
   /// that cell; dragging onto a legal adjacent cell extends. Shares
   /// [GameEngine.handleCellTap] so tap and drag never diverge.
+  ///
+  /// A drag may also start the puzzle: pressing on waypoint 1 and sweeping
+  /// outwards is the most natural first gesture, so `notStarted` is handled
+  /// here exactly as it is for a tap.
   void handleCellDrag(int row, int col) {
     if (state == null || _engine == null) return;
     if (state!.status == GameStatus.completed) return;
-    if (state!.status == GameStatus.notStarted) return;
 
-    final newState = _engine!.handleCellTap(state!, row, col);
+    final wasNotStarted = state!.status == GameStatus.notStarted;
+    final previousLength = state!.path.length;
+
+    // Sweeping back over four cells should cost what tapping the fourth cell
+    // costs: one undo for the gesture, not one per cell crossed.
+    final newState = _engine!.handleCellTap(
+      state!,
+      row,
+      col,
+      countUndo: !(_dragActive && _dragUndoCharged),
+    );
     if (identical(newState, state) || newState == state) return;
+    if (newState.path.length < previousLength) _dragUndoCharged = true;
 
-    _applyMove(_clearHint(newState), false);
+    _applyMove(_clearHint(newState), wasNotStarted);
+  }
+
+  /// Whether [row], [col] is a legal extension of the current path. Used by the
+  /// grid so input gating and scoring share one rulebook.
+  bool canMoveToCell(int row, int col) {
+    if (state == null || _engine == null) return false;
+    return _engine!.canMoveToCell(state!, row, col);
   }
 
   void _applyMove(GameState newState, bool wasNotStarted) {

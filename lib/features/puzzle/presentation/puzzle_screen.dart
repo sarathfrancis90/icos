@@ -323,16 +323,13 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                           palette: palette,
                           wrongCell: hintUi.wrongCell,
                           readOnly: isReplay || completed,
-                          onCellTap: (row, col) {
-                            Haptics.pathStep();
-                            AudioService.instance.play(SoundEffect.pathStep);
-                            notifier.handleCellTap(row, col);
-                          },
-                          onCellDrag: (row, col) {
-                            Haptics.pathStep();
-                            AudioService.instance.play(SoundEffect.pathStep);
-                            notifier.handleCellDrag(row, col);
-                          },
+                          // The grid owns move feedback: only it knows whether
+                          // a touch extends the line, retracts it or is
+                          // rejected.
+                          onCellTap: notifier.handleCellTap,
+                          onCellDrag: notifier.handleCellDrag,
+                          onDragStart: notifier.beginDrag,
+                          onDragEnd: notifier.endDrag,
                         ),
                       ),
                     ),

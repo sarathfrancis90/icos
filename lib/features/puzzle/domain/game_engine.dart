@@ -204,21 +204,30 @@ class GameEngine {
     return state.path.length == requiredCells;
   }
 
-  /// Allow backtracking: if user taps the second-to-last cell, remove the last.
   /// Tap or drag on [row], [col].
   ///
-  /// Tapping a cell that is already on the path retracts the line back to it
-  /// (the head cell itself is a no-op, so a stray tap on the head cannot clear
-  /// progress). Any other cell is treated as an attempt to extend.
+  /// A cell that is already on the path retracts the line back to it (the head
+  /// cell itself is a no-op, so a stray tap on the head cannot clear progress).
+  /// Any other cell is treated as an attempt to extend, and is rejected by
+  /// [addToPath] if the rules do not allow it.
   ///
   /// Retraction counts as a single undo regardless of how many cells are
   /// removed, matching the undo button so leaderboard stats stay comparable.
-  GameState handleCellTap(GameState state, int row, int col) {
+  /// Pass `countUndo: false` to retract without charging one; a drag that
+  /// sweeps backwards over several cells does this so the whole gesture costs
+  /// the same single undo as tapping its end point directly.
+  GameState handleCellTap(
+    GameState state,
+    int row,
+    int col, {
+    bool countUndo = true,
+  }) {
     final index = state.path.indexWhere((p) => p.row == row && p.col == col);
     if (index >= 0) {
       if (index == state.path.length - 1) return state; // head: no-op
       final retracted = backtrackToCell(state, row, col);
       if (retracted == null) return state;
+      if (!countUndo) return retracted;
       return retracted.copyWith(undosUsed: state.undosUsed + 1);
     }
 

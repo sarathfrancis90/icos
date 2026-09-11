@@ -74,7 +74,7 @@ class GridPalette {
     waypointText: AppColors.waypointText,
     waypointStartFill: AppColors.waypointStartFill,
     waypointStartBorder: AppColors.waypointStartBorder,
-    waypointStartText: Colors.white,
+    waypointStartText: AppColors.waypointText,
     hint: AppColors.hintPurple,
     wrongCell: AppColors.wrongCell,
   );
