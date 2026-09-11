@@ -67,109 +67,119 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Scaffold(
       backgroundColor: AppColors.deepBlack,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Skip button
-            Align(
-              alignment: AlignmentDirectional.topEnd,
-              child: Padding(
-                padding: const EdgeInsetsDirectional.only(
-                  end: AppSizes.md,
-                  top: AppSizes.sm,
-                ),
-                child: TextButton(
-                  onPressed: _finish,
-                  child: Text(
-                    'Skip',
-                    style: TextStyle(
-                      color: AppColors.textSecondaryDark,
-                      fontWeight: FontWeight.w600,
+        // Tablets are much wider than the design grid; keep onboarding in a
+        // readable column instead of stretching text and the button edge to edge.
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: AppSizes.contentMaxWidth,
+            ),
+            child: Column(
+              children: [
+                // Skip button
+                Align(
+                  alignment: AlignmentDirectional.topEnd,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      end: AppSizes.md,
+                      top: AppSizes.sm,
                     ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Pages
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _titles.length,
-                onPageChanged: (index) =>
-                    setState(() => _currentPage = index),
-                itemBuilder: (context, index) => _OnboardingPage(
-                  title: _titles[index],
-                  description: _descriptions[index],
-                  gradientColors: _gradients[index],
-                  isActive: _currentPage == index,
-                  pageIndex: index,
-                ),
-              ),
-            ),
-
-            // Dots indicator
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                _titles.length,
-                (index) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin:
-                      const EdgeInsetsDirectional.symmetric(horizontal: 4),
-                  width: _currentPage == index ? 28 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    gradient: _currentPage == index
-                        ? AppColors.purpleButtonGradient
-                        : null,
-                    color: _currentPage == index
-                        ? null
-                        : AppColors.cellBackground,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSizes.lg),
-
-            // Next/Get Started button — purple gradient with spring
-            Padding(
-              padding: const EdgeInsetsDirectional.symmetric(
-                horizontal: AppSizes.lg,
-              ),
-              child: SpringButton(
-                onPressed: _onNext,
-                child: Container(
-                  width: double.infinity,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.purpleButtonGradient,
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.purpleGlow,
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      _currentPage == _titles.length - 1
-                          ? 'Get Started'
-                          : 'Next',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                    child: TextButton(
+                      onPressed: _finish,
+                      child: Text(
+                        'Skip',
+                        style: TextStyle(
+                          color: AppColors.textSecondaryDark,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+
+                // Pages
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: _titles.length,
+                    onPageChanged: (index) =>
+                        setState(() => _currentPage = index),
+                    itemBuilder: (context, index) => _OnboardingPage(
+                      title: _titles[index],
+                      description: _descriptions[index],
+                      gradientColors: _gradients[index],
+                      isActive: _currentPage == index,
+                      pageIndex: index,
+                    ),
+                  ),
+                ),
+
+                // Dots indicator
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    _titles.length,
+                    (index) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: const EdgeInsetsDirectional.symmetric(
+                        horizontal: 4,
+                      ),
+                      width: _currentPage == index ? 28 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        gradient: _currentPage == index
+                            ? AppColors.purpleButtonGradient
+                            : null,
+                        color: _currentPage == index
+                            ? null
+                            : AppColors.cellBackground,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSizes.lg),
+
+                // Next/Get Started button — purple gradient with spring
+                Padding(
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: AppSizes.lg,
+                  ),
+                  child: SpringButton(
+                    onPressed: _onNext,
+                    child: Container(
+                      width: double.infinity,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.purpleButtonGradient,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.purpleGlow,
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          _currentPage == _titles.length - 1
+                              ? 'Get Started'
+                              : 'Next',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSizes.xl),
+              ],
             ),
-            const SizedBox(height: AppSizes.xl),
-          ],
+          ),
         ),
       ),
     );
@@ -257,19 +267,18 @@ class _OnboardingPageState extends State<_OnboardingPage>
             widget.title,
             // Onboarding always renders on the dark backdrop, so pin the
             // title colour instead of inheriting the (possibly light) theme.
-            style: Theme.of(context)
-                .textTheme
-                .headlineLarge
-                ?.copyWith(color: AppColors.textPrimaryDark),
+            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+              color: AppColors.textPrimaryDark,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSizes.md),
           Text(
             widget.description,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textSecondaryDark,
-                  height: 1.5,
-                ),
+              color: AppColors.textSecondaryDark,
+              height: 1.5,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -336,9 +345,15 @@ class _OnboardingIllustrationPainter extends CustomPainter {
 
     // Animated path: moves through grid cells
     final pathPoints = [
-      Offset(0, 0), Offset(1, 0), Offset(2, 0),
-      Offset(2, 1), Offset(1, 1), Offset(0, 1),
-      Offset(0, 2), Offset(1, 2), Offset(2, 2),
+      Offset(0, 0),
+      Offset(1, 0),
+      Offset(2, 0),
+      Offset(2, 1),
+      Offset(1, 1),
+      Offset(0, 1),
+      Offset(0, 2),
+      Offset(1, 2),
+      Offset(2, 2),
     ];
 
     final visibleCount = (pathPoints.length * progress).ceil();
@@ -443,7 +458,10 @@ class _OnboardingIllustrationPainter extends CustomPainter {
 
     for (int i = 0; i < angles.length; i++) {
       final delay = i * 0.15;
-      final localProgress = ((progress - delay) / (1.0 - delay)).clamp(0.0, 1.0);
+      final localProgress = ((progress - delay) / (1.0 - delay)).clamp(
+        0.0,
+        1.0,
+      );
       final eased = Curves.elasticOut.transform(localProgress);
 
       final angle = angles[i];
@@ -462,7 +480,8 @@ class _OnboardingIllustrationPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
       canvas.drawCircle(Offset(x, y + 2), avatarRadius, shadowPaint);
 
-      final paint = Paint()..color = avatarColors[i].withValues(alpha: localProgress);
+      final paint = Paint()
+        ..color = avatarColors[i].withValues(alpha: localProgress);
       canvas.drawCircle(Offset(x, y), avatarRadius, paint);
 
       // Simple face

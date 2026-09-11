@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:icos/core/constants/app_sizes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icos/core/constants/app_strings.dart';
@@ -44,14 +45,12 @@ void main() {
       return buildTestWidget(
         const HomeScreen(),
         overrides: [
-          dailyPuzzleProvider.overrideWith(
-            (ref) async {
-              if (puzzleState is AsyncError) {
-                throw (puzzleState as AsyncError).error!;
-              }
-              return testPuzzle;
-            },
-          ),
+          dailyPuzzleProvider.overrideWith((ref) async {
+            if (puzzleState is AsyncError) {
+              throw (puzzleState as AsyncError).error!;
+            }
+            return testPuzzle;
+          }),
           todayResultProvider.overrideWith((ref) async {
             if (resultPending) await Completer<SubmissionResult?>().future;
             return result;
@@ -83,13 +82,17 @@ void main() {
         expect(find.text(AppStrings.appTagline), findsOneWidget);
       });
 
-      testWidgets('shows a streak badge when the streak is positive',
-          (tester) async {
+      testWidgets('shows a streak badge when the streak is positive', (
+        tester,
+      ) async {
         await tester.pumpWidget(buildHomeScreen(streak: 6));
         await tester.pumpAndSettle();
 
         expect(find.text('6'), findsOneWidget);
-        expect(find.byIcon(Icons.local_fire_department_rounded), findsOneWidget);
+        expect(
+          find.byIcon(Icons.local_fire_department_rounded),
+          findsOneWidget,
+        );
       });
     });
 
@@ -120,8 +123,9 @@ void main() {
     });
 
     group('Solved state', () {
-      testWidgets('shows summary with time, hints and rank plus Share/View',
-          (tester) async {
+      testWidgets('shows summary with time, hints and rank plus Share/View', (
+        tester,
+      ) async {
         await tester.pumpWidget(buildHomeScreen(result: solvedResult));
         await tester.pumpAndSettle();
 
@@ -136,8 +140,12 @@ void main() {
         expect(find.byIcon(Icons.check_rounded), findsOneWidget);
       });
 
-      testWidgets('prefers the streak returned with the result', (tester) async {
-        await tester.pumpWidget(buildHomeScreen(result: solvedResult, streak: 1));
+      testWidgets('prefers the streak returned with the result', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          buildHomeScreen(result: solvedResult, streak: 1),
+        );
         await tester.pumpAndSettle();
 
         expect(find.text('4'), findsOneWidget);
@@ -179,8 +187,9 @@ void main() {
         expect(find.text(AppStrings.appTagline), findsOneWidget);
       });
 
-      testWidgets('hides Play while the result is still loading',
-          (tester) async {
+      testWidgets('hides Play while the result is still loading', (
+        tester,
+      ) async {
         await tester.pumpWidget(buildHomeScreen(resultPending: true));
         await tester.pump();
         await tester.pump();
@@ -194,7 +203,10 @@ void main() {
       testWidgets('shows puzzle card even on error (fallback)', (tester) async {
         await tester.pumpWidget(
           buildHomeScreen(
-            puzzleState: AsyncError(Exception('Network error'), StackTrace.empty),
+            puzzleState: AsyncError(
+              Exception('Network error'),
+              StackTrace.empty,
+            ),
           ),
         );
         await tester.pumpAndSettle();
@@ -220,7 +232,7 @@ void main() {
           find.byType(ConstrainedBox),
         );
         final hasContentMaxWidth = constrainedBoxes.any(
-          (box) => box.constraints.maxWidth == 600.0,
+          (box) => box.constraints.maxWidth == AppSizes.contentMaxWidth,
         );
         expect(hasContentMaxWidth, isTrue);
       });

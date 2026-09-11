@@ -9,8 +9,11 @@ abstract final class AppSizes {
 
   // Grid
   static const double gridPadding = 24;
-  static const double gridMaxWidth = 500;
-  static const double contentMaxWidth = 600;
+  /// Upper bound for the puzzle grid. Only tablets are wide enough to hit it.
+  static const double gridMaxWidth = 680;
+  /// The grid also never exceeds this fraction of the window height.
+  static const double gridMaxHeightFraction = 0.55;
+  static const double contentMaxWidth = 680;
   static const int minGridSize = 5;
   static const int maxGridSize = 8;
 

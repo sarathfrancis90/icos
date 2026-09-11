@@ -1,1 +1,3 @@
-Initial release.
+Icos is a daily path puzzle. Draw one continuous line through every cell of the grid, visiting the numbered waypoints in order. Every puzzle has exactly one solution.
+
+This is the first release.

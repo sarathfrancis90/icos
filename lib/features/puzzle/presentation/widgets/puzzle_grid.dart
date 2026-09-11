@@ -408,12 +408,23 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     return _lungeDirection * lungeAmount * t;
   }
 
+  /// Width of the square grid.
+  ///
+  /// Phones are always narrower than [AppSizes.gridMaxWidth], so the cap only
+  /// affects tablets. The height term stops the grid from crowding the timer
+  /// bar and controls on short/wide windows.
+  double get _gridWidth {
+    final media = MediaQuery.of(context).size;
+    final cap = math.min(
+      AppSizes.gridMaxWidth,
+      media.height * AppSizes.gridMaxHeightFraction,
+    );
+    return (media.width - AppSizes.gridPadding * 2).clamp(0.0, cap);
+  }
+
   double get cellSize {
     final size = widget.gameState.puzzle.gridSize;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final gridWidth = (screenWidth - AppSizes.gridPadding * 2)
-        .clamp(0.0, AppSizes.gridMaxWidth);
-    return gridWidth / size;
+    return _gridWidth / size;
   }
 
   @override
@@ -440,9 +451,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final size = widget.gameState.puzzle.gridSize;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final gridWidth = (screenWidth - AppSizes.gridPadding * 2)
-        .clamp(0.0, AppSizes.gridMaxWidth);
+    final gridWidth = _gridWidth;
     final cellSize = gridWidth / size;
 
     // Merge all animation listenables for repaint

@@ -104,4 +104,25 @@ platform :ios do
       }
     )
   end
+
+  # ---------------------------------------------------------------------------
+  # metadata: push App Store text + screenshots without submitting for review
+  # ---------------------------------------------------------------------------
+  desc "Upload App Store metadata and screenshots (no binary, no submission)"
+  lane :metadata do
+    deliver(
+      api_key: asc_api_key,
+      app_identifier: APP_ID,
+      skip_binary_upload: true,
+      skip_screenshots: false,
+      skip_metadata: false,
+      metadata_path: "./metadata",
+      screenshots_path: "./screenshots",
+      overwrite_screenshots: true,
+      submit_for_review: false,
+      force: true,
+      precheck_include_in_app_purchases: false,
+      run_precheck_before_submit: false
+    )
+  end
 end
