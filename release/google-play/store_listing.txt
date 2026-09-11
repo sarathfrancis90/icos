@@ -1,40 +1,39 @@
 ============================================================
-  ICOS - Google Play Store Listing (Closed Testing)
+  ICOS - Google Play Store Listing
 ============================================================
+
+PACKAGE NAME:
+com.icos.game
 
 APP TITLE (30 char max):
 Icos - Daily Path Puzzle
 
 SHORT DESCRIPTION (80 char max):
-Draw a path, connect waypoints, fill every cell. One new puzzle every day.
+One line. Every cell. A daily path puzzle with exactly one solution.
 
 FULL DESCRIPTION (4000 char max):
-Icos is a daily snake puzzle game that challenges you to draw a continuous path through a grid, connecting numbered waypoints in order while filling every cell. Simple rules, deep strategy.
+Icos is a daily path puzzle. Draw one continuous line through every cell of the grid, visiting the numbered waypoints in order, without lifting your finger. Every puzzle has exactly one solution.
+
+THE ORIGINAL PATH PUZZLE
+In 1857 the mathematician William Rowan Hamilton invented the Icosian game: find a route that visits every point exactly once. Icos brings that idea to your phone with a fresh grid every day.
 
 HOW TO PLAY
-Start at waypoint 1 and draw your path through the grid. Visit each numbered waypoint in sequence. Your goal: fill every cell with no gaps. Sounds easy? The grid has walls, tight turns, and tricky layouts that will make you think twice.
+Start at waypoint 1 and trace your line through the grid. Visit each numbered waypoint in sequence. Fill every cell, leave no gaps, and never cross your own path. Simple rules, deep strategy.
 
-ONE PUZZLE PER DAY
-Everyone in the world gets the same puzzle each day. Monday starts easy with a 5x5 grid. By Sunday, you're facing an 8x8 challenge. Compare your time with friends and see who solved it fastest.
+ONE PUZZLE A DAY, FOR EVERYONE
+Everyone in the world gets the same puzzle each day. Monday starts gentle with a 5x5 grid. By Sunday you are facing an 8x8. Build a streak, earn a weekly streak freeze, and compare your time with friends.
 
-FEATURES
-- Daily puzzles that scale from easy to hard across the week
-- Neon snake path with glowing animations and satisfying feedback
-- Daily streaks with streak freezes to keep your run alive
-- Groups and leaderboards to compete with friends and family
-- Hints when you're stuck (3 per puzzle, use them wisely)
-- Works offline with pre-cached puzzles
-- Dark immersive gaming theme that looks stunning
-- Share your results with friends
+PLAY WITH FRIENDS
+Create a group, share a six-character invite code or a QR code, and race on daily and weekly leaderboards. A live activity feed shows you when your friends solve.
 
-COMPETE WITH FRIENDS
-Create groups, invite friends with a simple code, and compare solve times on daily and weekly leaderboards. Who finishes first? Who uses the fewest hints? The competition is friendly but fierce.
+PRACTICE AND ARCHIVE
+Unlimited practice puzzles generated right on your device, plus the last 30 days of daily puzzles to catch up on.
 
-BUILD YOUR STREAK
-Solve a puzzle every day to build your streak. Miss a day? Use a streak freeze to keep it alive. Track your longest streak and personal bests in your stats.
+MADE FOR EVERYONE
+Colorblind palettes with pattern overlays. Full TalkBack support. Tap to play as an alternative to dragging. Light and dark themes. Offline play with automatic sync when you reconnect.
 
 FREE TO PLAY
-No ads. No paywalls. Just pure puzzle fun, one grid at a time.
+No ads. No paywalls. No account needed to play. Create one only if you want to keep your streak across devices and join groups.
 
 Download Icos and start your streak today.
 
@@ -56,14 +55,12 @@ sarathfrancis90@gmail.com
 ------------------------------------------------------------
 
 ASSETS CHECKLIST:
-[x] App bundle (.aab)         -> icos-v1.0.0.aab
+[x] App bundle (.aab)          -> build/app/outputs/bundle/release/app-release.aab
 [x] Feature graphic (1024x500) -> feature_graphic.png
-[x] Hi-res icon (512x512)     -> hi_res_icon_512.png
-[x] Phone screenshots (min 2)  -> screenshots/01-07_*.png
+[x] Hi-res icon (512x512)      -> hi_res_icon.png
+[x] Phone screenshots (min 2)  -> screenshots/01-06_*.png
 
 CLOSED TESTING NOTES:
-- Minimum 12 real testers must opt-in
-- Testers need real Android devices with Google accounts
-- 14 consecutive days of testing required before production eligibility
-- Create a closed testing track in Play Console > Testing > Closed testing
-- Share the opt-in link with testers
+- Minimum 12 real testers must opt in and stay opted in
+- 14 consecutive days of testing before production eligibility (personal accounts)
+- Play Console > Testing > Closed testing > create track, share the opt-in link
