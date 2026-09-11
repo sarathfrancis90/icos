@@ -43,7 +43,7 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 - [ ] **(once)** GitHub repo > Settings > Pages > Source: *Deploy from a branch*, branch `main`, folder `/docs`
 - [ ] **(once)** Custom domain: `icos.sarathfrancis.work`; tick *Enforce HTTPS* (wait for the certificate)
 - [ ] **(once)** DNS at the registrar for `sarathfrancis.work`: one `CNAME` record,
-      host `icos`, value `<github-user>.github.io.` (note the trailing dot; no A records
+      host `icos`, value `sarathfrancis90.github.io.` (note the trailing dot; no A records
       are needed for a subdomain). `docs/CNAME` already contains `icos.sarathfrancis.work`
 - [ ] `docs/.nojekyll` exists (it does) so the `.well-known/` directory is published
 - [ ] After Apple + Google setup below, fill the placeholders:
