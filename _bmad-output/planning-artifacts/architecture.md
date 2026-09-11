@@ -287,7 +287,7 @@ Post-creation, the project structure is reorganized to match the feature-based a
 
 **Routing: GoRouter**
 - Declarative route definitions in `core/router/app_router.dart`
-- Deep link support for group invites: `https://icos.app/join/{invite_code}`
+- Deep link support for group invites: `https://icos.sarathfrancis.work/join/{invite_code}`
 - Bottom navigation with ShellRoute for persistent tab bar across Home, Groups, Stats, Profile
 - Route guards for authenticated-only routes (group creation, profile editing)
 

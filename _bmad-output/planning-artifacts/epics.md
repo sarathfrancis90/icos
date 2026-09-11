@@ -1651,7 +1651,7 @@ So that I can easily post my result on social media or send it to friends.
 
 **Given** a player is on the result screen after completing a puzzle
 **When** the player taps the "Copy" button
-**Then** the result is copied to the system clipboard as formatted text (e.g., "Icos Day 42 (6x6)\nTime: 1:23.4\nHints: 0\nhttps://icos.app") without any image data
+**Then** the result is copied to the system clipboard as formatted text (e.g., "Icos Day 42 (6x6)\nTime: 1:23.4\nHints: 0\nhttps://icos.sarathfrancis.work") without any image data
 
 **Given** the player taps the "Copy" button
 **When** the text is successfully copied to the clipboard
@@ -1679,9 +1679,9 @@ So that I can easily invite friends to join my group regardless of how they pref
 
 **Given** a player is viewing a group they belong to on the group detail screen
 **When** the player taps the "Invite" button
-**Then** a bottom sheet appears with three sharing options: (1) "Share Link" — shares a deep link `https://icos.app/join/{invite_code}`, (2) "Copy Code" — copies the 6-character invite code as text, and (3) "Share QR Code" — shares a generated QR code image encoding the deep link URL
+**Then** a bottom sheet appears with three sharing options: (1) "Share Link" — shares a deep link `https://icos.sarathfrancis.work/join/{invite_code}`, (2) "Copy Code" — copies the 6-character invite code as text, and (3) "Share QR Code" — shares a generated QR code image encoding the deep link URL
 
-**Given** a user who has Icos installed taps a deep link (`https://icos.app/join/{invite_code}`)
+**Given** a user who has Icos installed taps a deep link (`https://icos.sarathfrancis.work/join/{invite_code}`)
 **When** the app opens or is brought to foreground
 **Then** GoRouter navigates directly to the group join confirmation screen showing the group name, member count, and a "Join Group" button, pre-filled with the invite code from the URL
 
@@ -2123,7 +2123,7 @@ So that banned users cannot interact with the platform and other users are prote
 
 **Given** a banned user attempts to log in (email/password, Google, or Apple OAuth)
 **When** the authentication succeeds at the Supabase Auth layer but the app checks the user's profile
-**Then** the login is rejected with a full-screen error message: "Your account has been suspended. Contact support@icos.app for assistance." and the user is signed out immediately
+**Then** the login is rejected with a full-screen error message: "Your account has been suspended. Contact sarathfrancis90@gmail.com for assistance." and the user is signed out immediately
 **And** this check occurs via a post-auth profile fetch that reads `is_banned` from the `profiles` table before allowing navigation to the home screen
 
 **Given** a banned user's device still has a valid session token (not yet expired)

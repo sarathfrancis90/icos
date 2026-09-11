@@ -12,7 +12,7 @@ import '../providers/groups_provider.dart';
 import 'widgets/account_required_card.dart';
 import 'widgets/group_ui.dart';
 
-/// Deep-link target for `/join/:code` (and `https://icos.app/join/CODE`).
+/// Deep-link target for `/join/:code` (and `https://icos.sarathfrancis.work/join/CODE`).
 ///
 /// Anonymous users see the account gate; signed-in users are joined
 /// automatically and forwarded to the group.

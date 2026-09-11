@@ -183,7 +183,7 @@ void main() {
 **Maestro flow example:**
 
 ```yaml
-appId: com.icos.app
+appId: com.icos.game
 ---
 - launchApp
 - takeScreenshot: 01_launch

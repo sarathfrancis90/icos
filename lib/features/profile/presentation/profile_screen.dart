@@ -21,8 +21,8 @@ import '../providers/profile_provider.dart';
 import 'widgets/colorblind_selector.dart';
 import 'widgets/edit_name_dialog.dart';
 
-const String kPrivacyPolicyUrl = 'https://icos.app/privacy-policy.html';
-const String kTermsUrl = 'https://icos.app/terms.html';
+const String kPrivacyPolicyUrl = 'https://icos.sarathfrancis.work/privacy-policy.html';
+const String kTermsUrl = 'https://icos.sarathfrancis.work/terms.html';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});

@@ -37,7 +37,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="icos.app" android:pathPrefix="/join/" />
+                <data android:scheme="https" android:host="icos.sarathfrancis.work" android:pathPrefix="/join/" />
             </intent-filter>
             <!-- Supabase auth callback -->
             <intent-filter>

@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
 	<!-- Universal links for /join/{code} and /puzzle/{date}; requires
-	     https://icos.app/.well-known/apple-app-site-association -->
+	     https://icos.sarathfrancis.work/.well-known/apple-app-site-association -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:icos.app</string>
+		<string>applinks:icos.sarathfrancis.work</string>
 	</array>
 	<!-- Push notifications (Firebase Messaging). Xcode/fastlane rewrites this
 	     to "production" automatically for App Store / TestFlight exports. -->

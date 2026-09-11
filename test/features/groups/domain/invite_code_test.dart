@@ -31,7 +31,7 @@ void main() {
     });
 
     test('joinLink builds the public deep link', () {
-      expect(InviteCode.joinLink('abc123'), 'https://icos.app/join/ABC123');
+      expect(InviteCode.joinLink('abc123'), 'https://icos.sarathfrancis.work/join/ABC123');
     });
   });
 

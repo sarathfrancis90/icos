@@ -29,7 +29,7 @@ class AppConfig {
   final Map<String, String> storeUrls;
 
   static const androidPlayStoreFallback =
-      'https://play.google.com/store/apps/details?id=com.icos.app';
+      'https://play.google.com/store/apps/details?id=com.icos.game';
   static const iosAppStoreFallback = 'https://apps.apple.com/app/icos';
 
   /// Store URL for the current platform (or [platformOverride] in tests).

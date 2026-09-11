@@ -44,10 +44,10 @@ CATEGORY: Puzzle
 CONTENT RATING: Everyone
 
 PRIVACY POLICY URL:
-https://icos.app/privacy-policy.html
+https://icos.sarathfrancis.work/privacy-policy.html
 
 WEBSITE:
-https://icos.app/
+https://icos.sarathfrancis.work/
 
 CONTACT EMAIL:
 sarathfrancis90@gmail.com

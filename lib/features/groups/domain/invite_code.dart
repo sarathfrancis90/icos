@@ -9,7 +9,7 @@ abstract final class InviteCode {
       RegExp('^[A-Z0-9]{${AppSizes.inviteCodeLength}}\$');
 
   /// Public deep-link base used in share text and QR codes.
-  static const String joinBaseUrl = 'https://icos.app/join';
+  static const String joinBaseUrl = 'https://icos.sarathfrancis.work/join';
 
   /// Trims, strips whitespace/dashes and upper-cases the raw input so that
   /// "ab-c 12d" becomes "ABC12D".

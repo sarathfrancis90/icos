@@ -687,7 +687,7 @@ CREATE GROUP                JOIN GROUP                  MANAGE GROUP
 
 ### Invite System
 - **Invite code**: 6-character alphanumeric (e.g., "ZP3K9M"), case-insensitive
-- **Deep link**: `https://icos.app/join/ZP3K9M` → opens app or app store
+- **Deep link**: `https://icos.sarathfrancis.work/join/ZP3K9M` → opens app or app store
 - **QR code**: generated in-app for in-person sharing
 - **Expiry**: codes don't expire (simplicity), but groups have max 50 members
 - **Regenerate code**: admin can invalidate old code and create new one

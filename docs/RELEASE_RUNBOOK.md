@@ -10,7 +10,7 @@ recurs per release.
 ---
 
 
-> **Status 2026-09-10:** The game was renamed to **Icos** (bundle id `com.icos.game`, auth scheme `io.supabase.icos`, deep-link host `icos.app`). The Supabase project is still named **`icos`** in the dashboard (rename it under Project Settings, General); everything else is live: ref `pdvgddvubxldjnemdkok`, us-east-1,
+> **Status 2026-09-10:** The game was renamed to **Icos** (bundle id `com.icos.game`, auth scheme `io.supabase.icos`, deep-link host `icos.sarathfrancis.work`). The Supabase project is still named **`icos`** in the dashboard (rename it under Project Settings, General); everything else is live: ref `pdvgddvubxldjnemdkok`, us-east-1,
 > org "Francis Org") is LIVE with all 21 migrations applied, all 5 edge functions deployed,
 > `PUZZLE_SEED_SALT` set, Vault entries (`project_url`, `service_role_key`) created, anonymous
 > sign-ins + email/password enabled (email confirmations currently OFF for testing — turn them on
@@ -32,32 +32,32 @@ recurs per release.
 - [ ] CocoaPods specs up to date: `cd ios && pod repo update && pod install` (first iOS build after the Firebase/notification plugins were added needs this)
 - [ ] Ruby 3.3 + Bundler: `bundle install` at the repo root installs fastlane and CocoaPods
 - [ ] Deno 2.x (`brew install deno`) and the Supabase CLI (`brew install supabase/tap/supabase`)
-- [ ] Access to: Apple Developer Program, Google Play Console, Supabase org, Firebase (optional), DNS for `icos.app`, this GitHub repo's Settings > Secrets
+- [ ] Access to: Apple Developer Program, Google Play Console, Supabase org, Firebase (optional), DNS for `icos.sarathfrancis.work`, this GitHub repo's Settings > Secrets
 
 ---
 
-## 1. Domain: `icos.app` (needed before universal links / app links verify)
+## 1. Domain: `icos.sarathfrancis.work` (needed before universal links / app links verify)
 
 The `docs/` folder is a static site (landing page, privacy policy, terms, `.well-known`).
 
 - [ ] **(once)** GitHub repo > Settings > Pages > Source: *Deploy from a branch*, branch `main`, folder `/docs`
-- [ ] **(once)** Custom domain: `icos.app`; tick *Enforce HTTPS* (wait for the certificate)
-- [ ] **(once)** DNS at your registrar: `A` records for the apex to GitHub Pages IPs
-      (`185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`) and a
-      `CNAME` for `www` to `<github-user>.github.io`
+- [ ] **(once)** Custom domain: `icos.sarathfrancis.work`; tick *Enforce HTTPS* (wait for the certificate)
+- [ ] **(once)** DNS at the registrar for `sarathfrancis.work`: one `CNAME` record,
+      host `icos`, value `<github-user>.github.io.` (note the trailing dot; no A records
+      are needed for a subdomain). `docs/CNAME` already contains `icos.sarathfrancis.work`
 - [ ] `docs/.nojekyll` exists (it does) so the `.well-known/` directory is published
 - [ ] After Apple + Google setup below, fill the placeholders:
-  - `docs/.well-known/apple-app-site-association`: replace `TEAMID` with your Apple Team ID (both occurrences)
-  - `docs/.well-known/assetlinks.json`: replace `REPLACE_WITH_UPLOAD_KEY_SHA256` with the
+  - `docs/.well-known/apple-app-site-association`: DONE (Team ID `H845PX7Q62`)
+  - `docs/.well-known/assetlinks.json`: replace `REPLACE_WITH_PLAY_APP_SIGNING_SHA256` with the
     **Play App Signing** certificate SHA-256 (Play Console > Setup > App signing > *App signing key certificate*),
     not the upload key. Add the upload-key fingerprint as a second array entry if you side-load release builds.
 - [ ] Verify after deploy:
   ```bash
-  curl -sI https://icos.app/.well-known/apple-app-site-association | grep -i content-type   # must be JSON, no redirect
-  curl -s https://icos.app/.well-known/assetlinks.json | python3 -m json.tool
+  curl -sI https://icos.sarathfrancis.work/.well-known/apple-app-site-association | grep -i content-type   # must be JSON, no redirect
+  curl -s https://icos.sarathfrancis.work/.well-known/assetlinks.json | python3 -m json.tool
   ```
   Then check with https://developer.android.com/training/app-links/verify-android-applinks and
-  https://app-site-association.cdn-apple.com/a/v1/icos.app (Apple CDN cache, can take up to 24h).
+  https://app-site-association.cdn-apple.com/a/v1/icos.sarathfrancis.work (Apple CDN cache, can take up to 24h).
 
 ---
 
@@ -85,7 +85,7 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
   - **Email**: enable; disable "Confirm email" only if you want frictionless upgrade (recommended: keep confirmation on)
   - **Google**: Client ID = the *Web* client ID, Client secret = its secret (from step 5); add the iOS client ID to *Authorized Client IDs*
   - **Apple**: Services ID + Team ID + Key ID + private key (`.p8`) from step 3; also list the bundle id `com.icos.game` in *Authorized Client IDs*
-- [ ] **(once)** Authentication > URL Configuration > *Redirect URLs*: add `io.supabase.icos://login-callback` and `https://icos.app/*`
+- [ ] **(once)** Authentication > URL Configuration > *Redirect URLs*: add `io.supabase.icos://login-callback` and `https://icos.sarathfrancis.work/*`
 - [ ] **(once)** Database > Replication (Realtime): enable the `group_feed` table (and any other table the client subscribes to)
 - [ ] **(once)** Copy **Project URL** and **anon key** (Project Settings > API) into `.env.production` locally and into GitHub secrets `SUPABASE_URL` / `SUPABASE_ANON_KEY`; copy the **service_role** key into `SUPABASE_SERVICE_ROLE_KEY` (GitHub only, never in the app)
 - [ ] Seed the first two weeks of puzzles: run the *Generate daily puzzles* workflow manually (Actions > Generate daily puzzles > Run workflow), or locally:
@@ -131,7 +131,7 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
   - Email Address, User ID, Gameplay Content: linked to identity, app functionality, no tracking
   - Crash Data, Performance Data, Product Interaction: not linked, analytics/app functionality, no tracking
   - Tracking: **No**
-- [ ] **(once)** App Information: Privacy Policy URL `https://icos.app/privacy-policy.html`, category *Games > Puzzle*, age rating questionnaire (expect 4+), content rights
+- [ ] **(once)** App Information: Privacy Policy URL `https://icos.sarathfrancis.work/privacy-policy.html`, category *Games > Puzzle*, age rating questionnaire (expect 4+), content rights
 - [ ] **(once)** Sign in with Apple review requirement: because the app offers Google sign-in it **must** also offer Sign in with Apple (it does); keep both visible on the sign-in screen
 - [ ] Per release: bump `version:` in `pubspec.yaml` (`1.0.0+3` -> build number must be higher than the last upload), commit, tag `vX.Y.Z`, push the tag. `deploy-ios.yml` uploads to TestFlight
 - [ ] Per release: TestFlight > add the build to a test group (internal testers need no review; external testers require a short beta review)
@@ -170,7 +170,7 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
       Secret `PLAY_STORE_CREDENTIALS` = `base64 -i service-account.json | pbcopy`. Locally save it as `android/play-store-credentials.json` (git-ignored)
 - [ ] **(once)** First upload **must be manual** (fastlane cannot create the first release): build locally (section 7) and upload the AAB to *Internal testing* in the console
 - [ ] **(once)** Policy > App content, answer every item:
-  - Privacy policy: `https://icos.app/privacy-policy.html`
+  - Privacy policy: `https://icos.sarathfrancis.work/privacy-policy.html`
   - Ads: No
   - App access: all functionality available without special access (guest mode) — provide a test account anyway
   - Content rating questionnaire (IARC): Game > Puzzle; no violence/gambling/user-generated *media*; expect *Everyone*
@@ -247,8 +247,8 @@ cd ios && bundle exec fastlane beta
 
 Test deep links on a device:
 ```bash
-adb shell am start -a android.intent.action.VIEW -d "https://icos.app/join/ABC123" com.icos.game
-xcrun simctl openurl booted "https://icos.app/join/ABC123"
+adb shell am start -a android.intent.action.VIEW -d "https://icos.sarathfrancis.work/join/ABC123" com.icos.game
+xcrun simctl openurl booted "https://icos.sarathfrancis.work/join/ABC123"
 ```
 
 ---

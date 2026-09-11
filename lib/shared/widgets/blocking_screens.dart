@@ -79,7 +79,7 @@ class BannedScreen extends StatelessWidget {
 
   final VoidCallback? onSignOut;
 
-  static const supportEmail = 'support@icos.app';
+  static const supportEmail = 'sarathfrancis90@gmail.com';
 
   Future<void> _contactSupport() async {
     final uri = Uri(

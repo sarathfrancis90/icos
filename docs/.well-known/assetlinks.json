@@ -1,11 +1,14 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.icos.game",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_UPLOAD_KEY_SHA256"
+        "7F:8E:E0:3D:05:F7:B1:86:6D:BE:A0:C9:5A:36:19:71:92:65:7C:6B:D9:52:C8:80:BF:3A:00:23:8A:33:BA:B4",
+        "REPLACE_WITH_PLAY_APP_SIGNING_SHA256"
       ]
     }
   }

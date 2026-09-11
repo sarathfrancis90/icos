@@ -3,12 +3,12 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID.com.icos.game",
+        "appID": "H845PX7Q62.com.icos.game",
         "paths": ["/join/*", "/puzzle/*"]
       }
     ]
   },
   "webcredentials": {
-    "apps": ["TEAMID.com.icos.game"]
+    "apps": ["H845PX7Q62.com.icos.game"]
   }
 }
