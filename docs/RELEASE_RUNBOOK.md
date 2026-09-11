@@ -243,6 +243,12 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 - [ ] **(once)** Service account for fastlane: Google Cloud Console > IAM > Service accounts > create `icos-play-publisher`, create a **JSON key**;
       Play Console > Users and permissions > Invite new users > paste the service-account email with *Release manager* rights (or app-level: Release to production, Manage testing tracks).
       Secret `PLAY_STORE_CREDENTIALS` = `base64 -i service-account.json | pbcopy`. Locally save it as `android/play-store-credentials.json` (git-ignored)
+- [ ] Track names in the API are **not** the console labels, and this bites:
+      `internal` = Internal testing, `alpha` = **Closed** testing, `beta` = **Open**
+      testing, `production` = Production. Trying to release to "beta" thinking it means
+      closed testing gets you `Precondition check failed`, because open testing has far
+      stricter requirements. The fastlane lanes are named after the console labels
+      (`closed`, `open_testing`).
 - [ ] **(once)** First upload: the API *can* do it, but only to **Internal testing**. Any
       release on closed/open/production returns `Precondition check failed` until Play's
       *App content* declarations are finished, and the error says nothing more than that.

@@ -13,7 +13,8 @@ on:
         type: choice
         options:
           - internal
-          - beta
+          - closed
+          - open_testing
           - production
 
 env:

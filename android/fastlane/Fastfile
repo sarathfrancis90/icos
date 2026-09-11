@@ -26,8 +26,16 @@ platform :android do
     upload_to_play_store(upload_opts("internal"))
   end
 
-  desc "Upload the release AAB to the Closed testing (beta) track"
-  lane :beta do
+  # Play's API track names do not match the console labels:
+  #   internal = Internal testing, alpha = CLOSED testing,
+  #   beta = OPEN testing, production = Production.
+  desc "Upload the release AAB to the Closed testing track (API name: alpha)"
+  lane :closed do
+    upload_to_play_store(upload_opts("alpha"))
+  end
+
+  desc "Upload the release AAB to the Open testing track (API name: beta)"
+  lane :open_testing do
     upload_to_play_store(upload_opts("beta"))
   end
 
