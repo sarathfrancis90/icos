@@ -11,6 +11,19 @@ A full 7x7 practice solve on an iPhone, sped up so the line drawing reads at a g
 over a blurred pull of the same footage. The audio track is silent by design: Play and
 YouTube both want one present, and the store plays the video muted anyway.
 
+## The thumbnail
+
+`icos-thumbnail-1280x720.png` — 1280x720, 221 KB, well inside YouTube's 2 MB cap.
+
+Set it under Video details, Thumbnail, Upload file. It needs a verified YouTube
+account; if yours is not verified yet, verify by phone first or YouTube will only
+offer the three auto-generated frames.
+
+Regenerate it with `python3 scripts/make_thumbnail.py`. The board in it is lifted from
+a real screenshot, not drawn, and the type is the same Inter the app ships. The layout
+deliberately keeps the bottom-right corner clear, because YouTube stamps the video
+duration there.
+
 ## Upload settings Play requires
 
 Get these wrong and Play rejects the URL.
