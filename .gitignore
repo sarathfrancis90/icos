@@ -77,3 +77,6 @@ maestro-report/
 
 # Claude Code
 .claude/projects/
+
+# Play Store upload artifacts (large, regenerated per build)
+release/**/mapping-*.txt

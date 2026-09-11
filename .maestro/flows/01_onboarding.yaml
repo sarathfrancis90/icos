@@ -10,7 +10,7 @@ appId: com.icos.game
 
 # -- Page 1: Welcome --
 - assertVisible:
-    text: "Welcome to Icos.*"
+    text: "(?s)Welcome to Icos.*"
 - assertVisible: "Skip"
 - assertVisible: "Next"
 - takeScreenshot: 01_onboarding/page1_welcome
@@ -19,14 +19,14 @@ appId: com.icos.game
 - tapOn: "Next"
 - waitForAnimationToEnd
 - assertVisible:
-    text: "One Puzzle Per Day.*"
+    text: "(?s)One Puzzle Per Day.*"
 - takeScreenshot: 01_onboarding/page2_one_puzzle_per_day
 
 # -- Page 3: Compete with Friends --
 - tapOn: "Next"
 - waitForAnimationToEnd
 - assertVisible:
-    text: "Compete with Friends.*"
+    text: "(?s)Compete with Friends.*"
 - assertVisible: "Get Started"
 - takeScreenshot: 01_onboarding/page3_compete_with_friends
 
@@ -38,11 +38,11 @@ appId: com.icos.game
     direction: RIGHT
 - waitForAnimationToEnd
 - assertVisible:
-    text: "Welcome to Icos.*"
+    text: "(?s)Welcome to Icos.*"
 - takeScreenshot: 01_onboarding/page1_after_swipe_back
 
 # -- Skip button takes to home --
 - tapOn: "Skip"
 - waitForAnimationToEnd
-- assertVisible: "Today's Puzzle"
+- assertVisible: "(?s).*Today's Puzzle.*"
 - takeScreenshot: 01_onboarding/home_after_skip

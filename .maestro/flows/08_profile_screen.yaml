@@ -21,12 +21,12 @@ appId: com.icos.game
 # -- Settings section --
 - assertVisible: "Settings"
 - assertVisible:
-    text: "Theme\n.*"
+    text: "(?s)Theme\n.*"
 - assertVisible: "Haptic Feedback"
 - assertVisible: "Sound Effects"
 - assertVisible:
-    text: "Colorblind Mode.*"
-- assertVisible: "Notifications"
+    text: "(?s)Colorblind Mode.*"
+- assertVisible: "(?s).*Daily reminder.*"
 - takeScreenshot: 08_profile/settings_section
 
 # -- Scroll to App section --
@@ -34,7 +34,7 @@ appId: com.icos.game
 - waitForAnimationToEnd
 - assertVisible: "App"
 - assertVisible:
-    text: "About\nVersion.*"
+    text: "(?s)About\nVersion.*"
 - takeScreenshot: 08_profile/app_section
 
 # -- Scroll back up --

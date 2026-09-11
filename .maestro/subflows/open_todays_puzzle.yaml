@@ -1,0 +1,14 @@
+# Opens today's puzzle from the home card.
+#
+# The card shows "Play" until the puzzle is solved and "View" afterwards, so a
+# flow that runs after a solve (or on a re-run) must accept either. Flows that
+# need a *playable* board assert "Play" themselves instead of using this.
+appId: com.icos.game
+---
+- tapOn:
+    text: "Play"
+    optional: true
+- tapOn:
+    text: "View"
+    optional: true
+- waitForAnimationToEnd

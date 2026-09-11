@@ -19,16 +19,16 @@ appId: com.icos.game
 
 # -- Verify streak and puzzle data --
 - assertVisible:
-    text: ".*Current Streak.*"
+    text: "(?s).*Current Streak.*"
 - assertVisible:
-    text: ".*Longest Streak.*"
+    text: "(?s).*Longest Streak.*"
 - assertVisible:
-    text: ".*Puzzles Solved.*"
+    text: "(?s).*Puzzles Solved.*"
 - takeScreenshot: 06_stats/streak_and_stats_cards
 
 # -- Verify calendar --
 - assertVisible:
-    text: "Last 30 Days.*"
+    text: "(?s).*Last 30 Days.*"
 - takeScreenshot: 06_stats/calendar_section
 
 # -- Scroll down to see more --

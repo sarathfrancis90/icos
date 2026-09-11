@@ -21,19 +21,19 @@ appId: com.icos.game
 
 # -- Verify OAuth buttons --
 - assertVisible:
-    text: ".*Google.*"
+    text: "(?s).*Google.*"
     optional: true
 - assertVisible:
-    text: ".*Apple.*"
+    text: "(?s).*Apple.*"
     optional: true
 - assertVisible:
-    text: ".*Email.*"
+    text: "(?s).*Email.*"
     optional: true
 - takeScreenshot: 09_auth/auth_options
 
 # -- Go to email auth --
 - tapOn:
-    text: ".*Email.*"
+    text: "(?s).*Email.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 09_auth/email_auth_screen

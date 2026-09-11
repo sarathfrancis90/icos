@@ -37,13 +37,13 @@ appId: com.icos.game
 - tapOn:
     text: "Home\nTab 1 of 4"
 - waitForAnimationToEnd
-- tapOn: "Play"
+- runFlow: ../subflows/open_todays_puzzle.yaml
 - waitForAnimationToEnd
 - takeScreenshot: 17_states/puzzle_loaded_ok
 
 # Verify grid rendered (check for waypoint 1)
 - assertVisible:
-    text: ".*waypoint 1"
+    text: "(?s).*waypoint 1"
 - takeScreenshot: 17_states/puzzle_grid_rendered
 
 - tapOn: "Go back"

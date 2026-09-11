@@ -280,6 +280,11 @@ flutter analyze --fatal-warnings && flutter test
 
 # Android — requires android/key.properties. Without it the build FAILS on purpose;
 # set ALLOW_DEBUG_SIGNING=true only for throw-away local testing.
+#
+# Do NOT add --no-pub here. Flutter regenerates GeneratedPluginRegistrant.java as
+# part of the pub step, and only then does it drop dev-dependency plugins. Skip
+# it and the release build fails with
+#   "package dev.flutter.plugins.integration_test does not exist".
 flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols --dart-define-from-file=.env.production
 #   -> build/app/outputs/bundle/release/app-release.aab
 #   -> build/app/outputs/mapping/release/mapping.txt   (upload with the AAB; fastlane does this)

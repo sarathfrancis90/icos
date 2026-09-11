@@ -14,7 +14,7 @@ appId: com.icos.game
 
 # Should be on home screen now (auto-signed in as anonymous)
 - assertVisible: "Icos"
-- assertVisible: "Today's Puzzle"
+- assertVisible: "(?s).*Today's Puzzle.*"
 - assertVisible: "Play"
 - takeScreenshot: 02_auth/home_auto_signed_in
 

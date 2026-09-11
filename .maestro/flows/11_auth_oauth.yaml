@@ -21,7 +21,7 @@ appId: com.icos.game
 
 # -- Tap Google to see what happens (native dialog or error) --
 - tapOn:
-    text: ".*Google.*"
+    text: "(?s).*Google.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 11_oauth/after_google_tap
@@ -32,7 +32,7 @@ appId: com.icos.game
 
 # -- Tap Apple to see what happens --
 - tapOn:
-    text: ".*Apple.*"
+    text: "(?s).*Apple.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 11_oauth/after_apple_tap

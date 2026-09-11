@@ -16,46 +16,46 @@ appId: com.icos.game
 # -- Draw a path step by step using cell taps --
 # Start at waypoint 1
 - tapOn:
-    text: "Row 6, Column 3, waypoint 1"
+    text: "(?s).*waypoint 1"
 - waitForAnimationToEnd
 - takeScreenshot: 05_drawing/started_at_waypoint1
 
 # Draw path upward
 - tapOn:
-    text: "Row 5, Column 3.*"
+    text: "(?s)Row 5, Column 3.*"
     optional: true
 - waitForAnimationToEnd
 - tapOn:
-    text: "Row 4, Column 3.*"
+    text: "(?s)Row 4, Column 3.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 05_drawing/path_going_up
 
 # Draw path right
 - tapOn:
-    text: "Row 4, Column 4.*"
+    text: "(?s)Row 4, Column 4.*"
     optional: true
 - waitForAnimationToEnd
 - tapOn:
-    text: "Row 4, Column 5.*"
+    text: "(?s)Row 4, Column 5.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 05_drawing/path_going_right
 
 # Draw path down toward waypoint 3
 - tapOn:
-    text: "Row 5, Column 5.*"
+    text: "(?s)Row 5, Column 5.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 05_drawing/reached_waypoint3
 
 # Continue drawing
 - tapOn:
-    text: "Row 5, Column 6.*"
+    text: "(?s)Row 5, Column 6.*"
     optional: true
 - waitForAnimationToEnd
 - tapOn:
-    text: "Row 5, Column 7.*"
+    text: "(?s)Row 5, Column 7.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 05_drawing/path_extended_further
@@ -72,7 +72,7 @@ appId: com.icos.game
 
 # -- Reset --
 - tapOn:
-    text: "Reset.*"
+    text: "(?s)Reset.*"
 - waitForAnimationToEnd
 - takeScreenshot: 05_drawing/after_full_reset
 

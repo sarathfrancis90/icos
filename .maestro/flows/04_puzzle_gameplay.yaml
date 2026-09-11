@@ -16,27 +16,27 @@ appId: com.icos.game
 # -- Verify puzzle elements --
 - assertVisible: "00:00"
 - assertVisible:
-    text: ".*Hard"
+    text: "(?s).*(Easy|Medium|Hard).*"
 - assertVisible:
-    text: "Par.*"
+    text: "(?s)Par.*"
 - takeScreenshot: 04_puzzle/timer_and_info_bar
 
 # -- Game Controls --
 - assertVisible:
-    text: "Reset.*"
+    text: "(?s)Reset.*"
 - assertVisible:
-    text: "Hint.*"
+    text: "(?s)Hint.*"
 - assertVisible: "Undo"
 - takeScreenshot: 04_puzzle/game_controls_bar
 
 # -- Verify grid cells are accessible --
 - assertVisible:
-    text: "Row 6, Column 3, waypoint 1"
+    text: "(?s).*waypoint 1"
 - takeScreenshot: 04_puzzle/waypoint1_visible
 
 # -- Tap waypoint 1 to start the path --
 - tapOn:
-    text: "Row 6, Column 3, waypoint 1"
+    text: "(?s).*waypoint 1"
 - waitForAnimationToEnd
 - takeScreenshot: 04_puzzle/after_tap_waypoint1
 
@@ -60,7 +60,7 @@ appId: com.icos.game
 
 # -- Test Hint button --
 - tapOn:
-    text: "Hint.*"
+    text: "(?s)Hint.*"
 - waitForAnimationToEnd
 - takeScreenshot: 04_puzzle/after_hint
 
@@ -71,7 +71,7 @@ appId: com.icos.game
 
 # -- Test Reset button --
 - tapOn:
-    text: "Reset.*"
+    text: "(?s)Reset.*"
 - waitForAnimationToEnd
 - takeScreenshot: 04_puzzle/after_reset
 

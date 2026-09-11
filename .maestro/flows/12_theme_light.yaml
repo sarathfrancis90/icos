@@ -15,7 +15,7 @@ appId: com.icos.game
 
 # Tap the Theme setting to open dropdown
 - tapOn:
-    text: "Theme\n.*"
+    text: "(?s)Theme\n.*"
 - waitForAnimationToEnd
 - takeScreenshot: 12_light/theme_dropdown_open
 
@@ -56,17 +56,17 @@ appId: com.icos.game
 - tapOn:
     text: "Home\nTab 1 of 4"
 - waitForAnimationToEnd
-- tapOn: "Play"
+- runFlow: ../subflows/open_todays_puzzle.yaml
 - waitForAnimationToEnd
 - takeScreenshot: 12_light/puzzle_light
 
 # Tap a cell to see path color in light theme
 - tapOn:
-    text: "Row 6, Column 3, waypoint 1"
+    text: "(?s).*waypoint 1"
     optional: true
 - waitForAnimationToEnd
 - tapOn:
-    text: "Row 6, Column 2.*"
+    text: "(?s)Row 6, Column 2.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 12_light/puzzle_path_light

@@ -14,13 +14,16 @@ appId: com.icos.game
 - takeScreenshot: 03_home/home_screen_full
 
 # -- Puzzle Card --
-- assertVisible: "Today's Puzzle"
+- assertVisible: "(?s).*Today's Puzzle.*"
 - assertVisible: "Play"
 - takeScreenshot: 03_home/puzzle_card_with_play
 
 # -- Puzzle metadata (grid size, difficulty, par time) --
-- assertVisible: "7x7"
-- assertVisible: "Hard"
+# Both rotate Monday..Sunday, and both sit inside the card's merged label.
+- assertVisible:
+    text: "(?s).*[5-8]x[5-8].*"
+- assertVisible:
+    text: "(?s).*(Easy|Medium|Hard).*"
 - takeScreenshot: 03_home/puzzle_metadata
 
 # -- Bottom Navigation --

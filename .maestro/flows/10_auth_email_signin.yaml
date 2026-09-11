@@ -15,21 +15,21 @@ appId: com.icos.game
 - tapOn: "Create Account"
 - waitForAnimationToEnd
 - tapOn:
-    text: ".*Email.*"
+    text: "(?s).*Email.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 10_email/email_form_create_mode
 
 # -- Enter email --
 - tapOn:
-    text: ".*email.*"
+    text: "(?s).*email.*"
     optional: true
 - inputText: "test@example.com"
 - takeScreenshot: 10_email/email_entered
 
 # -- Enter password --
 - tapOn:
-    text: ".*assword.*"
+    text: "(?s).*assword.*"
     optional: true
 - inputText: "Test123456"
 # Tap elsewhere to dismiss keyboard instead of hideKeyboard
@@ -40,14 +40,14 @@ appId: com.icos.game
 
 # -- Toggle to Sign In mode if available --
 - tapOn:
-    text: ".*Sign In.*"
+    text: "(?s).*Sign In.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 10_email/sign_in_mode
 
 # -- Toggle back --
 - tapOn:
-    text: ".*Sign Up.*"
+    text: "(?s).*Sign Up.*"
     optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 10_email/sign_up_mode_again

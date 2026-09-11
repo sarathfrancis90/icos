@@ -1,5 +1,6 @@
 # Flow 07: Groups Screen
-# Verifies groups screen empty state, Create Group and Join Group dialogs.
+# Groups need a real account, so a guest session sees the account gate instead
+# of the empty state. Both are valid; this covers whichever one is showing.
 appId: com.icos.game
 
 ---
@@ -13,33 +14,46 @@ appId: com.icos.game
     text: "Groups\nTab 2 of 4"
 - waitForAnimationToEnd
 
-# -- Empty state --
 - assertVisible: "Groups"
-- assertVisible:
-    text: "Create or join a group.*"
-- assertVisible: "Create Group"
-- assertVisible: "Join Group"
-- takeScreenshot: 07_groups/groups_empty_state
+- takeScreenshot: 07_groups/groups_landing
 
-# -- Open Create Group dialog --
-- tapOn: "Create Group"
-- waitForAnimationToEnd
-- takeScreenshot: 07_groups/create_group_dialog
+# -- Guest: the account gate --
+- runFlow:
+    when:
+      visible:
+        text: "(?s).*Account Required.*"
+    commands:
+      - assertVisible:
+          text: "(?s).*Groups are tied to an account.*"
+      - assertVisible:
+          text: "(?s).*Create an account.*"
+      - takeScreenshot: 07_groups/account_required_gate
 
-# Cancel the dialog
-- tapOn:
-    text: "Cancel"
-    optional: true
-- waitForAnimationToEnd
+# -- Signed in: the empty state and both dialogs --
+- runFlow:
+    when:
+      notVisible:
+        text: "(?s).*Account Required.*"
+    commands:
+      - assertVisible:
+          text: "(?s).*Create or join a group.*"
+      - assertVisible: "(?s).*Create Group.*"
+      - assertVisible: "Join Group"
+      - takeScreenshot: 07_groups/groups_empty_state
 
-# -- Open Join Group dialog --
-- tapOn: "Join Group"
-- waitForAnimationToEnd
-- takeScreenshot: 07_groups/join_group_dialog
+      - tapOn: "(?s).*Create Group.*"
+      - waitForAnimationToEnd
+      - takeScreenshot: 07_groups/create_group_dialog
+      - tapOn:
+          text: "Cancel"
+          optional: true
+      - waitForAnimationToEnd
 
-# Cancel
-- tapOn:
-    text: "Cancel"
-    optional: true
-- waitForAnimationToEnd
-- takeScreenshot: 07_groups/groups_back_to_empty
+      - tapOn: "Join Group"
+      - waitForAnimationToEnd
+      - takeScreenshot: 07_groups/join_group_dialog
+      - tapOn:
+          text: "Cancel"
+          optional: true
+      - waitForAnimationToEnd
+      - takeScreenshot: 07_groups/groups_back_to_empty

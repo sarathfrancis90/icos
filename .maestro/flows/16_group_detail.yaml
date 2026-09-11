@@ -1,6 +1,6 @@
 # Flow 16: Group Detail Screen
-# Note: Fresh guest has no groups, so this captures the empty state.
-# The group detail tabs are only reachable with existing group membership.
+# A fresh guest has no groups and no account, so this captures whichever
+# no-membership state the session lands on. Group detail tabs need membership.
 appId: com.icos.game
 
 ---
@@ -15,9 +15,22 @@ appId: com.icos.game
 - waitForAnimationToEnd
 - takeScreenshot: 16_group_detail/groups_no_membership
 
-# Verify empty state is properly displayed
-- assertVisible: "Create Group"
-- assertVisible: "Join Group"
-- assertVisible:
-    text: "Create or join a group.*"
-- takeScreenshot: 16_group_detail/empty_state_verified
+- runFlow:
+    when:
+      visible:
+        text: "(?s).*Account Required.*"
+    commands:
+      - assertVisible:
+          text: "(?s).*Create an account.*"
+      - takeScreenshot: 16_group_detail/account_gate_verified
+
+- runFlow:
+    when:
+      notVisible:
+        text: "(?s).*Account Required.*"
+    commands:
+      - assertVisible: "(?s).*Create Group.*"
+      - assertVisible: "Join Group"
+      - assertVisible:
+          text: "(?s).*Create or join a group.*"
+      - takeScreenshot: 16_group_detail/empty_state_verified

@@ -1,5 +1,6 @@
 # Flow 15: Group Create & Join Dialogs
-# Tests group creation and join dialog forms.
+# Group creation needs a real account. A guest gets the account gate instead of
+# the dialogs, so this covers whichever path the session is on.
 appId: com.icos.game
 
 ---
@@ -14,38 +15,49 @@ appId: com.icos.game
 - waitForAnimationToEnd
 - takeScreenshot: 15_groups/groups_initial
 
-# ====== Create Group Flow ======
-- tapOn: "Create Group"
-- waitForAnimationToEnd
-- takeScreenshot: 15_groups/create_dialog_empty
+# -- Guest: creating a group is gated behind signing up --
+# Deliberately does not open the signup screen. Both branches below are
+# evaluated in order, so navigating away here would make the second one think
+# the session is signed in. Signup itself is covered by flow 09.
+- runFlow:
+    when:
+      visible:
+        text: "(?s).*Account Required.*"
+    commands:
+      - assertVisible:
+          text: "(?s).*Create an account.*"
+      - takeScreenshot: 15_groups/create_gated_behind_account
 
-# -- Fill in group name (tap the field, enter text, tap done on keyboard) --
-- tapOn:
-    text: ".*roup.*ame.*"
-    optional: true
-- inputText: "Test Puzzle Squad"
-- takeScreenshot: 15_groups/create_name_entered
+# -- Signed in: the create and join dialogs --
+- runFlow:
+    when:
+      notVisible:
+        text: "(?s).*Account Required.*"
+    commands:
+      - tapOn: "(?s).*Create Group.*"
+      - waitForAnimationToEnd
+      - takeScreenshot: 15_groups/create_dialog_empty
 
-# Tap "done" on keyboard to dismiss it first
-- pressKey: enter
-- waitForAnimationToEnd
+      - tapOn:
+          text: "(?s).*roup.*ame.*"
+          optional: true
+      - inputText: "Test Puzzle Squad"
+      - takeScreenshot: 15_groups/create_name_entered
 
-# Now Cancel with keyboard dismissed
-- tapOn: "Cancel"
-- waitForAnimationToEnd
-- takeScreenshot: 15_groups/after_create_cancel
+      # Dismiss the keyboard before reaching for Cancel.
+      - pressKey: enter
+      - waitForAnimationToEnd
+      - tapOn: "Cancel"
+      - waitForAnimationToEnd
+      - takeScreenshot: 15_groups/after_create_cancel
 
-# ====== Join Group Flow ======
-# For anonymous users, tapping Join Group shows upgrade prompt.
-- tapOn:
-    text: "Join Group"
-    optional: true
-- waitForAnimationToEnd
-- takeScreenshot: 15_groups/join_group_result
-
-# Dismiss any dialog that appeared
-- tapOn:
-    text: "Cancel"
-    optional: true
-- waitForAnimationToEnd
-- takeScreenshot: 15_groups/groups_final
+      - tapOn:
+          text: "Join Group"
+          optional: true
+      - waitForAnimationToEnd
+      - takeScreenshot: 15_groups/join_group_result
+      - tapOn:
+          text: "Cancel"
+          optional: true
+      - waitForAnimationToEnd
+      - takeScreenshot: 15_groups/groups_final

@@ -91,7 +91,7 @@ analytics event payloads. Onboarding copy is already line-based.
 
 ## 5. Testing and validation
 
-1. `flutter analyze` clean, full `flutter test` green (551 today, plus new cases).
+1. `flutter analyze` clean, full `flutter test` green (551 before, 575 after).
 2. New unit tests: tap-retracts-to-cell, tap-on-head-is-noop, drag-retracts-multiple,
    retraction recomputes the waypoint index, retraction counts one undo.
 3. Golden-free visual validation: Maestro flows on iPhone 6.9", iPad 13" and Android,
@@ -100,7 +100,39 @@ analytics event payloads. Onboarding copy is already line-based.
 5. Re-shoot App Store and Play screenshots from the new build; re-upload to App Store
    Connect; rebuild the signed AAB for Play.
 
-## 6. Out of scope
+`test/visual/capture_puzzle_grid.dart` renders the grid to PNGs in `build/visual/`
+(four stages of the line, all four palettes, mid-flash). It is deliberately not named
+`*_test.dart`, so `flutter test` and CI skip it: rendering differs between machines, so
+it is an eyeballing tool, not a gate.
+
+## 6. Found during review
+
+Four things the review turned up that the plan above had not anticipated.
+
+**The painter froze every animation it read as a number.** `_GridPainter` is rebuilt only
+when the widget rebuilds, but `repaint` fires on every animation tick and reuses the same
+instance. Five values (glow breath, hint pulse, waypoint burst, completion ripple, and the
+new flash) were captured as plain numbers and so held whatever they had at the last
+rebuild. They are now read through closures, the way the per-index getters already were.
+This is why the flash appeared to be dead code even after it was wired up.
+
+**Every tap reported a drag it never made.** A tap cancels the pan recognizer, and
+`onPanCancel` called `onDragEnd` unguarded. The grid now tracks whether a gesture actually
+started.
+
+**A backwards sweep was charged one undo per cell.** Tapping the fourth cell back cost one
+undo; dragging over the same four cost four. `handleCellTap` takes `countUndo`, and the
+notifier charges once per gesture between `beginDrag` and `endDrag`.
+
+**The grid kept its own copy of the rules.** It re-derived adjacency and walls, which
+silently disagreed with the engine about revisits, "the first cell must be waypoint 1" and
+waypoint ordering. It now asks `GameEngine.canMoveToCell`.
+
+Also: a drag could not start a puzzle (now it can), retraction played the step sound
+(it plays undo), and reduced motion dropped the invalid cue entirely (it now holds the cue
+steady and clears it).
+
+## 7. Out of scope
 
 Dead-end highlighting, auto-fill of forced corridors, and a global leaderboard. They are
 good ideas but each changes difficulty balance and needs its own design pass.

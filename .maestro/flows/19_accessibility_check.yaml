@@ -12,16 +12,16 @@ appId: com.icos.game
 - takeScreenshot: 19_layout/home_layout
 
 # ====== Puzzle layout check ======
-- tapOn: "Play"
+- runFlow: ../subflows/open_todays_puzzle.yaml
 - waitForAnimationToEnd
 - takeScreenshot: 19_layout/puzzle_layout
 
 # Verify key elements present
 - assertVisible: "Undo"
 - assertVisible:
-    text: "Reset.*"
+    text: "(?s)Reset.*"
 - assertVisible:
-    text: "Hint.*"
+    text: "(?s)Hint.*"
 - takeScreenshot: 19_layout/puzzle_controls_layout
 
 # Back
