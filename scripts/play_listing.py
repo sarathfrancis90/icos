@@ -67,11 +67,17 @@ def main() -> int:
     icon = ASSETS / 'hi_res_icon.png'
     feature = ASSETS / 'feature_graphic.png'
     shots = sorted((ASSETS / 'screenshots').glob('*.png'))
+    # Same tablet capture serves both tablet slots; without either, Play shows
+    # a "Designed for phones" note on tablets.
+    tablet = sorted((ASSETS / 'screenshots-tablet').glob('*.png'))
     print(f'icon  : {icon.name}')
     print(f'feature: {feature.name}')
-    print(f'shots : {len(shots)} -> {", ".join(s.name for s in shots)}')
+    print(f'shots : {len(shots)} phone -> {", ".join(s.name for s in shots)}')
+    print(f'tablet: {len(tablet)} tablet')
     if not 2 <= len(shots) <= 8:
         raise SystemExit('Play wants between 2 and 8 phone screenshots')
+    if tablet and not 2 <= len(tablet) <= 8:
+        raise SystemExit('Play wants between 2 and 8 tablet screenshots')
     if dry:
         return 0
 
@@ -91,8 +97,12 @@ def main() -> int:
         raise SystemExit(f'listing text failed: {play.why(r)}')
     print('text uploaded')
 
-    for kind, files in [('icon', [icon]), ('featureGraphic', [feature]),
-                        ('phoneScreenshots', shots)]:
+    uploads = [('icon', [icon]), ('featureGraphic', [feature]),
+               ('phoneScreenshots', shots)]
+    if tablet:
+        uploads += [('sevenInchScreenshots', tablet),
+                    ('tenInchScreenshots', tablet)]
+    for kind, files in uploads:
         st, r = play.edit('DELETE', f'edits/{eid}/listings/{LANG}/{kind}')
         for f in files:
             st, r = play.upload(f'edits/{eid}/listings/{LANG}/{kind}',
