@@ -126,8 +126,7 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
   For CI, create a GitHub **personal access token** (classic, `repo` scope) on an account that can read the
   certificates repo and set `MATCH_GIT_BASIC_AUTHORIZATION` = `echo -n "<github-user>:<token>" | base64`.
   Use the HTTPS form of the repo URL in `MATCH_GIT_URL` when using basic auth.
-- [ ] **(once)** Google Sign-In on iOS: replace `com.googleusercontent.apps.REPLACE_WITH_IOS_CLIENT_ID` in `ios/Runner/Info.plist`
-      with the reversed iOS client ID (CI does this automatically from `GOOGLE_IOS_CLIENT_ID`; for local builds edit the file, but do not commit the real value)
+- [ ] **(once)** Google Sign-In on iOS: set the `GOOGLE_IOS_CLIENT_ID` secret. `deploy-ios.yml` appends the reversed client ID as a URL scheme in `ios/Runner/Info.plist` at build time. Info.plist must NOT contain a placeholder scheme: App Store validation rejects it with error 90158
 - [ ] **(once)** App Store Connect > App > **App Privacy**: answers must match `ios/Runner/PrivacyInfo.xcprivacy` and `docs/privacy-policy.html`:
   - Email Address, User ID, Gameplay Content: linked to identity, app functionality, no tracking
   - Crash Data, Performance Data, Product Interaction: not linked, analytics/app functionality, no tracking

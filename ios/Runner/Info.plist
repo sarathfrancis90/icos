@@ -63,17 +63,6 @@
 					<string>io.supabase.icos</string>
 				</array>
 			</dict>
-			<dict>
-				<key>CFBundleTypeRole</key>
-				<string>Editor</string>
-				<key>CFBundleURLSchemes</key>
-				<array>
-					<!-- Google Sign-In reversed iOS client ID. Replace the placeholder with
-					     the REVERSED_CLIENT_ID from your iOS OAuth client in Google Cloud
-					     Console (see docs/RELEASE_RUNBOOK.md). -->
-					<string>com.googleusercontent.apps.REPLACE_WITH_IOS_CLIENT_ID</string>
-				</array>
-			</dict>
 		</array>
 		<!-- iPhone: portrait only. iPad keeps all orientations (see ~ipad key). -->
 		<key>UISupportedInterfaceOrientations</key>

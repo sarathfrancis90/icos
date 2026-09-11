@@ -61,8 +61,15 @@ jobs:
           if [ -n "$GOOGLE_IOS_CLIENT_ID" ]; then
             # GOOGLE_IOS_CLIENT_ID is "<id>.apps.googleusercontent.com"; the URL
             # scheme is the reversed form "com.googleusercontent.apps.<id>".
+            # The scheme is appended here rather than kept as a placeholder in
+            # Info.plist: App Store validation rejects placeholder URL schemes (90158).
             REVERSED="com.googleusercontent.apps.${GOOGLE_IOS_CLIENT_ID%%.apps.googleusercontent.com}"
-            sed -i '' "s|com.googleusercontent.apps.REPLACE_WITH_IOS_CLIENT_ID|$REVERSED|" ios/Runner/Info.plist
+            PLIST=ios/Runner/Info.plist
+            N=$(/usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes" "$PLIST" | grep -c "Dict")
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:$N dict" "$PLIST"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:$N:CFBundleTypeRole string Editor" "$PLIST"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:$N:CFBundleURLSchemes array" "$PLIST"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:$N:CFBundleURLSchemes:0 string $REVERSED" "$PLIST"
           fi
 
       - name: Install dependencies
