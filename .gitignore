@@ -55,6 +55,9 @@ supabase/.branches/
 google-services.json
 GoogleService-Info.plist
 firebase_options.dart
+# ...except ours, which is hand-written and holds no keys: every value is read
+# from the active .env file at runtime. The app does not compile without it.
+!lib/firebase_options.dart
 
 # Coverage
 coverage/
