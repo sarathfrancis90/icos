@@ -11,7 +11,6 @@ enum SoundEffect {
   buttonTap,
   undo,
   invalidMove,
-  slither,
 }
 
 /// Manages sound effects for game interactions.
@@ -34,7 +33,6 @@ class AudioService {
     SoundEffect.buttonTap: 0.2,
     SoundEffect.undo: 0.25,
     SoundEffect.invalidMove: 0.35,
-    SoundEffect.slither: 0.25,
   };
 
   /// Asset paths for each sound effect.
@@ -46,7 +44,6 @@ class AudioService {
     SoundEffect.buttonTap: 'sounds/button_tap.ogg',
     SoundEffect.undo: 'sounds/undo.ogg',
     SoundEffect.invalidMove: 'sounds/invalid_move.ogg',
-    SoundEffect.slither: 'sounds/slither.ogg',
   };
 
   /// Pre-load all sound effects for instant playback.

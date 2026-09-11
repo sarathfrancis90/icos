@@ -4,6 +4,7 @@ import 'package:icos/features/puzzle/domain/models/game_state.dart';
 import 'package:icos/features/puzzle/domain/models/puzzle.dart';
 
 void main() {
+  group('retraction', _retractionTests);
   // Standard 3x3 test puzzle (no walls):
   //   (0,0)W1  (0,1)     (0,2)
   //   (1,0)    (1,1)     (1,2)
@@ -43,9 +44,7 @@ void main() {
         Waypoint(order: 1, row: 0, col: 0),
         Waypoint(order: 2, row: 2, col: 2),
       ],
-      walls: [
-        Wall(row: 1, col: 1),
-      ],
+      walls: [Wall(row: 1, col: 1)],
       difficulty: 'easy',
       parTimeSeconds: 60,
     );
@@ -176,9 +175,7 @@ void main() {
           Waypoint(order: 2, row: 0, col: 2),
           Waypoint(order: 3, row: 2, col: 2),
         ],
-        walls: [
-          Wall(row: 1, col: 1),
-        ],
+        walls: [Wall(row: 1, col: 1)],
         difficulty: 'easy',
         parTimeSeconds: 60,
       );
@@ -817,9 +814,7 @@ void main() {
         id: 'tiny',
         puzzleDate: '2026-03-03',
         gridSize: 1,
-        waypoints: [
-          Waypoint(order: 1, row: 0, col: 0),
-        ],
+        waypoints: [Waypoint(order: 1, row: 0, col: 0)],
         walls: [],
         difficulty: 'easy',
         parTimeSeconds: 10,
@@ -869,10 +864,7 @@ void main() {
           Waypoint(order: 1, row: 0, col: 0),
           Waypoint(order: 2, row: 2, col: 2),
         ],
-        walls: [
-          Wall(row: 0, col: 1),
-          Wall(row: 1, col: 1),
-        ],
+        walls: [Wall(row: 0, col: 1), Wall(row: 1, col: 1)],
         difficulty: 'medium',
         parTimeSeconds: 60,
       );
@@ -922,5 +914,105 @@ void main() {
         }
       }
     });
+  });
+}
+
+/// Retraction: tapping or dragging onto a cell already on the line pulls the
+/// head back to it. See docs/superpowers/specs/2026-09-11-line-redesign-spec.md
+void _retractionTests() {
+  late Puzzle puzzle;
+  late GameEngine engine;
+  late GameState state;
+
+  setUp(() {
+    puzzle = const Puzzle(
+      id: 'retract',
+      puzzleDate: '2026-09-11',
+      gridSize: 3,
+      waypoints: [
+        Waypoint(order: 1, row: 0, col: 0),
+        Waypoint(order: 2, row: 2, col: 2),
+      ],
+      walls: [],
+      difficulty: 'easy',
+      parTimeSeconds: 60,
+    );
+    engine = GameEngine(puzzle);
+    // Build (0,0)->(0,1)->(0,2)->(1,2)
+    state = engine.createInitialState();
+    for (final cell in const [
+      [0, 0],
+      [0, 1],
+      [0, 2],
+      [1, 2],
+    ]) {
+      state = engine.addToPath(state, cell[0], cell[1]);
+    }
+  });
+
+  test('tapping a body cell retracts the line to it', () {
+    final result = engine.handleCellTap(state, 0, 1);
+
+    expect(result.path.length, 2);
+    expect(result.path.last, const GridPosition(row: 0, col: 1));
+    // Cells after the tap are cleared.
+    expect(result.grid[0][2], CellState.empty);
+    expect(result.grid[1][2], CellState.empty);
+  });
+
+  test('retraction counts as a single undo however many cells are removed', () {
+    final result = engine.handleCellTap(state, 0, 0);
+
+    expect(result.path.length, 1);
+    expect(result.undosUsed, state.undosUsed + 1);
+  });
+
+  test('tapping the head does nothing', () {
+    final result = engine.handleCellTap(state, 1, 2);
+
+    expect(result.path.length, state.path.length);
+    expect(result.undosUsed, state.undosUsed);
+  });
+
+  test('retracting past a waypoint restores the waypoint index', () {
+    // Walk onto waypoint 2 at (2,2) via a full solution.
+    var full = engine.createInitialState();
+    for (final cell in const [
+      [0, 0],
+      [0, 1],
+      [0, 2],
+      [1, 2],
+      [1, 1],
+      [1, 0],
+      [2, 0],
+      [2, 1],
+      [2, 2],
+    ]) {
+      full = engine.addToPath(full, cell[0], cell[1]);
+    }
+    expect(full.currentWaypointIndex, 1, reason: 'reached waypoint 2');
+
+    final retracted = engine.handleCellTap(full, 1, 1);
+    expect(
+      retracted.currentWaypointIndex,
+      0,
+      reason: 'back to waypoint 1 only',
+    );
+    expect(
+      retracted.grid[2][2],
+      CellState.waypoint,
+      reason: 'waypoint cell is restored, not left filled',
+    );
+  });
+
+  test('tapping a non-adjacent empty cell is rejected', () {
+    final result = engine.handleCellTap(state, 2, 0);
+    expect(result.path.length, state.path.length);
+  });
+
+  test('tapping an adjacent empty cell still extends', () {
+    final result = engine.handleCellTap(state, 1, 1);
+    expect(result.path.length, state.path.length + 1);
+    expect(result.path.last, const GridPosition(row: 1, col: 1));
   });
 }

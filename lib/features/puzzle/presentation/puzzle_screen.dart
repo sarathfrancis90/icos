@@ -325,12 +325,12 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                           readOnly: isReplay || completed,
                           onCellTap: (row, col) {
                             Haptics.pathStep();
-                            AudioService.instance.play(SoundEffect.slither);
+                            AudioService.instance.play(SoundEffect.pathStep);
                             notifier.handleCellTap(row, col);
                           },
                           onCellDrag: (row, col) {
                             Haptics.pathStep();
-                            AudioService.instance.play(SoundEffect.slither);
+                            AudioService.instance.play(SoundEffect.pathStep);
                             notifier.handleCellDrag(row, col);
                           },
                         ),

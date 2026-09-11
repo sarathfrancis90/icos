@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -11,7 +10,7 @@ import '../../../../core/utils/motion.dart';
 import '../../domain/models/game_state.dart';
 import '../../domain/models/puzzle.dart';
 import 'grid_palette.dart';
-import 'snake_renderer.dart';
+import 'path_renderer.dart';
 
 class PuzzleGrid extends StatefulWidget {
   const PuzzleGrid({
@@ -66,15 +65,9 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   AnimationController? _completionRippleController;
   bool _hasTriggeredCompletion = false;
 
-  // ─── Snake animations ──────────────────────────────────────────
-  AnimationController? _eatingController;
-  int _eatingSegmentIndex = -1;
-  AnimationController? _idleBlinkController;
-  AnimationController? _tongueController;
-  Timer? _blinkTimer;
-  Timer? _tongueTimer;
-  AnimationController? _invalidLungeController;
-  Offset _lungeDirection = Offset.zero;
+  // ─── Invalid-move feedback ─────────────────────────────────────
+  /// Short flash on a cell the player tried to move to illegally.
+  AnimationController? _invalidFlashController;
 
   bool _reduceMotion = false;
 
@@ -95,8 +88,6 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
       _startHintPulse();
     }
 
-    // Snake idle animations
-    _startIdleAnimations();
   }
 
   @override
@@ -166,11 +157,10 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
       _stopHintPulse();
     }
 
-    // ── Phase 4: Waypoint reached + snake eating ───────────────
+    // ── Phase 4: Waypoint reached ──────────────────────────────
     final newWpIdx = widget.gameState.currentWaypointIndex;
     if (newWpIdx > _previousWaypointIndex && !_reduceMotion) {
       _triggerWaypointBurst();
-      triggerEatingAnimation(newLen - 1);
       AudioService.instance.play(SoundEffect.waypointReached);
     }
     _previousWaypointIndex = newWpIdx;
@@ -320,92 +310,18 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     return controller.value;
   }
 
-  // ── Snake animations ──────────────────────────────────────────────
+  // ── Invalid-move feedback ─────────────────────────────────────────
 
-  void _startIdleAnimations() {
+  /// Flash the cell the player tried to enter illegally.
+  void triggerInvalidFlash(Offset direction) {
     if (_reduceMotion) return;
-    // Eye blink every 4-6 seconds
-    _scheduleNextBlink();
-    // Tongue flick periodically
-    _scheduleNextTongue();
-  }
-
-  void _scheduleNextBlink() {
-    final delay = 4000 + (math.Random().nextInt(2000));
-    _blinkTimer?.cancel();
-    _blinkTimer = Timer(Duration(milliseconds: delay), () {
-      if (!mounted) return;
-      _idleBlinkController?.dispose();
-      _idleBlinkController = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 250),
-      )..forward().then((_) {
-          _idleBlinkController?.reverse().then((_) {
-            _scheduleNextBlink();
-          });
-        });
-    });
-  }
-
-  void _scheduleNextTongue() {
-    final delay = 6000 + (math.Random().nextInt(4000));
-    _tongueTimer?.cancel();
-    _tongueTimer = Timer(Duration(milliseconds: delay), () {
-      if (!mounted) return;
-      _tongueController?.dispose();
-      _tongueController = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 400),
-      )..forward().then((_) {
-          _tongueController?.reverse().then((_) {
-            _scheduleNextTongue();
-          });
-        });
-    });
-  }
-
-  void triggerEatingAnimation(int segmentIndex) {
-    if (_reduceMotion) return;
-    _eatingSegmentIndex = segmentIndex;
-    _eatingController?.dispose();
-    _eatingController = AnimationController(
+    _invalidFlashController?.dispose();
+    _invalidFlashController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 160),
     )..forward().then((_) {
-        _eatingSegmentIndex = -1;
+        _invalidFlashController?.reverse();
       });
-  }
-
-  void triggerInvalidLunge(Offset direction) {
-    if (_reduceMotion) return;
-    _lungeDirection = direction;
-    _invalidLungeController?.dispose();
-    _invalidLungeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    )..forward().then((_) {
-        _invalidLungeController?.reverse();
-      });
-  }
-
-  double _getEatingProgress() {
-    return _eatingController?.value ?? -1.0;
-  }
-
-  double _getIdleBlinkProgress() {
-    return _idleBlinkController?.value ?? -1.0;
-  }
-
-  double _getTongueProgress() {
-    return _tongueController?.value ?? -1.0;
-  }
-
-  Offset _getInvalidLungeOffset() {
-    final controller = _invalidLungeController;
-    if (controller == null || !controller.isAnimating) return Offset.zero;
-    final lungeAmount = cellSize * 0.15;
-    final t = Curves.easeOut.transform(controller.value);
-    return _lungeDirection * lungeAmount * t;
   }
 
   /// Width of the square grid.
@@ -429,16 +345,12 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _blinkTimer?.cancel();
-    _tongueTimer?.cancel();
+
     _glowBreathController.dispose();
     _hintPulseController?.dispose();
     _waypointBurstController?.dispose();
     _completionRippleController?.dispose();
-    _eatingController?.dispose();
-    _idleBlinkController?.dispose();
-    _tongueController?.dispose();
-    _invalidLungeController?.dispose();
+    _invalidFlashController?.dispose();
     for (final c in _segmentControllers.values) {
       c.dispose();
     }
@@ -460,10 +372,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
       ?_hintPulseController,
       ?_waypointBurstController,
       ?_completionRippleController,
-      ?_eatingController,
-      ?_idleBlinkController,
-      ?_tongueController,
-      ?_invalidLungeController,
+      ?_invalidFlashController,
       ..._segmentControllers.values,
       ..._cellEntryControllers.values,
     ];
@@ -500,11 +409,6 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
                 waypointBurstProgress: _getWaypointBurstProgress(),
                 waypointBurstGridPos: _waypointBurstCenter,
                 completionRippleProgress: _getCompletionRippleProgress(),
-                eatingProgress: _getEatingProgress(),
-                eatingSegmentIndex: _eatingSegmentIndex,
-                idleBlinkProgress: _getIdleBlinkProgress(),
-                tongueProgress: _getTongueProgress(),
-                invalidLungeOffset: _getInvalidLungeOffset(),
                 repaintNotifier: listenables.isNotEmpty
                     ? Listenable.merge(listenables)
                     : null,
@@ -541,30 +445,17 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   }
 
   void _handleCellDrag(int row, int col) {
+    if (widget.readOnly) return;
     final path = widget.gameState.path;
 
-    // Skip if dragging over the current head
+    // Dragging over the head is a no-op.
     if (path.isNotEmpty && path.last.row == row && path.last.col == col) {
       return;
     }
 
-    // Allow drag-undo to second-to-last cell only
-    if (path.length >= 2 &&
-        path[path.length - 2].row == row &&
-        path[path.length - 2].col == col) {
-      widget.onCellDrag(row, col);
-      return;
-    }
-
-    // Reject drag to any already-visited cell
-    if (path.any((p) => p.row == row && p.col == col)) {
-      return;
-    }
-
-    // Reject walls
-    if (widget.gameState.grid[row][col] == CellState.wall) {
-      return;
-    }
+    // Walls are never draggable. Cells already on the line retract, and legal
+    // adjacent cells extend; both are resolved by the engine downstream.
+    if (widget.gameState.grid[row][col] == CellState.wall) return;
 
     widget.onCellDrag(row, col);
   }
@@ -573,40 +464,42 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     if (widget.readOnly) return;
     final path = widget.gameState.path;
 
-    // Check if tapping an already-visited cell (not the second-to-last for undo)
-    final isInPath = path.any((p) => p.row == row && p.col == col);
-    final isSecondToLast = path.length >= 2 &&
-        path[path.length - 2].row == row &&
-        path[path.length - 2].col == col;
-    final isLastCell = path.isNotEmpty &&
-        path.last.row == row &&
-        path.last.col == col;
-
-    if (isInPath && !isSecondToLast && !isLastCell) {
-      // Invalid move — trigger lunge animation + feedback
-      if (path.isNotEmpty) {
-        final headPos = path.last;
-        final dx = (col - headPos.col).toDouble();
-        final dy = (row - headPos.row).toDouble();
-        final len = math.sqrt(dx * dx + dy * dy);
-        if (len > 0) {
-          triggerInvalidLunge(Offset(dx / len, dy / len));
-        }
-      }
-      Haptics.error();
-      AudioService.instance.play(SoundEffect.invalidMove);
-      widget.onInvalidMove?.call(row, col);
+    // Walls are never tappable.
+    if (widget.gameState.grid[row][col] == CellState.wall) {
+      _rejectMove(row, col);
       return;
     }
 
-    // Check if tapping a wall
-    if (widget.gameState.grid[row][col] == CellState.wall) {
-      Haptics.error();
-      AudioService.instance.play(SoundEffect.invalidMove);
+    final indexInPath = path.indexWhere((p) => p.row == row && p.col == col);
+
+    // Tapping the head is a deliberate no-op so a stray tap cannot clear
+    // progress; any other cell on the line retracts back to it.
+    if (indexInPath >= 0) {
+      if (indexInPath == path.length - 1) return;
+      widget.onCellTap(row, col);
       return;
+    }
+
+    // Extending: the cell must be orthogonally adjacent to the head.
+    if (path.isNotEmpty) {
+      final head = path.last;
+      final adjacent =
+          (head.row - row).abs() + (head.col - col).abs() == 1;
+      if (!adjacent) {
+        _rejectMove(row, col);
+        return;
+      }
     }
 
     widget.onCellTap(row, col);
+  }
+
+  /// Shared feedback for a move the rules do not allow.
+  void _rejectMove(int row, int col) {
+    triggerInvalidFlash(Offset.zero);
+    Haptics.error();
+    AudioService.instance.play(SoundEffect.invalidMove);
+    widget.onInvalidMove?.call(row, col);
   }
 
   String _cellSemanticLabel(int row, int col) {
@@ -644,11 +537,6 @@ class _GridPainter extends CustomPainter {
     required this.waypointBurstProgress,
     this.waypointBurstGridPos,
     required this.completionRippleProgress,
-    required this.eatingProgress,
-    required this.eatingSegmentIndex,
-    required this.idleBlinkProgress,
-    required this.tongueProgress,
-    required this.invalidLungeOffset,
     Listenable? repaintNotifier,
   }) : super(repaint: repaintNotifier);
 
@@ -664,11 +552,6 @@ class _GridPainter extends CustomPainter {
   final double waypointBurstProgress;
   final Offset? waypointBurstGridPos;
   final double completionRippleProgress;
-  final double eatingProgress;
-  final int eatingSegmentIndex;
-  final double idleBlinkProgress;
-  final double tongueProgress;
-  final Offset invalidLungeOffset;
 
   // Cell geometry constants
   static const double _cellInset = 2.0;
@@ -689,8 +572,8 @@ class _GridPainter extends CustomPainter {
     _drawHintCell(canvas);
     _drawWrongCell(canvas);
 
-    // Draw snake path
-    _drawSnakePath(canvas);
+    // Draw the player line
+    _drawLine(canvas);
 
     // Draw waypoints on top
     for (int row = 0; row < gridSize; row++) {
@@ -882,8 +765,8 @@ class _GridPainter extends CustomPainter {
     canvas.restore();
   }
 
-  /// Draws the snake path using the SnakeRenderer.
-  void _drawSnakePath(Canvas canvas) {
+  /// Draws the player's line using [PathRenderer].
+  void _drawLine(Canvas canvas) {
     if (gameState.path.isEmpty) return;
 
     final points = <Offset>[];
@@ -894,15 +777,10 @@ class _GridPainter extends CustomPainter {
       ));
     }
 
-    final renderer = SnakeRenderer(
+    final renderer = PathRenderer(
       cellSize: cellSize,
       palette: palette,
       glowBreathValue: glowBreathValue,
-      eatingProgress: eatingProgress,
-      eatingSegmentIndex: eatingSegmentIndex,
-      idleBlinkProgress: idleBlinkProgress,
-      tongueProgress: tongueProgress,
-      invalidLungeOffset: invalidLungeOffset,
     );
 
     renderer.paint(canvas, points, segmentProgressGetter);
@@ -1155,9 +1033,6 @@ class _GridPainter extends CustomPainter {
         oldDelegate.hintPulseValue != hintPulseValue ||
         oldDelegate.waypointBurstProgress != waypointBurstProgress ||
         oldDelegate.completionRippleProgress != completionRippleProgress ||
-        oldDelegate.eatingProgress != eatingProgress ||
-        oldDelegate.idleBlinkProgress != idleBlinkProgress ||
-        oldDelegate.tongueProgress != tongueProgress ||
-        oldDelegate.invalidLungeOffset != invalidLungeOffset;
+        oldDelegate.wrongCell != wrongCell;
   }
 }

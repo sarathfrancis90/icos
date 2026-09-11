@@ -134,35 +134,18 @@ class GameNotifier extends _$GameNotifier {
     _applyMove(newState, wasNotStarted);
   }
 
+  /// Drag across [row], [col]. Dragging backwards over the line retracts to
+  /// that cell; dragging onto a legal adjacent cell extends. Shares
+  /// [GameEngine.handleCellTap] so tap and drag never diverge.
   void handleCellDrag(int row, int col) {
     if (state == null || _engine == null) return;
     if (state!.status == GameStatus.completed) return;
     if (state!.status == GameStatus.notStarted) return;
 
-    // Skip if dragging over the current last cell
-    if (state!.path.isNotEmpty &&
-        state!.path.last.row == row &&
-        state!.path.last.col == col) {
-      return;
-    }
+    final newState = _engine!.handleCellTap(state!, row, col);
+    if (identical(newState, state) || newState == state) return;
 
-    // Only allow backtracking to the second-to-last cell (single undo step).
-    if (state!.path.length >= 2) {
-      final secondToLast = state!.path[state!.path.length - 2];
-      if (secondToLast.row == row && secondToLast.col == col) {
-        state = _clearHint(_engine!.undo(state!));
-        _saveGameState();
-        return;
-      }
-    }
-
-    // Reject any move to an already-visited cell
-    if (state!.path.any((p) => p.row == row && p.col == col)) return;
-
-    if (_engine!.canMoveToCell(state!, row, col)) {
-      final newState = _clearHint(_engine!.addToPath(state!, row, col));
-      _applyMove(newState, false);
-    }
+    _applyMove(_clearHint(newState), false);
   }
 
   void _applyMove(GameState newState, bool wasNotStarted) {

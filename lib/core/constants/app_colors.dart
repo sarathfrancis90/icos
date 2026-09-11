@@ -19,9 +19,9 @@ abstract final class AppColors {
   static const cellShadow = Color(0xFF0D1219); // bottom-right shadow edge
   static const cellBorder = Color(0xFF2A3548);
 
-  /// Visited / filled cell (snake trail green tint)
-  static const filledCellLight = Color(0xFF1B4332);
-  static const filledCellDark = Color(0xFF14291E);
+  /// Visited / filled cell (warm tint under the line)
+  static const filledCellLight = Color(0xFF3A2A12);
+  static const filledCellDark = Color(0xFF241A0C);
 
   // Grid lines (subtle)
   static const gridLine = Color(0xFF1E2D42);
@@ -78,34 +78,14 @@ abstract final class AppColors {
   static const coralOrange = Color(0xFFFF6B35);
   static const coralOrangeLight = Color(0xFFFF8F5E);
 
-  // ─── Snake Colors (Neon Green palette) ──────────────────────────────
-  static const snakeHeadHighlight = Color(0xFF7DFFB3); // mint-white specular
-  static const snakeHeadBright = Color(0xFF39FF7F); // electric neon head
-  static const snakeBodyStart = Color(0xFF22FF6E); // bright near head
-  static const snakeBodyMid = Color(0xFF00E650); // strong green
-  static const snakeBodyDark = Color(0xFF00B341); // deep emerald
-  static const snakeBodyEnd = Color(0xFF007A2D); // dark forest tail
-  static const snakeSegmentHighlight = Color(0xFFB3FFD6); // top-left specular
-  static const snakeSegmentShadow = Color(0xFF005C22); // bottom-right shadow
-  static const snakeEye = Color(0xFFF0FFF4); // green-tinted sclera
-  static const snakePupil = Color(0xFF0A1628); // matches background
-  static const snakeTongue = Color(0xFFFF4757); // coral-red contrast
-  static const snakeGlowOuter = Color(0x4000FF55); // outer neon bloom
-  static const snakeGlowInner = Color(0x6039FF7F); // inner glow halo
-  static const snakeBellyHighlight = Color(0xFF66FFB3); // underside stripe
-  static const snakeScaleHighlight = Color(0x30FFFFFF);
-  // Legacy alias
-  static const snakeGlow = snakeGlowOuter;
+  // ─── Path line (amber ramp, matches the app icon) ───────────────────
+  /// Bright cap drawn at the head of the line.
+  static const pathHead = pathYellowBright;
+  /// Cap drawn at waypoint 1, the start of the line.
+  static const pathStartCap = pathOrangeDeep;
+  /// Soft bloom under the stroke.
+  static const pathGlowSoft = Color(0x33FF9100);
 
-  static const snakeGradientColors = [
-    snakeBodyEnd, // tail
-    snakeBodyDark,
-    snakeBodyMid,
-    snakeBodyStart,
-    snakeHeadBright, // head
-  ];
-
-  // ─── Glow & Effects ──────────────────────────────────────────────
   static const pathGlowOrange = Color(0x60FF9100);
   static const pathGlowYellow = Color(0x60FFD740);
   static const purpleGlow = Color(0x409C27B0);
@@ -150,7 +130,7 @@ abstract final class AppColors {
   static const tritanopiaWaypoint = Color(0xFFCC79A7);
 
   /// Deuteranopia: blue path, orange waypoints.
-  static const cbDeutSnakeGradient = [
+  static const cbDeutPathGradient = [
     Color(0xFF003F6B),
     Color(0xFF00568A),
     deuteranopiaPath,
@@ -165,7 +145,7 @@ abstract final class AppColors {
   static const cbDeutFilledLight = Color(0xFF16406A);
 
   /// Protanopia: sky-blue path, yellow waypoints.
-  static const cbProtSnakeGradient = [
+  static const cbProtPathGradient = [
     Color(0xFF1B5E8C),
     Color(0xFF2F7FB5),
     protanopiaPath,
@@ -180,7 +160,7 @@ abstract final class AppColors {
   static const cbProtFilledLight = Color(0xFF1B4F6E);
 
   /// Tritanopia: red path, teal waypoints.
-  static const cbTritSnakeGradient = [
+  static const cbTritPathGradient = [
     Color(0xFF7A1414),
     Color(0xFFA11E1E),
     Color(0xFFD62828),

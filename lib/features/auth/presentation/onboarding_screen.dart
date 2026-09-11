@@ -33,8 +33,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   ];
 
   static const _gradients = [
-    [AppColors.snakeBodyStart, AppColors.snakeHeadBright],
-    [AppColors.snakeBodyMid, AppColors.snakeHeadBright],
+    [AppColors.pathOrange, AppColors.pathYellowBright],
+    [AppColors.pathAmber, AppColors.pathYellowBright],
     [AppColors.success, AppColors.electricBlue],
   ];
 

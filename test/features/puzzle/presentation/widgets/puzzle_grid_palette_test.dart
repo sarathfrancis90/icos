@@ -15,10 +15,10 @@ void main() {
         final palette = GridPalette.forMode(mode);
         expect(palette.mode, mode);
         expect(palette.patterns, isTrue);
-        expect(palette.snakeGradientColors, hasLength(5));
+        expect(palette.pathGradient, hasLength(5));
         expect(
           palette.waypointFill,
-          isNot(palette.snakeBodyMid),
+          isNot(palette.pathHead),
           reason: 'waypoints must contrast with the path in $mode',
         );
       }
