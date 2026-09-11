@@ -80,3 +80,6 @@ maestro-report/
 
 # Play Store upload artifacts (large, regenerated per build)
 release/**/mapping-*.txt
+
+# Maestro run output (screenshots + logs, regenerated per run)
+maestro-out/
