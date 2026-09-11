@@ -36,6 +36,52 @@ recurs per release.
 
 ---
 
+## 0b. Status of the automated setup (2026-09-11)
+
+Done automatically via the App Store Connect API (`scripts/asc.py`):
+
+| Item | Value |
+|---|---|
+| App record | `Icos: Daily Path Puzzle`, bundle `com.icos.game`, SKU `icos-ios`, Apple ID `6810895361` |
+| Builds uploaded | 1.0 (1) and 1.0 (2), both processed. Build **2** is attached to version 1.0 |
+| Category | Games / Puzzle (secondary: Board) |
+| Age rating | All content descriptors "None" (expect 4+) |
+| Name, subtitle, description, keywords, promo text | Uploaded (en-US) |
+| Support + marketing URL | `https://icos.sarathfrancis.work/` |
+| Privacy policy URL | `https://icos.sarathfrancis.work/privacy-policy.html` |
+| Screenshots | 7x iPhone 6.7" + 7x iPad 12.9", all processed |
+| Pricing | Free, base territory USA, all territories |
+| Content rights | Does not use third-party content |
+| Review contact | Sarath Francis, sarathfrancis90@gmail.com, **phone is a placeholder — replace it** |
+| Demo account | Not required (guest play) |
+| Release type | Manual (you press Release after approval) |
+
+**Remaining blocker for submission: App Privacy.** Apple does not expose the data-usage
+questionnaire in the API, so it must be answered once in the web UI:
+App Store Connect > Icos > App Privacy > Get Started, then Publish.
+
+Answer exactly this (it matches `ios/Runner/PrivacyInfo.xcprivacy` and the privacy policy):
+
+| Data type | Collected | Linked to identity | Tracking | Purpose |
+|---|---|---|---|---|
+| Contact Info > Email Address | Yes (optional sign-up) | Yes | No | App Functionality |
+| User Content > Other User Content (display name, group names) | Yes | Yes | No | App Functionality |
+| Identifiers > User ID | Yes | Yes | No | App Functionality |
+| Usage Data > Product Interaction | Yes | No | No | Analytics |
+| Diagnostics > Crash Data | Yes | No | No | App Functionality |
+| Diagnostics > Performance Data | Yes | No | No | App Functionality |
+
+Everything else: **not collected**. "Do you or your third-party partners use data for
+tracking?" -> **No**.
+
+Then in App Store Connect press **Add for Review** > **Submit to App Review**. (The review
+submission record already exists; adding the version fails until App Privacy is published.)
+
+Also before submitting: replace the placeholder review phone number
+(App Review Information > Contact) with a number Apple can actually reach.
+
+---
+
 ## 1. Domain: `icos.sarathfrancis.work` (needed before universal links / app links verify)
 
 The `docs/` folder is a static site (landing page, privacy policy, terms, `.well-known`).
