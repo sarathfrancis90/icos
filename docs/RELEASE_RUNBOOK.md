@@ -243,7 +243,14 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 - [ ] **(once)** Service account for fastlane: Google Cloud Console > IAM > Service accounts > create `icos-play-publisher`, create a **JSON key**;
       Play Console > Users and permissions > Invite new users > paste the service-account email with *Release manager* rights (or app-level: Release to production, Manage testing tracks).
       Secret `PLAY_STORE_CREDENTIALS` = `base64 -i service-account.json | pbcopy`. Locally save it as `android/play-store-credentials.json` (git-ignored)
-- [ ] **(once)** First upload **must be manual** (fastlane cannot create the first release): build locally (section 7) and upload the AAB to *Internal testing* in the console
+- [ ] **(once)** First upload: the API *can* do it, but only to **Internal testing**. Any
+      release on closed/open/production returns `Precondition check failed` until Play's
+      *App content* declarations are finished, and the error says nothing more than that.
+      Do Internal first, complete App content, then closed testing.
+- [ ] Mapping files: **do not** upload `mapping.txt` separately for an AAB. The
+      `deobfuscationFiles` endpoint is APK-only and 404s for bundles. AGP already embeds it
+      at `BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map`, so Play picks
+      it up from the bundle. `upload_to_play_store(mapping:)` is a no-op here at best.
 - [ ] **(once)** Policy > App content, answer every item:
   - Privacy policy: `https://icos.sarathfrancis.work/privacy-policy.html`
   - Ads: No
