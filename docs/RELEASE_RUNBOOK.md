@@ -43,13 +43,14 @@ Done automatically via the App Store Connect API (`scripts/asc.py`):
 | Item | Value |
 |---|---|
 | App record | `Icos: Daily Path Puzzle`, bundle `com.icos.game`, SKU `icos-ios`, Apple ID `6810895361` |
-| Builds uploaded | 1.0 (1) and 1.0 (2), both processed. Build **2** is attached to version 1.0 |
+| Builds uploaded | 1.0 (1), (2) and (3), all processed. Build **3** (the line redesign) is attached to version 1.0 |
 | Category | Games / Puzzle (secondary: Board) |
 | Age rating | All content descriptors "None" (expect 4+) |
 | Name, subtitle, description, keywords, promo text | Uploaded (en-US) |
 | Support + marketing URL | `https://icos.sarathfrancis.work/` |
 | Privacy policy URL | `https://icos.sarathfrancis.work/privacy-policy.html` |
-| Screenshots | 7x iPhone 6.7" + 7x iPad 12.9", all processed |
+| Screenshots | 7x iPhone 6.7" + 7x iPad 12.9", all processed. Re-shot 2026-09-11 from the line-redesign build, dark mode |
+| App preview | 27s iPhone 6.7" gameplay video, 886x1920, accepted |
 | Pricing | Free, base territory USA, all territories |
 | Content rights | Does not use third-party content |
 | Review contact | Sarath Francis, sarathfrancis90@gmail.com, **phone is a placeholder — replace it** |
@@ -79,6 +80,34 @@ submission record already exists; adding the version fails until App Privacy is 
 
 Also before submitting: replace the placeholder review phone number
 (App Review Information > Contact) with a number Apple can actually reach.
+
+### Google Play: one manual step left
+
+The signed bundle is built and staged, but it cannot be pushed from here — Play
+publishing needs a service-account key and there is none on this machine
+(`android/play-store-credentials.json`, or the `PLAY_STORE_JSON_KEY` env var, both
+absent). Either drop that key in and run `bundle exec fastlane android beta`, or upload
+by hand:
+
+| File | What it is |
+|---|---|
+| `release/google-play/icos-1.0.0-3.aab` | version code 3, obfuscated, signed with the upload key |
+| `release/google-play/mapping-1.0.0-3.txt` | deobfuscation mapping; upload it alongside the bundle |
+| `release/google-play/screenshots/` | 7 phone screenshots, 1080x2400, re-shot from this build |
+
+### Store assets, and how they are produced
+
+Screenshots are captured from a real device running a real solve, not composited.
+`scripts/board_from_screen.py` reads the puzzle off the screen via the accessibility
+tree, `test/visual/solve_board.dart` solves it with the app's own solver, and the
+resulting cell order is replayed as taps. That means a fresh set can be shot on any day,
+against whatever the daily puzzle happens to be.
+
+Upload with `scripts/upload_screenshots.py` and `scripts/upload_preview.py`; `fastlane
+deliver` silently uploads nothing when it cannot map a resolution to a display type.
+
+App previews must carry a **stereo audio track**, even a silent one. Without it App Store
+Connect accepts the upload and then fails the asset with `MOV_RESAVE_STEREO`.
 
 ---
 
