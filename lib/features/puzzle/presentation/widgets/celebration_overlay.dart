@@ -223,7 +223,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
   /// Stagger helper: returns 0-1 for an element that appears at [delayMs]
   /// within the stats controller timeline.
   double _staggeredValue(int delayMs) {
-    final totalMs = 1200.0;
+    const totalMs = 1200.0;
     final start = delayMs / totalMs;
     final end = (delayMs + AppSizes.statRevealStaggerMs) / totalMs;
     if (_statsController.value < start) return 0.0;
@@ -739,11 +739,11 @@ class _GradientButton extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: AppColors.purpleButtonGradient,
           borderRadius: BorderRadius.circular(AppSizes.radiusXl),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               color: AppColors.purpleGlow,
               blurRadius: 12,
-              offset: const Offset(0, 4),
+              offset: Offset(0, 4),
             ),
           ],
         ),

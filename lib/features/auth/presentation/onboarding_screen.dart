@@ -86,7 +86,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     child: TextButton(
                       onPressed: _finish,
-                      child: Text(
+                      child: const Text(
                         'Skip',
                         style: TextStyle(
                           color: AppColors.textSecondaryDark,
@@ -153,11 +153,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       decoration: BoxDecoration(
                         gradient: AppColors.purpleButtonGradient,
                         borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
+                        boxShadow: const [
                           BoxShadow(
                             color: AppColors.purpleGlow,
                             blurRadius: 16,
-                            offset: const Offset(0, 6),
+                            offset: Offset(0, 6),
                           ),
                         ],
                       ),
@@ -345,15 +345,15 @@ class _OnboardingIllustrationPainter extends CustomPainter {
 
     // Animated path: moves through grid cells
     final pathPoints = [
-      Offset(0, 0),
-      Offset(1, 0),
-      Offset(2, 0),
-      Offset(2, 1),
-      Offset(1, 1),
-      Offset(0, 1),
-      Offset(0, 2),
-      Offset(1, 2),
-      Offset(2, 2),
+      const Offset(0, 0),
+      const Offset(1, 0),
+      const Offset(2, 0),
+      const Offset(2, 1),
+      const Offset(1, 1),
+      const Offset(0, 1),
+      const Offset(0, 2),
+      const Offset(1, 2),
+      const Offset(2, 2),
     ];
 
     final visibleCount = (pathPoints.length * progress).ceil();
@@ -391,7 +391,7 @@ class _OnboardingIllustrationPainter extends CustomPainter {
     final offset = Offset(cellSize * 0.5, cellSize * 0.8);
 
     // 5x5 calendar grid
-    final totalCells = 25;
+    const totalCells = 25;
     final filledCount = (totalCells * progress).ceil();
 
     for (int i = 0; i < totalCells; i++) {

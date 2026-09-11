@@ -90,7 +90,7 @@ abstract final class AppTheme {
             borderSide: const BorderSide(color: AppColors.purpleLight),
           ),
           labelStyle: const TextStyle(color: AppColors.textSecondaryDark),
-          hintStyle: TextStyle(color: AppColors.textTertiaryDark),
+          hintStyle: const TextStyle(color: AppColors.textTertiaryDark),
           prefixIconColor: AppColors.textSecondaryDark,
           contentPadding: const EdgeInsetsDirectional.symmetric(
             horizontal: AppSizes.md,
@@ -233,7 +233,7 @@ abstract final class AppTheme {
             borderSide: const BorderSide(color: AppColors.purpleDeep),
           ),
           labelStyle: const TextStyle(color: AppColors.textSecondaryLight),
-          hintStyle: TextStyle(color: AppColors.textSecondaryLight),
+          hintStyle: const TextStyle(color: AppColors.textSecondaryLight),
           prefixIconColor: AppColors.textSecondaryLight,
           contentPadding: const EdgeInsetsDirectional.symmetric(
             horizontal: AppSizes.md,
@@ -308,7 +308,7 @@ abstract final class AppTheme {
         : AppColors.textSecondaryLight;
 
     final base = GoogleFonts.interTextTheme(
-      TextTheme(
+      const TextTheme(
         displayLarge: TextStyle(
           fontSize: 32,
           fontWeight: FontWeight.w800,

@@ -3,20 +3,19 @@
 /// at each step for visual verification.
 ///
 /// Run on simulator:
-///   flutter test integration_test/visual_app_test.dart -d <device_id>
+///   flutter test integration_test/visual_app_test.dart -d `<device_id>`
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
-
 import 'package:icos/core/constants/app_colors.dart';
 import 'package:icos/core/constants/app_sizes.dart';
 import 'package:icos/features/puzzle/domain/game_engine.dart';
 import 'package:icos/features/puzzle/domain/models/game_state.dart';
 import 'package:icos/features/puzzle/domain/models/puzzle.dart';
 import 'package:icos/features/puzzle/presentation/widgets/puzzle_grid.dart';
+import 'package:integration_test/integration_test.dart';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();

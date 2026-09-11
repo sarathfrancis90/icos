@@ -1,7 +1,7 @@
 /// Comprehensive visual audit — renders EVERY screen/state in the app,
 /// takes screenshots, and verifies core interactions.
 ///
-/// Run: flutter test integration_test/full_visual_audit.dart -d <device_id>
+/// Run: flutter test integration_test/full_visual_audit.dart -d `<device_id>`
 ///
 /// This test covers:
 ///   1. Onboarding (3 pages + skip)
@@ -18,8 +18,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
-
 import 'package:icos/core/constants/app_colors.dart';
 import 'package:icos/core/theme/app_theme.dart';
 import 'package:icos/features/auth/presentation/onboarding_screen.dart';
@@ -31,6 +29,7 @@ import 'package:icos/features/puzzle/presentation/widgets/celebration_overlay.da
 import 'package:icos/features/puzzle/presentation/widgets/game_controls.dart';
 import 'package:icos/features/puzzle/presentation/widgets/puzzle_grid.dart';
 import 'package:icos/features/stats/presentation/stats_screen.dart';
+import 'package:integration_test/integration_test.dart';
 // NOTE: GroupsScreen, ProfileScreen, AuthScreen require Supabase and are
 // tested via the running app, not in this isolated audit.
 
@@ -154,8 +153,8 @@ void main() {
         Center(
           child: PuzzleGrid(
             gameState: state,
-            onCellTap: (_, __) {},
-            onCellDrag: (_, __) {},
+            onCellTap: (_, _) {},
+            onCellDrag: (_, _) {},
           ),
         ),
       ));
@@ -177,8 +176,8 @@ void main() {
         Center(
           child: PuzzleGrid(
             gameState: state,
-            onCellTap: (_, __) {},
-            onCellDrag: (_, __) {},
+            onCellTap: (_, _) {},
+            onCellDrag: (_, _) {},
           ),
         ),
       ));
@@ -209,7 +208,9 @@ void main() {
                       onCellDrag: (r, c) {
                         if (state.path.isNotEmpty &&
                             state.path.last.row == r &&
-                            state.path.last.col == c) return;
+                            state.path.last.col == c) {
+                          return;
+                        }
                         final bt = engine.backtrackToCell(state, r, c);
                         if (bt != null) {
                           setState(() => state = bt);
@@ -273,7 +274,9 @@ void main() {
                       onCellDrag: (r, c) {
                         if (state.path.isNotEmpty &&
                             state.path.last.row == r &&
-                            state.path.last.col == c) return;
+                            state.path.last.col == c) {
+                          return;
+                        }
                         final bt = engine.backtrackToCell(state, r, c);
                         if (bt != null) {
                           setState(() => state = bt);
@@ -362,7 +365,7 @@ void main() {
 
     testWidgets('Under par celebration', (tester) async {
       await tester.pumpWidget(_wrapScaffold(
-        Stack(children: [
+        const Stack(children: [
           CelebrationOverlay(
             timeSeconds: 30,
             hintsUsed: 0,
@@ -383,7 +386,7 @@ void main() {
 
     testWidgets('Over par celebration', (tester) async {
       await tester.pumpWidget(_wrapScaffold(
-        Stack(children: [
+        const Stack(children: [
           CelebrationOverlay(
             timeSeconds: 150,
             hintsUsed: 2,

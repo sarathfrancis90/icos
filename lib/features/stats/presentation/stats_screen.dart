@@ -157,7 +157,7 @@ class _StatsOverviewCards extends StatelessWidget {
                 label: 'Puzzles Solved',
                 value: '${overview.totalSolved}',
                 icon: Icons.check_circle_rounded,
-                gradientColors: [AppColors.success, AppColors.successDim],
+                gradientColors: const [AppColors.success, AppColors.successDim],
               ),
             ),
             const SizedBox(width: AppSizes.sm),
@@ -168,7 +168,7 @@ class _StatsOverviewCards extends StatelessWidget {
                     ? AppDateUtils.formatTime(overview.averageTimeSeconds)
                     : '--:--',
                 icon: Icons.timer_rounded,
-                gradientColors: [AppColors.purpleLight, AppColors.purpleDeep],
+                gradientColors: const [AppColors.purpleLight, AppColors.purpleDeep],
               ),
             ),
           ],
@@ -178,7 +178,7 @@ class _StatsOverviewCards extends StatelessWidget {
           label: 'Streak Freeze',
           value: freezeStatus,
           icon: Icons.ac_unit_rounded,
-          gradientColors: [AppColors.electricBlue, AppColors.electricBlueDim],
+          gradientColors: const [AppColors.electricBlue, AppColors.electricBlueDim],
         ),
       ],
     );
