@@ -160,16 +160,28 @@ ios/AuthKey_SignInWithApple_<KEY_ID>.p8
 
 Supabase dashboard > Authentication > Sign In / Providers > **Apple**.
 
-- Enable
-- Authorised Client IDs:
+The form is shorter than Apple's own docs imply. There are no separate Team ID,
+Key ID or Services ID fields, and **Secret Key (for OAuth) does not take the `.p8`**.
+Paste the raw key and it rejects it with "Secret key should be a JWT."
+
+- **Client IDs**:
   ```
   com.icos.game,com.icos.game.signin
   ```
-  The bundle ID covers native iOS; the Services ID covers the web flow.
-- Services ID: `com.icos.game.signin`
-- Team ID: `H845PX7Q62`
-- Key ID: from A3
-- Private key: paste the whole contents of the `.p8`, `-----BEGIN` line included
+  The bundle id covers native iOS; the Services ID covers the web flow.
+- **Secret Key (for OAuth)**: an ES256 JWT signed with the `.p8`. Apple calls this the
+  client secret. The team id, key id and services id all live inside it as claims,
+  which is why the form does not ask for them separately. Generate it with:
+  ```bash
+  python3 scripts/apple_client_secret.py --key-id <KEY_ID> --copy
+  ```
+  `--copy` puts it on the clipboard rather than leaving it in terminal scrollback.
+- **Allow users without an email**: leave off. Apple always returns an email for this
+  app's scopes, and off is the safer default.
+
+Apple caps the client secret at **six months**. The dashboard warns about this. When it
+expires, web sign-in breaks and native iOS sign-in keeps working, which makes for a
+confusing bug report. Re-run the script and paste the new value.
 
 ---
 
