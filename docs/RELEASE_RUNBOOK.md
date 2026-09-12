@@ -302,6 +302,8 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 > It checks Supabase's live provider state, the client ids, and that the iOS URL scheme
 > matches the client id. Non-zero exit means sign-in cannot work yet.
 
+Step-by-step with this project's actual values: **[docs/SIGNIN_SETUP.md](SIGNIN_SETUP.md)**.
+
 ### 5a. Google Cloud Console
 
 Create three OAuth clients under APIs & Services > Credentials, all in one project:
