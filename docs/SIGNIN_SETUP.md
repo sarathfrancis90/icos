@@ -97,13 +97,16 @@ so CI builds match.
 
 Supabase dashboard > Authentication > Sign In / Providers > **Google**.
 
-- Enable
-- Client ID: the **web** client id from G2
-- Client Secret: the **web** client secret from G2
-- Authorised Client IDs: the **iOS** and **Android** client ids, comma separated
+There is no field called "Authorised Client IDs". Supabase renamed it. The field is
+just **Client IDs**, and it takes a comma-separated list — every client, web included:
 
-That last field is what makes native sign-in work. The app sends an id token minted for
-the iOS or Android client, and Supabase rejects it unless the id is listed.
+```
+876802621972-tsu3ss64bros8iub3mijmraaj20m3t67.apps.googleusercontent.com,876802621972-29bmvc0vva0n7qn1f9i2ufa0cunmjg8l.apps.googleusercontent.com,876802621972-d1meldlrheldggi3pa22oigfmfeutt8j.apps.googleusercontent.com,876802621972-fc2vik9e4rsgpk1tpu8jhdm1s2cqucmq.apps.googleusercontent.com,876802621972-uganblnaf7r2j4eoh4saqn6uer1mmv1i.apps.googleusercontent.com
+```
+
+**Client Secret (for OAuth)** takes the **web** client's secret, and only that one. It
+is what the browser redirect flow uses. The native flows send an id token minted for one
+of the ids above, and Supabase rejects any id not in that list.
 
 ---
 
