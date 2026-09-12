@@ -164,11 +164,15 @@ The form is shorter than Apple's own docs imply. There are no separate Team ID,
 Key ID or Services ID fields, and **Secret Key (for OAuth) does not take the `.p8`**.
 Paste the raw key and it rejects it with "Secret key should be a JWT."
 
-- **Client IDs**:
+- **Client IDs** — **order matters**:
   ```
-  com.icos.game,com.icos.game.signin
+  com.icos.game.signin,com.icos.game
   ```
-  The bundle id covers native iOS; the Services ID covers the web flow.
+  Supabase validates native id tokens against the whole list, but hands the **first**
+  entry to Apple as `client_id` for the web redirect. Apple's web flow only accepts a
+  Services ID. Put the bundle id first and every web sign-in dies on Apple's side with
+  `Invalid client id or web redirect url`, while native iOS sign-in still works, so the
+  app looks half-broken for no visible reason.
 - **Secret Key (for OAuth)**: an ES256 JWT signed with the `.p8`. Apple calls this the
   client secret. The team id, key id and services id all live inside it as claims,
   which is why the form does not ask for them separately. Generate it with:

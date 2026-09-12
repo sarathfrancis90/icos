@@ -46,6 +46,47 @@ def supabase_providers(url: str, anon: str) -> dict:
         return json.load(r).get('external', {})
 
 
+def authorize_client_id(url: str, provider: str) -> str | None:
+    """The client_id Supabase hands to the provider for the web redirect flow.
+
+    Supabase uses the *first* entry of its Client IDs list here, and that choice
+    matters for Apple: the web flow only accepts a Services ID, never a bundle id.
+    """
+    target = (f'{url}/auth/v1/authorize?provider={provider}'
+              '&redirect_to=io.supabase.icos%3A%2F%2Flogin-callback')
+    req = urllib.request.Request(target, method='GET')
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *a, **k):
+            return None
+    opener = urllib.request.build_opener(NoRedirect)
+    try:
+        opener.open(req, timeout=40)
+        return None
+    except urllib.error.HTTPError as exc:
+        loc = exc.headers.get('location')
+        if not loc:
+            return None
+        import urllib.parse as up
+        return up.parse_qs(up.urlparse(loc).query).get('client_id', [None])[0]
+
+
+def apple_accepts(client_id: str, callback: str) -> bool:
+    """Ask Apple directly whether it will serve a sign-in page for this id."""
+    import urllib.parse as up
+    target = ('https://appleid.apple.com/auth/authorize?'
+              + up.urlencode({'client_id': client_id, 'redirect_uri': callback,
+                              'response_type': 'code', 'scope': 'email name',
+                              'response_mode': 'form_post'}))
+    try:
+        with urllib.request.urlopen(target, timeout=40) as r:
+            body = r.read().decode('utf-8', 'replace')
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode('utf-8', 'replace')
+    except urllib.error.URLError:
+        return False
+    return 'Invalid client id' not in body and 'invalid_request' not in body
+
+
 def url_schemes() -> list[str]:
     raw = subprocess.run(['plutil', '-convert', 'xml1', '-o', '-', str(PLIST)],
                          capture_output=True).stdout
@@ -71,6 +112,21 @@ def main() -> int:
         line(OK if ext.get('anonymous_users') else BAD, 'Anonymous sign-in enabled')
     except (urllib.error.URLError, KeyError) as exc:
         line(BAD, 'could not reach Supabase', str(exc))
+
+    print('\nWeb redirect flow (used for every sign-in, because the app starts anonymous)')
+    base = cfg.get('SUPABASE_URL', '')
+    callback = f'{base}/auth/v1/callback'
+    g_cid = authorize_client_id(base, 'google')
+    line(OK if g_cid and g_cid == web else BAD, 'Google authorize client_id',
+         g_cid or 'no redirect')
+    a_cid = authorize_client_id(base, 'apple')
+    if not a_cid:
+        line(BAD, 'Apple authorize client_id', 'no redirect')
+    elif not apple_accepts(a_cid, callback):
+        line(BAD, f'Apple rejects client_id {a_cid}',
+             'put the Services ID first in Supabase > Apple > Client IDs')
+    else:
+        line(OK, 'Apple authorize client_id', a_cid)
 
     print('\nGoogle client ids')
     for label, val in [('web/server client id', web), ('iOS client id', ios)]:
