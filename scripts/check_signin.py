@@ -87,6 +87,48 @@ def apple_accepts(client_id: str, callback: str) -> bool:
     return 'Invalid client id' not in body and 'invalid_request' not in body
 
 
+def link_identity_probe(url: str, anon: str, provider: str) -> tuple[bool, str]:
+    """Run the exact call a sign-in press makes: anonymous user, then linkIdentity.
+
+    Every button in this app hits this path, because the app signs in
+    anonymously on first launch and then links the provider to that user. If
+    Supabase has manual linking switched off, this 404s and the app shows a
+    generic error with nothing in the logs.
+    """
+    import json as _json
+    req = urllib.request.Request(
+        f'{url}/auth/v1/signup', data=b'{}', method='POST',
+        headers={'apikey': anon, 'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=40) as r:
+            token = _json.load(r).get('access_token')
+    except urllib.error.HTTPError as exc:
+        return False, f'anonymous sign-up failed: {exc.code}'
+    if not token:
+        return False, 'anonymous sign-up returned no token'
+
+    target = (f'{url}/auth/v1/user/identities/authorize?provider={provider}'
+              '&redirect_to=io.supabase.icos%3A%2F%2Flogin-callback')
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *a, **k):
+            return None
+    opener = urllib.request.build_opener(NoRedirect)
+    req = urllib.request.Request(
+        target, headers={'apikey': anon, 'Authorization': f'Bearer {token}'})
+    try:
+        opener.open(req, timeout=40)
+        return True, 'unexpected 200'
+    except urllib.error.HTTPError as exc:
+        if exc.code in (301, 302, 303, 307, 308):
+            return True, 'redirects to the provider'
+        body = exc.read().decode('utf-8', 'replace')
+        try:
+            err = _json.loads(body)
+            return False, err.get('error_code') or err.get('msg') or body[:80]
+        except Exception:
+            return False, f'{exc.code}: {body[:80]}'
+
+
 def url_schemes() -> list[str]:
     raw = subprocess.run(['plutil', '-convert', 'xml1', '-o', '-', str(PLIST)],
                          capture_output=True).stdout
@@ -127,6 +169,18 @@ def main() -> int:
              'put the Services ID first in Supabase > Apple > Client IDs')
     else:
         line(OK, 'Apple authorize client_id', a_cid)
+
+    print('\nlinkIdentity, the call every sign-in press actually makes')
+    anon_key = cfg.get('SUPABASE_ANON_KEY', '')
+    for prov in ('google', 'apple'):
+        ok, detail = link_identity_probe(base, anon_key, prov)
+        if ok:
+            line(OK, f'{prov} linkIdentity', detail)
+        elif detail == 'manual_linking_disabled':
+            line(BAD, f'{prov} linkIdentity', 
+                 'manual linking is off in Supabase; every sign-in fails')
+        else:
+            line(BAD, f'{prov} linkIdentity', detail)
 
     print('\nGoogle client ids')
     for label, val in [('web/server client id', web), ('iOS client id', ios)]:

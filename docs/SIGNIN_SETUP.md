@@ -191,7 +191,23 @@ confusing bug report. Re-run the script and paste the new value.
 
 # Part 3: Finish
 
-## F1. Allowlist the redirect
+## F1. Enable manual linking
+
+Supabase dashboard > Authentication > Sign In / Providers, scroll to the bottom, and
+turn on **Manual Linking**. It is off by default.
+
+This one is not optional and not obvious. The app signs in anonymously on first launch,
+so pressing any sign-in button calls `linkIdentity` to attach the provider to that guest
+user and carry the progress across. With manual linking off, Supabase answers:
+
+```
+404 {"error_code":"manual_linking_disabled","msg":"Manual linking is disabled"}
+```
+
+The app catches it and shows "Something went wrong. Please try again." Every provider
+fails identically, which makes it look like the OAuth setup is wrong when it is fine.
+
+## F2. Allowlist the redirect
 
 Supabase > Authentication > URL Configuration > Redirect URLs, add:
 
@@ -203,7 +219,7 @@ The app signs in anonymously on first launch, so every sign-in press runs throug
 `linkIdentity`, which is a browser redirect. Without this the browser opens and
 dead-ends.
 
-## F2. Verify
+## F3. Verify
 
 ```bash
 python3 scripts/check_signin.py
@@ -211,7 +227,7 @@ python3 scripts/check_signin.py
 
 Everything should read `ok`. If it does not, it names what is missing.
 
-## F3. Rebuild
+## F4. Rebuild
 
 The iOS URL scheme is injected at build time from `GOOGLE_IOS_CLIENT_ID`, so the client
 id must be in place before you build. Both stores need a fresh build with a bumped
