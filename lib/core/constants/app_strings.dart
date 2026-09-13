@@ -29,6 +29,8 @@ abstract final class AppStrings {
   static const signInWithGoogle = 'Continue with Google';
   static const signInWithApple = 'Continue with Apple';
   static const signInWithEmail = 'Continue with Email';
+  static const signUpWithEmail = 'Sign up with Email';
+  static const alreadyHaveAccount = 'Already have an account? Sign in';
   static const continueAsGuest = 'Continue as Guest';
   static const linkAccountPrompt =
       'Create an account to save your progress and join groups';

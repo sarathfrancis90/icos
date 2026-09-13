@@ -36,10 +36,31 @@ class AuthFlowMessage extends _$AuthFlowMessage {
   void clear() => state = null;
 }
 
+/// One-shot signal that an asynchronous (deep-link) sign-in came back with
+/// "this identity already belongs to another account".
+///
+/// Kept separate from [AuthFlowMessage] because this one is not a message. It
+/// needs an action: offer to sign in to that account instead. The web redirect
+/// flow reports it through the auth error stream, long after the call that
+/// started it has returned, so there is no outcome to hand back.
+@riverpod
+class AuthIdentityConflict extends _$AuthIdentityConflict {
+  @override
+  OAuthKind? build() => null;
+
+  void show(OAuthKind? provider) => state = provider;
+
+  void clear() => state = null;
+}
+
 @riverpod
 class AuthNotifier extends _$AuthNotifier {
   StreamSubscription<AuthState>? _subscription;
   bool _googleInitialized = false;
+
+  /// Provider behind the redirect currently in flight. The auth error stream
+  /// does not say which provider failed, so remember it on the way out.
+  OAuthKind? _pendingRedirectProvider;
 
   @override
   AsyncValue<User?> build() {
@@ -63,6 +84,7 @@ class AuthNotifier extends _$AuthNotifier {
         user != null &&
         !user.isAnonymous) {
       // Deep-link linkIdentity completed for a former guest.
+      _pendingRedirectProvider = null;
       ref.read(authFlowMessageProvider.notifier).show(
             'Account linked. Your progress is saved.',
           );
@@ -71,12 +93,20 @@ class AuthNotifier extends _$AuthNotifier {
 
   void _onAuthError(Object error, StackTrace st) {
     AppLogger.warn('Auth stream error', error: error, st: st);
+    final provider = _pendingRedirectProvider;
+    _pendingRedirectProvider = null;
+
+    if (error is AuthException &&
+        AuthStrategy.isIdentityAlreadyExists(
+            code: error.code, message: error.message)) {
+      // Offer the way out rather than describing the problem.
+      ref.read(authIdentityConflictProvider.notifier).show(provider);
+      state = AsyncValue.data(SupabaseService.auth.currentUser);
+      return;
+    }
+
     final message = error is AuthException
-        ? (AuthStrategy.isIdentityAlreadyExists(
-                code: error.code, message: error.message)
-            ? 'That account is already linked to another player. '
-                'Sign in to it instead, or use a different provider.'
-            : AuthStrategy.friendlyMessage(error.message))
+        ? AuthStrategy.friendlyMessage(error.message)
         : AuthStrategy.friendlyMessage(error.toString());
     ref.read(authFlowMessageProvider.notifier).show(message);
     state = AsyncValue.data(SupabaseService.auth.currentUser);
@@ -185,6 +215,7 @@ class AuthNotifier extends _$AuthNotifier {
     try {
       switch (method) {
         case OAuthMethod.linkIdentityWeb:
+          _pendingRedirectProvider = provider;
           await SupabaseService.auth.linkIdentity(
             supabaseProvider,
             redirectTo: kAuthRedirectUri,
@@ -194,6 +225,7 @@ class AuthNotifier extends _$AuthNotifier {
           return AuthRedirected(provider: provider, linking: true);
 
         case OAuthMethod.webOAuth:
+          _pendingRedirectProvider = provider;
           await SupabaseService.auth.signInWithOAuth(
             supabaseProvider,
             redirectTo: kAuthRedirectUri,
