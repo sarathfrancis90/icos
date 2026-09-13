@@ -43,7 +43,7 @@ Done automatically via the App Store Connect API (`scripts/asc.py`):
 | Item | Value |
 |---|---|
 | App record | `Icos: Daily Path Puzzle`, bundle `com.icos.game`, SKU `icos-ios`, Apple ID `6810895361` |
-| Builds uploaded | 1.0 (1), (2) and (3), all processed. Build **3** (the line redesign) is attached to version 1.0 |
+| Builds uploaded | 1.0 (1) through (4), all processed. Build **4** is attached to version 1.0 and submitted for review on 2026-09-13 |
 | Category | Games / Puzzle (secondary: Board) |
 | Age rating | All content descriptors "None" (expect 4+) |
 | Name, subtitle, description, keywords, promo text | Uploaded (en-US) |
