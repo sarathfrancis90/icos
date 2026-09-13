@@ -28,8 +28,8 @@ class AuthScreen extends ConsumerWidget {
         ? 'Save your progress'
         : AppStrings.appName;
     final subtitle = hasSession && isGuest
-        ? 'Create an account to keep your streak and join groups. '
-              'Your guest progress comes with you.'
+        ? 'Create an account to keep your streak and join groups, or sign in '
+              'to one you already have. Your guest progress comes with you.'
         : AppStrings.appTagline;
 
     // Auth screens are always dark; pin the theme so the AppBar/text stay
@@ -174,16 +174,47 @@ class AuthScreen extends ConsumerWidget {
                     const SizedBox(height: AppSizes.sm),
                   ],
 
-                  // Email sign in
+                  // Email: creates an account, or signs in to an existing one.
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () => context.push('/auth/email'),
                       icon: const Icon(Icons.email_outlined),
-                      label: const Text(AppStrings.signInWithEmail),
+                      label: const Text(AppStrings.signUpWithEmail),
                     ),
                   ),
-                  const SizedBox(height: AppSizes.lg),
+                  const SizedBox(height: AppSizes.md),
+
+                  // Returning players had no way in: every route on this screen
+                  // read as "create an account", and the email form opened in
+                  // sign-up mode.
+                  Semantics(
+                    button: true,
+                    label: AppStrings.alreadyHaveAccount,
+                    child: TextButton(
+                      onPressed: () =>
+                          context.push('/auth/email?mode=signin'),
+                      child: Text.rich(
+                        TextSpan(
+                          text: 'Already have an account?  ',
+                          style: AppTheme.darkTheme.textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.textSecondaryDark),
+                          children: [
+                            TextSpan(
+                              text: AppStrings.signIn,
+                              style: AppTheme
+                                  .darkTheme.textTheme.bodyMedium
+                                  ?.copyWith(
+                                color: AppColors.purpleLight,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSizes.sm),
 
                   TextButton(
                     onPressed: () async {

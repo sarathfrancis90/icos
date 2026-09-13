@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:icos/core/theme/app_theme.dart';
 import 'package:icos/features/puzzle/domain/models/game_state.dart';
@@ -24,6 +25,21 @@ Widget buildTestWidget(
     child: MaterialApp(
       theme: theme ?? AppTheme.darkTheme,
       home: child,
+    ),
+  );
+}
+
+/// Wraps a router in the providers and theme, for screens that navigate.
+Widget buildTestWidgetWithRouter(
+  GoRouter router, {
+  List<Override>? overrides,
+  ThemeData? theme,
+}) {
+  return ProviderScope(
+    overrides: overrides ?? [],
+    child: MaterialApp.router(
+      theme: theme ?? AppTheme.darkTheme,
+      routerConfig: router,
     ),
   );
 }

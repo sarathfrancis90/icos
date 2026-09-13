@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,7 +8,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 
 /// Shows one-shot messages from [authFlowMessageProvider] (deep-link
-/// callbacks etc.) as SnackBars. Call from `build`.
+/// callbacks etc.) as SnackBars, and turns an identity conflict reported by
+/// the deep-link flow into the same "sign in instead" dialog the synchronous
+/// flows get. Call from `build`.
 void listenForAuthFlowMessages(BuildContext context, WidgetRef ref) {
   ref.listen<String?>(authFlowMessageProvider, (_, message) {
     if (message == null) return;
@@ -14,6 +18,22 @@ void listenForAuthFlowMessages(BuildContext context, WidgetRef ref) {
       SnackBar(content: Text(message)),
     );
     ref.read(authFlowMessageProvider.notifier).clear();
+  });
+
+  ref.listen<OAuthKind?>(authIdentityConflictProvider, (previous, provider) {
+    // The provider may legitimately be null (we could not tell which one it
+    // was), so fire on any transition into a set state.
+    if (previous == provider) return;
+    final conflict = ref.read(authIdentityConflictProvider);
+    if (previous != null && conflict == null) return;
+    ref.read(authIdentityConflictProvider.notifier).clear();
+    unawaited(_offerExistingAccount(
+      context,
+      ref,
+      email: null,
+      password: null,
+      provider: provider,
+    ));
   });
 }
 
@@ -110,7 +130,12 @@ Future<bool> _offerExistingAccount(
   required String? password,
   required OAuthKind? provider,
 }) async {
-  final label = email ?? (provider == null ? 'that account' : provider.name);
+  final label = email ??
+      switch (provider) {
+        OAuthKind.google => 'that Google account',
+        OAuthKind.apple => 'that Apple account',
+        null => 'that account',
+      };
   final proceed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
