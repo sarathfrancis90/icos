@@ -65,8 +65,8 @@ Future<void> main() async {
 
   // Notifications (local reminders + optional FCM); never throws.
   await NotificationService.initialize();
-  // Pre-load sound effects.
-  await AudioService.instance.initialize();
+  // Prepare sound effects in the background; startup never waits for audio.
+  unawaited(AudioService.instance.initialize());
 
   // Remove splash screen
   FlutterNativeSplash.remove();

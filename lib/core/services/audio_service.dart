@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 
 import 'app_logger.dart';
@@ -20,20 +22,31 @@ abstract interface class SoundPlayer {
   /// Loads [asset] (a path under `assets/`) once, at [volume].
   Future<void> load(String asset, double volume);
 
-  /// Plays the loaded sound from the start.
-  Future<void> play();
+  /// Plays the loaded sound from the start (restarting it if still playing).
+  Future<void> replay();
 
   Future<void> dispose();
 }
 
-/// [SoundPlayer] backed by audioplayers in low-latency mode.
-class AudioplayersSound implements SoundPlayer {
-  AudioplayersSound() : _player = AudioPlayer();
+/// The few engine calls a short sound needs. Deliberately has no `seek`: on
+/// Android a low-latency (SoundPool) player never reports seek completion, so
+/// `AudioPlayer.seek` would wait out its 30 s timeout and the sound would
+/// never play.
+abstract interface class ShortSoundEngine {
+  Future<void> prepare(String asset, double volume);
+  Future<void> stop();
+  Future<void> resume();
+  Future<void> dispose();
+}
+
+/// [ShortSoundEngine] backed by audioplayers in low-latency mode.
+class AudioplayersEngine implements ShortSoundEngine {
+  AudioplayersEngine() : _player = AudioPlayer();
 
   final AudioPlayer _player;
 
   @override
-  Future<void> load(String asset, double volume) async {
+  Future<void> prepare(String asset, double volume) async {
     await _player.setPlayerMode(PlayerMode.lowLatency);
     await _player.setReleaseMode(ReleaseMode.stop);
     await _player.setVolume(volume);
@@ -41,13 +54,36 @@ class AudioplayersSound implements SoundPlayer {
   }
 
   @override
-  Future<void> play() async {
-    await _player.seek(Duration.zero);
-    await _player.resume();
-  }
+  Future<void> stop() => _player.stop();
+
+  @override
+  Future<void> resume() => _player.resume();
 
   @override
   Future<void> dispose() => _player.dispose();
+}
+
+/// [SoundPlayer] over a [ShortSoundEngine]: replays by `stop()` then
+/// `resume()`, which restarts a short source from the start on iOS and
+/// Android without seeking.
+class AudioplayersSound implements SoundPlayer {
+  AudioplayersSound([ShortSoundEngine? engine])
+    : _engine = engine ?? AudioplayersEngine();
+
+  final ShortSoundEngine _engine;
+
+  @override
+  Future<void> load(String asset, double volume) =>
+      _engine.prepare(asset, volume);
+
+  @override
+  Future<void> replay() async {
+    await _engine.stop();
+    await _engine.resume();
+  }
+
+  @override
+  Future<void> dispose() => _engine.dispose();
 }
 
 /// Manages sound effects for game interactions.
@@ -75,8 +111,12 @@ class AudioService {
 
   /// Effects that loaded and can be played.
   final Map<SoundEffect, SoundPlayer> _players = {};
-  bool _initialized = false;
+  bool _started = false;
   bool _loggedFailure = false;
+  Future<void>? _preparing;
+
+  /// Completes when background preparation has finished (for tests).
+  Future<void> get ready => _preparing ?? Future<void>.value();
 
   /// Sound configuration: volume levels per effect.
   static const _volumes = {
@@ -104,32 +144,52 @@ class AudioService {
   /// All sound asset paths, relative to `assets/`.
   static Iterable<String> get assetPaths => _assets.values;
 
-  /// Pre-load all sound effects for instant playback.
+  /// Starts preparing the sound effects in the background and returns
+  /// immediately; never throws and never blocks startup. Does nothing while
+  /// the sound setting is off (preparation then happens on the first play
+  /// after it is switched on).
   Future<void> initialize() async {
-    if (_initialized) return;
-    _initialized = true;
+    if (_started || !_soundEnabled()) return;
+    _started = true;
+    _preparing = _prepareAll();
+  }
 
-    for (final effect in SoundEffect.values) {
-      final player = _playerFactory(_assets[effect]!);
+  Future<void> _prepareAll() async {
+    await Future.wait([
+      for (final effect in SoundEffect.values) _prepare(effect),
+    ]);
+  }
+
+  Future<void> _prepare(SoundEffect effect) async {
+    final asset = _assets[effect]!;
+    SoundPlayer? player;
+    try {
+      player = _playerFactory(asset);
+      await player
+          .load(asset, _volumes[effect] ?? 0.3)
+          .timeout(const Duration(seconds: 5));
+      _players[effect] = player;
+    } catch (e) {
+      _logOnce('sound could not be loaded', e);
       try {
-        await player.load(_assets[effect]!, _volumes[effect] ?? 0.3);
-        _players[effect] = player;
-      } catch (e) {
-        _logOnce('sound could not be loaded', e);
-        try {
-          await player.dispose();
-        } catch (_) {}
-      }
+        await player?.dispose();
+      } catch (_) {}
     }
   }
 
-  /// Play a sound effect if sound is enabled and it loaded.
+  /// Play a sound effect if sound is enabled and it is ready. A request that
+  /// arrives before preparation has finished is silently dropped (never
+  /// queued).
   Future<void> play(SoundEffect effect) async {
     if (!_soundEnabled()) return;
+    if (!_started) {
+      unawaited(initialize());
+      return;
+    }
     final player = _players[effect];
     if (player == null) return;
     try {
-      await player.play();
+      await player.replay();
     } catch (e) {
       _logOnce('sound playback failed', e);
     }
@@ -156,6 +216,7 @@ class AudioService {
       await player.dispose();
     }
     _players.clear();
-    _initialized = false;
+    _started = false;
+    _preparing = null;
   }
 }

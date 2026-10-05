@@ -229,7 +229,7 @@ class _OutlinedPillButton extends StatelessWidget {
                         ),
                       ),
                     ],
-                      ],
+                  ],
                 ),
               ),
             ),
