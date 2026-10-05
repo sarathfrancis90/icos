@@ -22,6 +22,7 @@ import {
   json,
   Logger,
 } from "../_shared/http.ts";
+import { blocksFromResult } from "./blocks.ts";
 
 const FN = "export-data";
 
@@ -68,6 +69,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (r.error) throw new Error(`export query failed: ${r.error.message}`);
     }
 
+    const blocksRes = await admin
+      .from("user_blocks")
+      .select("blocked_id, created_at")
+      .eq("blocker_id", user.id)
+      .order("created_at");
+    const blocked_users = blocksFromResult(blocksRes);
+
     const groups = (memberships.data ?? []).map((m) => {
       const row = m as unknown as {
         role: string;
@@ -94,6 +102,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       streak_freezes: freezes.data ?? [],
       groups,
       reports_filed: reports.data ?? [],
+      blocked_users,
     };
 
     lg.info("export produced", {
