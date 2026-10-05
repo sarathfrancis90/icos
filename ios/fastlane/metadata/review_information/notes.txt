@@ -1,0 +1,21 @@
+Icos - notes for App Review
+
+LOGIN
+No login is needed. The app starts in guest mode and the daily puzzle, practice and archive work immediately. Accounts are optional and are only needed for groups.
+
+USER-GENERATED CONTENT
+User-generated content is limited to display names, group names and the automatic group activity entries (for example "solved today's puzzle"). There is no free-text chat, no messaging and no image or photo upload.
+
+SAFEGUARDS (guideline 1.2)
+- Terms agreement: the sign-in and create-account screens show "By continuing, you agree to our Terms of Service and Privacy Policy" with links. The Terms (section 4A) state zero tolerance for objectionable content and abusive users.
+- Filtering: display names and group names go through a profanity filter, applied in the app and again on our server.
+- Report: Groups tab > open a group > Members tab > the three-dot menu on a member > "Report user". To report a group: open the group > the three-dot menu at the top right > "Report group".
+- Block: Groups tab > open a group > Members tab > the three-dot menu on a member > "Block user", then confirm. The blocked user's scores and activity disappear from your leaderboards and activity feed immediately. They are not told. Blocking also notifies us automatically. To manage or undo blocks: Profile tab > "Blocked users" > "Unblock".
+- Response: every report (including every block) is reviewed within 24 hours. Content that breaks the Terms is removed and the offending user is ejected from the app.
+- Contact: sarathfrancis90@gmail.com
+
+ACCOUNT DELETION
+Profile tab > "Delete Account". The account is scheduled for deletion and permanently removed after 30 days unless the user signs back in to cancel.
+
+HOW TO SEE GROUPS AS A REVIEWER
+Groups are available to accounts only. On the Groups tab tap "Create an account" (or Profile > "Create account"), sign up with any email address and password, then Groups > "Create Group". Use the invite code or QR code on the group screen to have a second account join it and try Report and Block between the two.
