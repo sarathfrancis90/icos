@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -17,6 +16,7 @@ import '../../../core/services/supabase_service.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
+import '../../../core/utils/share_utils.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../domain/account_deletion_copy.dart';
 import '../domain/models/profile.dart';
@@ -418,7 +418,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             onTap: () => context.push('/blocked-users'),
           ),
           const Divider(height: 1),
-          ListTile(
+          // Builder: the share sheet anchors to this row.
+          Builder(
+            builder: (rowContext) => ListTile(
             leading: const Icon(Icons.download_rounded),
             title: const Text('Export my data'),
             subtitle: const Text('Download a JSON copy of your data'),
@@ -432,7 +434,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     Icons.chevron_right_rounded,
                     color: AppColors.textTertiaryDark,
                   ),
-            onTap: _busy ? null : () => _exportData(context),
+            onTap: _busy ? null : () => _exportData(rowContext),
+          ),
           ),
           const Divider(height: 1),
           ListTile(
@@ -598,28 +601,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _exportData(BuildContext context) async {
+    // Captured before the awaits: the share sheet anchors to the tapped row.
+    final origin = sharePositionOriginFor(context);
     setState(() => _busy = true);
-    final result =
-        await ref.read(profileNotifierProvider.notifier).exportData();
+    final result = await ref
+        .read(profileNotifierProvider.notifier)
+        .exportAndShareData(origin: origin);
     if (!mounted) return;
     setState(() => _busy = false);
 
-    switch (result) {
-      case Success(data: final file):
-        try {
-          await Share.shareXFiles(
-            [XFile(file.path, mimeType: 'application/json')],
-            subject: 'My Icos data',
-            text: 'Your Icos data export',
-          );
-        } catch (e) {
-          AppLogger.warn('Share export failed', error: e);
-          if (context.mounted) {
-            _snack(context, 'Export saved to ${file.path}');
-          }
-        }
-      case Failure(error: final error):
-        if (context.mounted) _snack(context, error.userMessage);
+    if (result case Failure(error: final error)) {
+      if (context.mounted) _snack(context, error.userMessage);
     }
   }
 

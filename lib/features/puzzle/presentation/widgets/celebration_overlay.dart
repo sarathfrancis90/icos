@@ -10,6 +10,7 @@ import '../../../../core/services/analytics_service.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/utils/motion.dart';
+import '../../../../core/utils/share_utils.dart';
 import '../../../../shared/widgets/spring_button.dart';
 import '../../../sharing/domain/share_card_generator.dart';
 import '../../../sharing/presentation/share_card_widget.dart';
@@ -91,6 +92,8 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
   Future<void> _share() async {
     if (_sharing) return;
     setState(() => _sharing = true);
+    // iOS refuses to present the share sheet without an anchor rect.
+    final origin = sharePositionOriginFor(context);
     final underPar = widget.timeSeconds <= widget.parTimeSeconds;
     final text = ShareCardGenerator.buildShareText(
       timeSeconds: widget.timeSeconds,
@@ -109,9 +112,10 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
           [XFile.fromData(bytes, mimeType: 'image/png', name: name)],
           text: text,
           fileNameOverrides: [name],
+          sharePositionOrigin: origin,
         );
       } else {
-        await Share.share(text);
+        await Share.share(text, sharePositionOrigin: origin);
       }
       unawaited(
         AnalyticsService.logEvent(AnalyticsEvents.shareResult, {
@@ -122,7 +126,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
     } catch (e, st) {
       AppLogger.warn('share failed', error: e, st: st);
       try {
-        await Share.share(text);
+        await Share.share(text, sharePositionOrigin: origin);
       } catch (_) {}
     } finally {
       if (mounted) setState(() => _sharing = false);

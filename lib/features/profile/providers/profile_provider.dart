@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Rect;
 
 import 'package:flutter/material.dart' show TimeOfDay;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:share_plus/share_plus.dart' show XFile;
 
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/services/analytics_service.dart';
@@ -15,6 +17,7 @@ import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
+import '../../../core/utils/share_utils.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/profile_repository.dart';
 import '../domain/models/profile.dart';
@@ -25,6 +28,10 @@ part 'profile_provider.g.dart';
 ProfileRepository profileRepository(Ref ref) {
   return ProfileRepository();
 }
+
+/// Overridable in tests: how a file reaches the OS share sheet.
+@Riverpod(keepAlive: true)
+FileSharer fileSharer(Ref ref) => platformFileSharer;
 
 @riverpod
 Future<UserProfile?> profile(Ref ref) async {
@@ -323,6 +330,30 @@ class ProfileNotifier extends _$ProfileNotifier {
       await refresh();
     }
     return result;
+  }
+
+  /// Exports the user's data and presents the system share sheet for the
+  /// JSON file (so it can be saved to Files, AirDropped, mailed...), anchored
+  /// at [origin] (required by iOS for the share sheet).
+  Future<Result<void, AppError>> exportAndShareData({Rect? origin}) async {
+    final exported = await exportData();
+    switch (exported) {
+      case Failure(error: final e):
+        return Result.failure(e);
+      case Success(data: final file):
+        try {
+          await ref.read(fileSharerProvider)(
+            file: XFile(file.path, mimeType: 'application/json'),
+            subject: 'My Icos data',
+            text: 'Your Icos data export',
+            origin: origin,
+          );
+          return const Result.success(null);
+        } catch (e, st) {
+          AppLogger.warn('Sharing the export failed', error: e, st: st);
+          return Result.failure(AppError.unknown(e.toString()));
+        }
+    }
   }
 
   /// Downloads the user's data via the `export-data` edge function and

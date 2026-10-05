@@ -3,6 +3,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/services/analytics_service.dart';
 import '../../../../core/services/app_logger.dart';
+import '../../../../core/utils/share_utils.dart';
 import '../../../puzzle/data/submission_result.dart';
 import '../../../sharing/domain/share_card_generator.dart';
 import '../../../sharing/presentation/share_card_widget.dart';
@@ -19,6 +20,8 @@ Future<void> shareResultFromHome(
   required List<List<int>> walls,
   int? streak,
 }) async {
+  // iOS refuses to present the share sheet without an anchor rect.
+  final origin = sharePositionOriginFor(context);
   final underPar = result.timeSeconds <= parTimeSeconds;
   final text = ShareCardGenerator.buildShareText(
     timeSeconds: result.timeSeconds,
@@ -72,9 +75,10 @@ Future<void> shareResultFromHome(
         [XFile.fromData(bytes, mimeType: 'image/png', name: name)],
         text: text,
         fileNameOverrides: [name],
+        sharePositionOrigin: origin,
       );
     } else {
-      await Share.share(text);
+      await Share.share(text, sharePositionOrigin: origin);
     }
     await AnalyticsService.logEvent(AnalyticsEvents.shareResult, {
       'image': bytes != null,
@@ -83,7 +87,7 @@ Future<void> shareResultFromHome(
   } catch (e, st) {
     AppLogger.warn('share from home failed', error: e, st: st);
     try {
-      await Share.share(text);
+      await Share.share(text, sharePositionOrigin: origin);
     } catch (_) {}
   } finally {
     entry?.remove();
