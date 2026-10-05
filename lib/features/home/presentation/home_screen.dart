@@ -27,17 +27,25 @@ class HomeScreen extends ConsumerWidget {
     final streakAsync = ref.watch(streakProvider);
     final today = AppDateUtils.todayUtc();
 
-    // Unsolved on load → remind before midnight UTC (cancelled on solve).
-    ref.listen(todayResultProvider, (prev, next) {
-      if (next is AsyncData<SubmissionResult?> && next.value == null) {
-        final streak = ref.read(streakProvider).valueOrNull?.currentStreak ?? 0;
-        unawaited(
-          NotificationService.scheduleStreakReminder(
-            currentStreak: streak,
-          ).catchError((Object _) {}),
-        );
-      }
-    });
+    // Keep the streak reminder in step with today's (UTC) result and streak:
+    // armed only while unsolved with a streak, and only if the player has
+    // reminders on (the service enforces the opt-out and OS permission).
+    void syncStreakReminder() {
+      final today = ref.read(todayResultProvider);
+      if (today is! AsyncData<SubmissionResult?>) return;
+      final solved = today.value != null;
+      final streak = today.value?.streak?.currentStreak ??
+          ref.read(streakProvider).valueOrNull?.currentStreak;
+      unawaited(
+        NotificationService.refreshStreakReminder(
+          solvedToday: solved,
+          currentStreak: streak,
+        ).catchError((Object _) {}),
+      );
+    }
+
+    ref.listen(todayResultProvider, (_, _) => syncStreakReminder());
+    ref.listen(streakProvider, (_, _) => syncStreakReminder());
 
     final result = resultAsync.valueOrNull;
     final streak =

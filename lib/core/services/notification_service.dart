@@ -11,14 +11,18 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'analytics_service.dart';
 import 'app_logger.dart';
+import 'streak_reminder_schedule.dart';
 
 /// Local + push notifications.
 ///
 /// - Daily reminder: repeating local notification at a user-chosen local
 ///   time (default 09:00). Persisted in SharedPreferences.
-/// - Streak-at-risk: one-shot local notification at 20:00 local today, meant
-///   to be scheduled by the puzzle feature when today's puzzle is unsolved
-///   and cancelled once it is solved.
+/// - Streak-at-risk: one-shot local notification 4 hours before the next
+///   00:00 UTC (see [streakReminderFireTime]), scheduled only while today's
+///   puzzle is unsolved and the player has a streak; cancelled once solved.
+/// - Every scheduling path goes through [_mayNotify]: the in-app setting and
+///   the OS permission must both be on, otherwise pending notifications of
+///   that kind are cancelled instead.
 /// - FCM: subscribes to the `daily_puzzle` topic when Firebase is configured.
 abstract final class NotificationService {
   static const int dailyReminderId = 1;
@@ -29,27 +33,26 @@ abstract final class NotificationService {
   static const String _prefMinute = 'notif_daily_minute';
 
   static const TimeOfDay defaultReminderTime = TimeOfDay(hour: 9, minute: 0);
-  static const TimeOfDay streakReminderTime = TimeOfDay(hour: 20, minute: 0);
 
   static const String dailyPuzzleTopic = 'daily_puzzle';
 
   static const AndroidNotificationDetails _androidDaily =
       AndroidNotificationDetails(
-    'daily_reminder',
-    'Daily puzzle reminder',
-    channelDescription: 'Reminds you to play today\'s puzzle',
-    importance: Importance.defaultImportance,
-    priority: Priority.defaultPriority,
-  );
+        'daily_reminder',
+        'Daily puzzle reminder',
+        channelDescription: 'Reminds you to play today\'s puzzle',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      );
 
   static const AndroidNotificationDetails _androidStreak =
       AndroidNotificationDetails(
-    'streak_reminder',
-    'Streak at risk',
-    channelDescription: 'Warns you before your streak resets at midnight UTC',
-    importance: Importance.high,
-    priority: Priority.high,
-  );
+        'streak_reminder',
+        'Streak at risk',
+        channelDescription: 'Warns you before today\'s puzzle closes',
+        importance: Importance.high,
+        priority: Priority.high,
+      );
 
   static const DarwinNotificationDetails _darwin = DarwinNotificationDetails(
     presentAlert: true,
@@ -59,6 +62,23 @@ abstract final class NotificationService {
 
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+
+  /// Replaces the OS-facing plugin calls in tests.
+  @visibleForTesting
+  static NotificationBackend? backendOverride;
+
+  /// Replaces the device time zone in tests.
+  @visibleForTesting
+  static tz.Location? locationOverride;
+
+  static NotificationBackend get _backend =>
+      backendOverride ?? _PluginBackend(_plugin);
+
+  /// Replaces the clock in tests.
+  @visibleForTesting
+  static DateTime Function()? clockOverride;
+
+  static tz.Location get _location => locationOverride ?? tz.local;
 
   static bool _initialized = false;
   static bool _timezoneReady = false;
@@ -98,9 +118,7 @@ abstract final class NotificationService {
 
     // Re-arm the daily reminder in case the OS dropped it (reboot etc.).
     try {
-      if (await isEnabled()) {
-        await scheduleDailyReminder(await reminderTime());
-      }
+      await refreshDailyReminder();
     } catch (e, st) {
       AppLogger.warn('Re-scheduling daily reminder failed', error: e, st: st);
     }
@@ -109,7 +127,7 @@ abstract final class NotificationService {
   }
 
   static Future<void> _ensureTimezone() async {
-    if (_timezoneReady) return;
+    if (_timezoneReady || locationOverride != null) return;
     try {
       tzdata.initializeTimeZones();
       final info = await FlutterTimezone.getLocalTimezone();
@@ -129,7 +147,10 @@ abstract final class NotificationService {
     try {
       final messaging = FirebaseMessaging.instance;
       await messaging.subscribeToTopic(dailyPuzzleTopic);
-      AppLogger.info('Subscribed to FCM topic', data: {'topic': dailyPuzzleTopic});
+      AppLogger.info(
+        'Subscribed to FCM topic',
+        data: {'topic': dailyPuzzleTopic},
+      );
     } catch (e, st) {
       AppLogger.warn('FCM setup failed', error: e, st: st);
     }
@@ -141,22 +162,30 @@ abstract final class NotificationService {
     var granted = true;
     try {
       if (!kIsWeb && Platform.isIOS) {
-        final ios = _plugin.resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>();
-        granted = await ios?.requestPermissions(
+        final ios = _plugin
+            .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin
+            >();
+        granted =
+            await ios?.requestPermissions(
               alert: true,
               badge: true,
               sound: true,
             ) ??
             false;
       } else if (!kIsWeb && Platform.isAndroid) {
-        final android = _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+        final android = _plugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
         granted = await android?.requestNotificationsPermission() ?? true;
       }
     } catch (e, st) {
-      AppLogger.warn('Notification permission request failed',
-          error: e, st: st);
+      AppLogger.warn(
+        'Notification permission request failed',
+        error: e,
+        st: st,
+      );
       granted = false;
     }
 
@@ -190,32 +219,60 @@ abstract final class NotificationService {
     return TimeOfDay(hour: hour, minute: minute);
   }
 
-  /// Schedules (or re-schedules) the repeating daily reminder at [time]
-  /// (device local time) and persists the preference.
+  /// True only when the in-app notification setting is on AND the OS lets
+  /// the app notify. The one gate every scheduling path goes through.
+  static Future<bool> _mayNotify() async {
+    try {
+      return await isEnabled() && await _backend.hasPermission();
+    } catch (e) {
+      AppLogger.debug('Notification gate check failed', error: e);
+      return false;
+    }
+  }
+
+  /// Re-arms the daily reminder when allowed (setting on + OS permission),
+  /// otherwise cancels any pending one.
+  static Future<void> refreshDailyReminder() async {
+    if (!await _mayNotify()) {
+      await _cancelPending(dailyReminderId);
+      return;
+    }
+    await _scheduleDaily(await reminderTime());
+  }
+
+  /// Turns the daily reminder on at [time] (device local time) and persists
+  /// the preference. If the OS has notifications off, nothing is scheduled
+  /// and the preference stays off.
   static Future<void> scheduleDailyReminder(TimeOfDay time) async {
-    await _ensureTimezone();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_prefEnabled, true);
     await prefs.setInt(_prefHour, time.hour);
     await prefs.setInt(_prefMinute, time.minute);
+    await prefs.setBool(_prefEnabled, true);
+    if (!await _mayNotify()) {
+      await prefs.setBool(_prefEnabled, false);
+      await _cancelPending(dailyReminderId);
+      return;
+    }
+    await _scheduleDaily(time);
+  }
 
+  static Future<void> _scheduleDaily(TimeOfDay time) async {
+    await _ensureTimezone();
     try {
-      await _plugin.cancel(id: dailyReminderId);
-      await _plugin.zonedSchedule(
+      await _backend.cancel(dailyReminderId);
+      await _backend.schedule(
         id: dailyReminderId,
         title: 'Today\'s Icos is ready',
         body: 'A fresh path awaits. Keep your streak alive!',
-        scheduledDate: nextInstanceOf(time),
-        notificationDetails: const NotificationDetails(
-          android: _androidDaily,
-          iOS: _darwin,
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.time,
+        at: nextInstanceOf(time, now: tz.TZDateTime.now(_location)),
+        android: _androidDaily,
+        repeatsDaily: true,
         payload: 'daily',
       );
-      AppLogger.info('Daily reminder scheduled',
-          data: {'hour': time.hour, 'minute': time.minute});
+      AppLogger.info(
+        'Daily reminder scheduled',
+        data: {'hour': time.hour, 'minute': time.minute},
+      );
     } catch (e, st) {
       AppLogger.warn('Scheduling daily reminder failed', error: e, st: st);
     }
@@ -225,49 +282,60 @@ abstract final class NotificationService {
   static Future<void> cancelReminder() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefEnabled, false);
+    await _cancelPending(dailyReminderId);
+  }
+
+  static Future<void> _cancelPending(int id) async {
     try {
-      await _plugin.cancel(id: dailyReminderId);
+      await _backend.cancel(id);
     } catch (e) {
-      AppLogger.debug('Cancelling daily reminder failed', error: e);
+      AppLogger.debug('Cancelling notification $id failed', error: e);
     }
   }
 
   // ─── Streak at risk ─────────────────────────────────────────────────
 
-  /// Schedules a one-shot "streak at risk" notification at 20:00 local
-  /// today. No-op if that time has already passed. The puzzle feature should
-  /// call this when today's puzzle is unsolved and [cancelStreakReminder]
-  /// once it is solved.
-  static Future<void> scheduleStreakReminder({int currentStreak = 0}) async {
-    await _ensureTimezone();
-    final now = tz.TZDateTime.now(tz.local);
-    final at = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      streakReminderTime.hour,
-      streakReminderTime.minute,
-    );
-    if (!at.isAfter(now)) return;
+  /// Brings the streak reminder in line with the current state.
+  ///
+  /// Schedules it only when reminders are allowed (see [_mayNotify]), today's
+  /// UTC puzzle is unsolved ([solvedToday] false), the player has a streak of
+  /// at least 1 and the fire time ([streakReminderFireTime]) is still ahead.
+  /// In every other case any pending streak reminder is cancelled. A null
+  /// [currentStreak] means the streak is not known yet: nothing is scheduled,
+  /// but an opt-out still cancels.
+  static Future<void> refreshStreakReminder({
+    required bool solvedToday,
+    required int? currentStreak,
+    DateTime? nowUtc,
+  }) async {
+    if (!await _mayNotify() || solvedToday) {
+      await _cancelPending(streakReminderId);
+      return;
+    }
+    if (currentStreak == null) return;
+    if (currentStreak < 1) {
+      await _cancelPending(streakReminderId);
+      return;
+    }
 
-    final body = currentStreak > 0
-        ? 'You haven\'t solved today\'s puzzle yet. Your $currentStreak-day '
-            'streak resets at midnight UTC.'
-        : 'You haven\'t solved today\'s puzzle yet. Play before midnight UTC!';
+    await _ensureTimezone();
+    final now = (nowUtc ?? clockOverride?.call() ?? DateTime.now()).toUtc();
+    final at = streakReminderFireTime(nowUtc: now, location: _location);
+    if (at == null) {
+      await _cancelPending(streakReminderId);
+      return;
+    }
+    final hours = streakReminderHoursLeft(at, streakDeadlineUtc(now));
 
     try {
-      await _plugin.cancel(id: streakReminderId);
-      await _plugin.zonedSchedule(
+      await _backend.cancel(streakReminderId);
+      await _backend.schedule(
         id: streakReminderId,
-        title: 'Streak at risk',
-        body: body,
-        scheduledDate: at,
-        notificationDetails: const NotificationDetails(
-          android: _androidStreak,
-          iOS: _darwin,
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        title: 'Keep your streak alive',
+        body: streakReminderBody(hours),
+        at: at,
+        android: _androidStreak,
+        repeatsDaily: false,
         payload: 'streak',
       );
     } catch (e, st) {
@@ -275,13 +343,8 @@ abstract final class NotificationService {
     }
   }
 
-  static Future<void> cancelStreakReminder() async {
-    try {
-      await _plugin.cancel(id: streakReminderId);
-    } catch (e) {
-      AppLogger.debug('Cancelling streak reminder failed', error: e);
-    }
-  }
+  static Future<void> cancelStreakReminder() =>
+      _cancelPending(streakReminderId);
 
   /// Next occurrence of [time] in the local timezone (today if still ahead,
   /// otherwise tomorrow).
@@ -301,4 +364,76 @@ abstract final class NotificationService {
     }
     return scheduled;
   }
+}
+
+/// The OS-facing operations [NotificationService] needs, so the scheduling
+/// rules can be tested without a device.
+abstract interface class NotificationBackend {
+  /// Whether the OS currently lets the app show notifications.
+  Future<bool> hasPermission();
+
+  Future<void> schedule({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime at,
+    required AndroidNotificationDetails android,
+    required bool repeatsDaily,
+    required String payload,
+  });
+
+  Future<void> cancel(int id);
+}
+
+class _PluginBackend implements NotificationBackend {
+  const _PluginBackend(this._plugin);
+
+  final FlutterLocalNotificationsPlugin _plugin;
+
+  @override
+  Future<bool> hasPermission() async {
+    if (kIsWeb) return true;
+    if (Platform.isIOS) {
+      final ios = _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >();
+      final options = await ios?.checkPermissions();
+      return options?.isEnabled ?? false;
+    }
+    if (Platform.isAndroid) {
+      final android = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      return await android?.areNotificationsEnabled() ?? true;
+    }
+    return true;
+  }
+
+  @override
+  Future<void> schedule({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime at,
+    required AndroidNotificationDetails android,
+    required bool repeatsDaily,
+    required String payload,
+  }) => _plugin.zonedSchedule(
+    id: id,
+    title: title,
+    body: body,
+    scheduledDate: at,
+    notificationDetails: NotificationDetails(
+      android: android,
+      iOS: NotificationService._darwin,
+    ),
+    androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    matchDateTimeComponents: repeatsDaily ? DateTimeComponents.time : null,
+    payload: payload,
+  );
+
+  @override
+  Future<void> cancel(int id) => _plugin.cancel(id: id);
 }
