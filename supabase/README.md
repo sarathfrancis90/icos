@@ -153,8 +153,17 @@ Errors: 400 `INVALID_JSON|INVALID_INVITE_CODE`, 404 `GROUP_NOT_FOUND`, 409 `GROU
 | `decrement_group_member_count` | `p_group_id` | void (compat shim: resyncs the trigger-maintained count) |
 | `get_group_daily_leaderboard` | `p_group_id, p_puzzle_date` | `rank, user_id, display_name, avatar_url, time_seconds, hints_used, undos_used, completed, verified` |
 | `get_group_weekly_leaderboard` | `p_group_id, p_week_start` | `rank, user_id, display_name, avatar_url, completed_count, avg_time_seconds, total_hints` |
+| `block_user` | `p_user_id` | void. `22023` if null/self, `P0002` if no such profile. Idempotent; a new block also files a `reports` row (`reason = 'blocked_by_user'`) so the developer is notified |
+| `unblock_user` | `p_user_id` | void (idempotent) |
+| `list_blocked_users` | – | `user_id, display_name, blocked_at` (caller's blocks, newest first; `''` names show as `Anonymous`) |
+| `is_blocked_by_me` | `p_user_id` | boolean (STABLE helper used by the leaderboard RPCs and the `group_feed` policy) |
 | `request_account_deletion` / `cancel_account_deletion` | – | `profiles` row |
 | `sanitize_text` | `p_input` | text (also callable from clients for previews) |
+
+Blocking (`user_blocks`, RPC-only writes, SELECT policy for the blocker): the daily and weekly
+leaderboard RPCs drop rows for users the caller has blocked (ranks follow the filtered set) and the
+`group_feed` member SELECT policy hides entries authored by them. The blocked user is not told and
+still sees the blocker; group member lists are not filtered, so an admin can still remove the member.
 
 Errors raised by RPCs carry a machine-readable `HINT` (`NOT_ADMIN`, `NOT_A_MEMBER`,
 `PROFANITY`, `INVALID_LENGTH`, `ANONYMOUS_USER`, `GROUP_FULL`, …) and SQLSTATE

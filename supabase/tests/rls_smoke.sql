@@ -265,6 +265,137 @@ BEGIN
 END $$;
 
 -- ===========================================================================
+-- 9B. User blocking: hides the blocked user's leaderboard rows and feed
+--     entries from the blocker only; self-block rejected; repeat block is a
+--     no-op (one report); unblock restores; user_blocks is private.
+--     Fixtures added here are removed at the end of the section.
+-- ===========================================================================
+SELECT pg_temp.reset_role();
+INSERT INTO public.puzzle_attempts (user_id, puzzle_id, puzzle_date, time_seconds, hints_used, undos_used, completed, path, completed_at)
+VALUES ('22222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', current_date, 30, 0, 0, true, '[[0,0]]', now());
+INSERT INTO public.group_feed (group_id, user_id, puzzle_date, event)
+VALUES (current_setting('test.group_id')::uuid, '11111111-1111-1111-1111-111111111111', current_date, 'solved'),
+       (current_setting('test.group_id')::uuid, '22222222-2222-2222-2222-222222222222', current_date, 'solved');
+
+SELECT pg_temp.impersonate('11111111-1111-1111-1111-111111111111');
+DO $$
+DECLARE n int; r record; gid uuid := current_setting('test.group_id')::uuid;
+BEGIN
+  -- Before blocking: bob (30s) outranks alice (42s) and both feed rows are visible.
+  SELECT rank INTO n FROM public.get_group_daily_leaderboard(gid, current_date)
+   WHERE user_id = '11111111-1111-1111-1111-111111111111';
+  IF n <> 2 THEN RAISE EXCEPTION 'FAIL 9B-a: alice rank before block = %', n; END IF;
+  SELECT count(*) INTO n FROM public.group_feed WHERE group_id = gid;
+  IF n <> 2 THEN RAISE EXCEPTION 'FAIL 9B-b: alice sees % feed rows before block', n; END IF;
+
+  BEGIN
+    PERFORM public.block_user(auth.uid());
+    RAISE EXCEPTION 'FAIL 9B-c: self-block accepted';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+  BEGIN
+    PERFORM public.block_user(NULL);
+    RAISE EXCEPTION 'FAIL 9B-d: NULL block accepted';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+  BEGIN
+    PERFORM public.block_user('99999999-9999-9999-9999-999999999999');
+    RAISE EXCEPTION 'FAIL 9B-e: block of unknown user accepted';
+  EXCEPTION WHEN no_data_found THEN NULL;
+  END;
+
+  PERFORM public.block_user('22222222-2222-2222-2222-222222222222');
+  PERFORM public.block_user('22222222-2222-2222-2222-222222222222');   -- idempotent
+
+  SELECT count(*) INTO n FROM public.user_blocks;
+  IF n <> 1 THEN RAISE EXCEPTION 'FAIL 9B-f: % block rows after double block', n; END IF;
+  SELECT count(*) INTO n FROM public.reports
+   WHERE reporter_id = auth.uid() AND reported_user_id = '22222222-2222-2222-2222-222222222222'
+     AND reason = 'blocked_by_user';
+  IF n <> 1 THEN RAISE EXCEPTION 'FAIL 9B-g: % block reports (expected exactly 1)', n; END IF;
+
+  -- Bob is gone from alice's leaderboards and feed; ranks are recomputed.
+  SELECT count(*) INTO n FROM public.get_group_daily_leaderboard(gid, current_date)
+   WHERE user_id = '22222222-2222-2222-2222-222222222222';
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL 9B-h: blocked user still on daily leaderboard'; END IF;
+  SELECT rank INTO n FROM public.get_group_daily_leaderboard(gid, current_date)
+   WHERE user_id = '11111111-1111-1111-1111-111111111111';
+  IF n <> 1 THEN RAISE EXCEPTION 'FAIL 9B-i: alice rank after block = %', n; END IF;
+  SELECT count(*) INTO n FROM public.get_group_weekly_leaderboard(gid, date_trunc('week', current_date)::date)
+   WHERE user_id = '22222222-2222-2222-2222-222222222222';
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL 9B-j: blocked user still on weekly leaderboard'; END IF;
+  SELECT count(*) INTO n FROM public.group_feed WHERE group_id = gid AND user_id = '22222222-2222-2222-2222-222222222222';
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL 9B-k: blocked user still in feed'; END IF;
+  SELECT count(*) INTO n FROM public.group_feed WHERE group_id = gid AND user_id = auth.uid();
+  IF n <> 1 THEN RAISE EXCEPTION 'FAIL 9B-l: own feed row hidden'; END IF;
+
+  -- The member row stays so an admin can still remove the user.
+  SELECT count(*) INTO n FROM public.group_members WHERE group_id = gid;
+  IF n <> 2 THEN RAISE EXCEPTION 'FAIL 9B-m: member list shows % rows', n; END IF;
+
+  SELECT * INTO r FROM public.list_blocked_users();
+  IF r.user_id IS DISTINCT FROM '22222222-2222-2222-2222-222222222222' OR r.display_name <> 'Bob' THEN
+    RAISE EXCEPTION 'FAIL 9B-n: list_blocked_users row %', r;
+  END IF;
+
+  -- Direct writes are denied (RPC only).
+  BEGIN
+    INSERT INTO public.user_blocks (blocker_id, blocked_id)
+    VALUES (auth.uid(), '33333333-3333-3333-3333-333333333333');
+    RAISE EXCEPTION 'FAIL 9B-o: direct INSERT into user_blocks allowed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  RAISE NOTICE 'PASS 9B-1: block hides bob from alice; self/null/unknown rejected; repeat block is a no-op';
+END $$;
+
+-- The blocked user is not affected: bob still sees alice (and himself).
+SELECT pg_temp.impersonate('22222222-2222-2222-2222-222222222222');
+DO $$
+DECLARE n int; gid uuid := current_setting('test.group_id')::uuid;
+BEGIN
+  SELECT count(*) INTO n FROM public.get_group_daily_leaderboard(gid, current_date);
+  IF n <> 2 THEN RAISE EXCEPTION 'FAIL 9B-p: bob sees % leaderboard rows', n; END IF;
+  SELECT count(*) INTO n FROM public.group_feed WHERE group_id = gid;
+  IF n <> 2 THEN RAISE EXCEPTION 'FAIL 9B-q: bob sees % feed rows', n; END IF;
+  SELECT count(*) INTO n FROM public.user_blocks;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL 9B-r: bob can read alice''s blocks'; END IF;
+  RAISE NOTICE 'PASS 9B-2: blocked user still sees the blocker; blocks are private from bob';
+END $$;
+
+-- Carol (unrelated) cannot read alice's blocks.
+SELECT pg_temp.impersonate('33333333-3333-3333-3333-333333333333');
+DO $$
+DECLARE n int;
+BEGIN
+  SELECT count(*) INTO n FROM public.user_blocks;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL 9B-s: carol sees % user_blocks rows', n; END IF;
+  RAISE NOTICE 'PASS 9B-3: user_blocks private to the blocker';
+END $$;
+
+-- Unblock restores visibility; unblocking again is a no-op.
+SELECT pg_temp.impersonate('11111111-1111-1111-1111-111111111111');
+DO $$
+DECLARE n int; gid uuid := current_setting('test.group_id')::uuid;
+BEGIN
+  PERFORM public.unblock_user('22222222-2222-2222-2222-222222222222');
+  PERFORM public.unblock_user('22222222-2222-2222-2222-222222222222');
+  SELECT count(*) INTO n FROM public.get_group_daily_leaderboard(gid, current_date);
+  IF n <> 2 THEN RAISE EXCEPTION 'FAIL 9B-t: % leaderboard rows after unblock', n; END IF;
+  SELECT count(*) INTO n FROM public.group_feed WHERE group_id = gid;
+  IF n <> 2 THEN RAISE EXCEPTION 'FAIL 9B-u: % feed rows after unblock', n; END IF;
+  SELECT count(*) INTO n FROM public.list_blocked_users();
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL 9B-v: blocked list not empty after unblock'; END IF;
+  RAISE NOTICE 'PASS 9B-4: unblock restores visibility';
+END $$;
+
+-- Remove the section's fixtures so later sections see the original state.
+SELECT pg_temp.reset_role();
+DELETE FROM public.group_feed WHERE group_id = current_setting('test.group_id')::uuid;
+DELETE FROM public.reports WHERE reason = 'blocked_by_user';
+DELETE FROM public.puzzle_attempts
+ WHERE user_id = '22222222-2222-2222-2222-222222222222' AND puzzle_date = current_date;
+
+-- ===========================================================================
 -- 10. Streak machinery: record_solve, recompute, freezes.
 -- ===========================================================================
 SELECT pg_temp.reset_role();

@@ -109,6 +109,7 @@ Every feature under `lib/features/{feature}/` follows this structure:
 | puzzle_sessions / submission_log | 2026-09 | HMAC nonce per user/date; rate limiting |
 | streaks / streak_freezes | 3.5 | Recomputed by `recompute_streak(uid)` from attempts + freezes |
 | groups / group_members / group_feed | 4.1 | Groups, membership (count via trigger), realtime activity feed |
+| user_blocks | 2026-10 | Who blocked whom (RPC-only writes: `block_user`, `unblock_user`, `list_blocked_users`); hides the blocked user from the blocker's leaderboards and feed |
 | app_config | 2026-09 | Force-update / maintenance / store URLs |
 | reports / banned_words | 8.2 | Moderation reports, profanity list used by `contains_profanity()` |
 
