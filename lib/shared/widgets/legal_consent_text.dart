@@ -108,16 +108,31 @@ class _LegalConsentTextState extends State<LegalConsentText> {
     final local = paragraph.globalToLocal(event.position);
     const half = AppSizes.minTouchTarget / 2;
 
+    // On a link's own text the span's recognizer handles the tap; on any
+    // other text (the words of an adjacent line) nothing happens.
+    for (final link in _links) {
+      for (final box in paragraph.getBoxesForSelection(
+        TextSelection(baseOffset: link.start, extentOffset: link.end),
+      )) {
+        if (box.toRect().inflate(1).contains(local)) return;
+      }
+    }
+    final textLength = paragraph.text.toPlainText().length;
+    for (final box in paragraph.getBoxesForSelection(
+      TextSelection(baseOffset: 0, extentOffset: textLength),
+    )) {
+      if (box.toRect().contains(local)) return;
+    }
+
+    // Otherwise a tap just above or below a link, horizontally over it, opens
+    // it (the nearest, when bands overlap).
     _Link? best;
     var bestDistance = double.infinity;
     for (final link in _links) {
-      final boxes = paragraph.getBoxesForSelection(
+      for (final box in paragraph.getBoxesForSelection(
         TextSelection(baseOffset: link.start, extentOffset: link.end),
-      );
-      for (final box in boxes) {
+      )) {
         final rect = box.toRect();
-        // On the link's own text the span's recognizer handles the tap.
-        if (rect.inflate(1).contains(local)) return;
         final band = Rect.fromLTRB(
           rect.left,
           rect.center.dy - half,

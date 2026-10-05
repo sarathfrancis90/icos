@@ -114,6 +114,44 @@ void main() {
     }
   });
 
+  testWidgets('plain words are never a link tap, wherever they sit', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(393, 852);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final opened = <String>[];
+    await tester.pumpWidget(host(opened));
+    final p = paragraph(tester);
+    final text = p.text.toPlainText();
+    final origin = p.localToGlobal(Offset.zero);
+    // Every box of text outside the two links (prefix, " and ", ".").
+    final plain = <(int, int)>[
+      (0, text.indexOf(terms)),
+      (text.indexOf(terms) + terms.length, text.indexOf(privacy)),
+      (text.indexOf(privacy) + privacy.length, text.length),
+    ];
+    var sampled = 0;
+    for (final (start, end) in plain) {
+      for (final box in p.getBoxesForSelection(
+        TextSelection(baseOffset: start, extentOffset: end),
+      )) {
+        await tester.tapAt(box.toRect().center + origin);
+        sampled++;
+      }
+    }
+    await tester.pump(const Duration(seconds: 1));
+    expect(sampled, greaterThan(2));
+    expect(opened, isEmpty);
+
+    // ...but just above the first line's link (inside the 44dp band, over no
+    // text) it opens.
+    final rect = rectOf(tester, terms);
+    await tester.tapAt(Offset(rect.center.dx, rect.top - 8));
+    await tester.pump(const Duration(seconds: 1));
+    expect(opened, [kTermsUrl]);
+  });
+
   testWidgets('a tap on a link opens it exactly once', (tester) async {
     tester.view.physicalSize = const Size(393, 852);
     tester.view.devicePixelRatio = 1;
