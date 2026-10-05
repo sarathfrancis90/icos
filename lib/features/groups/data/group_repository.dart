@@ -1,11 +1,13 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../domain/invite_code.dart';
+import '../domain/models/blocked_user.dart';
 import '../domain/models/group.dart';
 import 'group_parsers.dart';
 
@@ -31,9 +33,22 @@ class GroupRepository {
   /// Default page size for the activity feed.
   static const defaultFeedLimit = 50;
 
-  SupabaseClient get _client => SupabaseService.client;
+  /// [client] and [userIdOverride] exist so tests can drive the repository
+  /// through an in-memory HTTP handler; production code uses the defaults.
+  GroupRepository({
+    @visibleForTesting SupabaseClient? client,
+    @visibleForTesting String? Function()? userIdOverride,
+  })  : _clientOverride = client,
+        _userIdOverride = userIdOverride;
 
-  String? get _userId => SupabaseService.auth.currentUser?.id;
+  final SupabaseClient? _clientOverride;
+  final String? Function()? _userIdOverride;
+
+  SupabaseClient get _client => _clientOverride ?? SupabaseService.client;
+
+  String? get _userId => _userIdOverride != null
+      ? _userIdOverride()
+      : SupabaseService.auth.currentUser?.id;
 
   // ─── Group lifecycle ───────────────────────────────────────────────
 
@@ -239,6 +254,28 @@ class GroupRepository {
           .order('created_at', ascending: false)
           .limit(limit);
       return GroupParsers.parseFeed(rows);
+    });
+  }
+
+  // ─── Blocking ──────────────────────────────────────────────────────
+
+  /// Blocks [userId] via the `block_user` RPC. Their scores and activity are
+  /// hidden from the caller server-side; the developer is notified through a
+  /// `reports` row the RPC files.
+  Future<Result<void, AppError>> blockUser(String userId) {
+    return _guard(() => _rpcVoid('block_user', {'p_user_id': userId}));
+  }
+
+  Future<Result<void, AppError>> unblockUser(String userId) {
+    return _guard(() => _rpcVoid('unblock_user', {'p_user_id': userId}));
+  }
+
+  /// The caller's blocked users, newest first (`list_blocked_users`).
+  Future<Result<List<BlockedUser>, AppError>> listBlockedUsers() {
+    return _guard(() async {
+      if (_userId == null) return const <BlockedUser>[];
+      final response = await _client.rpc<dynamic>('list_blocked_users');
+      return GroupParsers.asRows(response).map(BlockedUser.fromJson).toList();
     });
   }
 
