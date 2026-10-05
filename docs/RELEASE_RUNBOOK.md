@@ -66,11 +66,13 @@ Answer exactly this (it matches `ios/Runner/PrivacyInfo.xcprivacy` and the priva
 | Data type | Collected | Linked to identity | Tracking | Purpose |
 |---|---|---|---|---|
 | Contact Info > Email Address | Yes (optional sign-up) | Yes | No | App Functionality |
-| User Content > Other User Content (display name, group names) | Yes | Yes | No | App Functionality |
+| Contact Info > Name (display name) | Yes | Yes | No | App Functionality |
+| User Content > Other User Content (group names) | Yes | Yes | No | App Functionality |
 | Identifiers > User ID | Yes | Yes | No | App Functionality |
 | Usage Data > Product Interaction | Yes | No | No | Analytics |
 | Diagnostics > Crash Data | Yes | No | No | App Functionality |
 | Diagnostics > Performance Data | Yes | No | No | App Functionality |
+| Identifiers > Device ID (Firebase Cloud Messaging registration, only when Firebase is configured) | Yes | No | No | App Functionality |
 
 Everything else: **not collected**. "Do you or your third-party partners use data for
 tracking?" -> **No**.
