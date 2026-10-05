@@ -20,6 +20,10 @@ abstract final class AppStrings {
       "Offline puzzle. This one is just for practice and won't count toward "
       'your streak.';
 
+  // Stats
+  static const statsShowingSaved = 'Showing saved stats';
+  static const statsLoadFailed = 'Failed to load stats. Pull down to retry.';
+
   // Difficulty
   static const difficultyEasy = 'Easy';
   static const difficultyMedium = 'Medium';

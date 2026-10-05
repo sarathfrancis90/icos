@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../practice/providers/practice_provider.dart';
@@ -34,6 +35,9 @@ class StatsScreen extends ConsumerWidget {
           ]);
         },
         child: ListView(
+          // Always scrollable so pull-to-refresh works on short content such
+          // as the error state.
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsetsDirectional.all(AppSizes.lg),
           children: [
             Text(
@@ -51,11 +55,16 @@ class StatsScreen extends ConsumerWidget {
                 builder: (context) => Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildOverviewSection(context, overviewAsync),
+                    _buildOverviewSection(context, ref, overviewAsync),
                     const SizedBox(height: AppSizes.sm),
                     _PracticeStatsCard(stats: practiceStats),
                     const SizedBox(height: AppSizes.lg),
-                    _buildCalendarSection(context, overviewAsync, historyAsync),
+                    _buildCalendarSection(
+                      context,
+                      overviewAsync,
+                      historyAsync,
+                      ref,
+                    ),
                     const SizedBox(height: AppSizes.lg),
                     _buildTimeDistribution(context, historyAsync),
                   ],
@@ -71,11 +80,26 @@ class StatsScreen extends ConsumerWidget {
 
   Widget _buildOverviewSection(
     BuildContext context,
+    WidgetRef ref,
     AsyncValue<StatsOverview> overviewAsync,
   ) {
     return switch (overviewAsync) {
-      AsyncData(:final value) => _StatsOverviewCards(overview: value),
-      AsyncError(:final error) => _ErrorCard(message: error.toString()),
+      AsyncData(:final value) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (value.fromCache) ...[
+            const _SavedStatsNote(),
+            const SizedBox(height: AppSizes.sm),
+          ],
+          _StatsOverviewCards(overview: value),
+        ],
+      ),
+      AsyncError() => _ErrorCard(
+        onRetry: () {
+          ref.invalidate(statsOverviewProvider);
+          ref.invalidate(solveHistoryProvider);
+        },
+      ),
       _ => const _LoadingCards(),
     };
   }
@@ -84,6 +108,7 @@ class StatsScreen extends ConsumerWidget {
     BuildContext context,
     AsyncValue<StatsOverview> overviewAsync,
     AsyncValue<List<SolveHistory>> historyAsync,
+    WidgetRef ref,
   ) {
     final currentStreak = switch (overviewAsync) {
       AsyncData(:final value) => value.currentStreak,
@@ -105,7 +130,11 @@ class StatsScreen extends ConsumerWidget {
           currentStreak: currentStreak,
         ),
       ),
-      AsyncError(:final error) => _ErrorCard(message: error.toString()),
+      // The overview card already shows the error + retry.
+      AsyncError() when overviewAsync.hasError => const SizedBox.shrink(),
+      AsyncError() => _ErrorCard(
+        onRetry: () => ref.invalidate(solveHistoryProvider),
+      ),
       _ => Container(
         decoration: BoxDecoration(
           color: AppColors.cardSurface,
@@ -168,7 +197,10 @@ class _StatsOverviewCards extends StatelessWidget {
                     ? AppDateUtils.formatTime(overview.averageTimeSeconds)
                     : '--:--',
                 icon: Icons.timer_rounded,
-                gradientColors: const [AppColors.purpleLight, AppColors.purpleDeep],
+                gradientColors: const [
+                  AppColors.purpleLight,
+                  AppColors.purpleDeep,
+                ],
               ),
             ),
           ],
@@ -178,7 +210,10 @@ class _StatsOverviewCards extends StatelessWidget {
           label: 'Streak Freeze',
           value: freezeStatus,
           icon: Icons.ac_unit_rounded,
-          gradientColors: const [AppColors.electricBlue, AppColors.electricBlueDim],
+          gradientColors: const [
+            AppColors.electricBlue,
+            AppColors.electricBlueDim,
+          ],
         ),
       ],
     );
@@ -388,10 +423,40 @@ class _LoadingCards extends StatelessWidget {
   }
 }
 
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message});
+class _SavedStatsNote extends StatelessWidget {
+  const _SavedStatsNote();
 
-  final String message;
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: AppStrings.statsShowingSaved,
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 16,
+              color: AppColors.textSecondaryDark,
+            ),
+            const SizedBox(width: AppSizes.xs),
+            Flexible(
+              child: Text(
+                AppStrings.statsShowingSaved,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.onRetry});
+
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -402,14 +467,28 @@ class _ErrorCard extends StatelessWidget {
         border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsetsDirectional.all(AppSizes.md),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(Icons.error_outline_rounded, color: AppColors.error),
-          const SizedBox(width: AppSizes.sm),
-          Expanded(
-            child: Text(
-              'Failed to load stats. Pull down to retry.',
-              style: Theme.of(context).textTheme.bodyMedium,
+          Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: AppColors.error),
+              const SizedBox(width: AppSizes.sm),
+              Expanded(
+                child: Text(
+                  AppStrings.statsLoadFailed,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.sm),
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton(
+              style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
+              onPressed: onRetry,
+              child: const Text(AppStrings.retry),
             ),
           ),
         ],

@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../data/stats_repository.dart';
 import '../domain/models/streak.dart';
@@ -37,16 +39,14 @@ Future<Streak> streak(Ref ref) async {
 Future<List<SolveHistory>> solveHistory(Ref ref) async {
   final userId = SupabaseService.auth.currentUser?.id;
   if (userId == null) return [];
-
-  final repo = ref.read(statsRepositoryProvider);
-  final result = await repo.getSolveHistory(userId);
-  return switch (result) {
-    Success(:final data) => data,
-    Failure() => [],
-  };
+  return loadSolveHistory(ref.read(statsRepositoryProvider), userId);
 }
 
 /// Aggregated stats overview combining streak, total solved, and average time.
+///
+/// A backend failure never becomes zeros: it falls back to the last good copy
+/// (flagged [StatsOverview.fromCache]) or, with no copy, throws so the screen
+/// shows its error + retry state.
 @riverpod
 Future<StatsOverview> statsOverview(Ref ref) async {
   final userId = SupabaseService.auth.currentUser?.id;
@@ -60,47 +60,86 @@ Future<StatsOverview> statsOverview(Ref ref) async {
       lastFreezeUsedAt: null,
     );
   }
+  return loadStatsOverview(ref.read(statsRepositoryProvider), userId);
+}
 
-  final repo = ref.read(statsRepositoryProvider);
+/// Fetches the overview; caches it on success, serves the cache on failure.
+Future<StatsOverview> loadStatsOverview(
+  StatsRepository repo,
+  String userId,
+) async {
+  final results = await Future.wait<Object>([
+    repo.getStreak(userId),
+    repo.getTotalSolved(userId),
+    repo.getAverageTime(userId),
+  ]);
+  final streakResult = results[0] as Result<Streak, AppError>;
+  final totalResult = results[1] as Result<int, AppError>;
+  final avgResult = results[2] as Result<int, AppError>;
 
-  // Fetch all stats concurrently.
-  final streakFuture = repo.getStreak(userId);
-  final totalFuture = repo.getTotalSolved(userId);
-  final avgFuture = repo.getAverageTime(userId);
+  if (streakResult case Success(data: final streak)) {
+    if (totalResult case Success(data: final total)) {
+      if (avgResult case Success(data: final avg)) {
+        final fresh = StatsOverview(
+          currentStreak: streak.currentStreak,
+          longestStreak: streak.longestStreak,
+          totalSolved: total,
+          averageTimeSeconds: avg,
+          freezeCount: streak.freezeCount,
+          lastFreezeUsedAt: streak.lastFreezeUsedAt,
+        );
+        await StorageService.saveStatsCache(
+          'overview',
+          fresh.toJson(),
+          userId: userId,
+        );
+        return fresh;
+      }
+    }
+  }
 
-  final streakResult = await streakFuture;
-  final totalResult = await totalFuture;
-  final avgResult = await avgFuture;
-
-  // Gracefully handle failures for new users with no data
-  final streak = switch (streakResult) {
-    Success(:final data) => data,
-    Failure() => Streak(
-        userId: userId,
-        currentStreak: 0,
-        longestStreak: 0,
-        freezeCount: 1,
-      ),
+  final cached = StorageService.getStatsCache('overview', userId: userId);
+  if (cached != null) {
+    final overview = StatsOverview.tryFromJson(cached);
+    if (overview != null) return overview.copyAsCached();
+  }
+  final error = switch ((streakResult, totalResult, avgResult)) {
+    (Failure(:final error), _, _) => error,
+    (_, Failure(:final error), _) => error,
+    (_, _, Failure(:final error)) => error,
+    _ => const AppError.unknown('Stats unavailable'),
   };
+  throw error;
+}
 
-  final totalSolved = switch (totalResult) {
-    Success(:final data) => data,
-    Failure() => 0,
-  };
-
-  final avgTime = switch (avgResult) {
-    Success(:final data) => data,
-    Failure() => 0,
-  };
-
-  return StatsOverview(
-    currentStreak: streak.currentStreak,
-    longestStreak: streak.longestStreak,
-    totalSolved: totalSolved,
-    averageTimeSeconds: avgTime,
-    freezeCount: streak.freezeCount,
-    lastFreezeUsedAt: streak.lastFreezeUsedAt,
-  );
+/// Fetches recent solves; caches on success, serves the cache on failure and
+/// throws when there is no cached copy.
+Future<List<SolveHistory>> loadSolveHistory(
+  StatsRepository repo,
+  String userId,
+) async {
+  final result = await repo.getSolveHistory(userId);
+  switch (result) {
+    case Success(:final data):
+      await StorageService.saveStatsCache('history', {
+        'items': data.map((h) => h.toJson()).toList(),
+      }, userId: userId);
+      return data;
+    case Failure(:final error):
+      final cached = StorageService.getStatsCache('history', userId: userId);
+      final items = cached?['items'];
+      if (items is List) {
+        try {
+          return [
+            for (final row in items)
+              SolveHistory.fromJson(Map<String, dynamic>.from(row as Map)),
+          ];
+        } catch (_) {
+          // Corrupt cache: treat as missing.
+        }
+      }
+      throw error;
+  }
 }
 
 /// Simple data class for aggregated stats.
@@ -112,7 +151,45 @@ class StatsOverview {
     required this.averageTimeSeconds,
     required this.freezeCount,
     required this.lastFreezeUsedAt,
+    this.fromCache = false,
   });
+
+  /// True when the backend was unreachable and this is the last saved copy.
+  final bool fromCache;
+
+  StatsOverview copyAsCached() => StatsOverview(
+    currentStreak: currentStreak,
+    longestStreak: longestStreak,
+    totalSolved: totalSolved,
+    averageTimeSeconds: averageTimeSeconds,
+    freezeCount: freezeCount,
+    lastFreezeUsedAt: lastFreezeUsedAt,
+    fromCache: true,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'currentStreak': currentStreak,
+    'longestStreak': longestStreak,
+    'totalSolved': totalSolved,
+    'averageTimeSeconds': averageTimeSeconds,
+    'freezeCount': freezeCount,
+    'lastFreezeUsedAt': lastFreezeUsedAt,
+  };
+
+  static StatsOverview? tryFromJson(Map<String, dynamic> json) {
+    try {
+      return StatsOverview(
+        currentStreak: json['currentStreak'] as int,
+        longestStreak: json['longestStreak'] as int,
+        totalSolved: json['totalSolved'] as int,
+        averageTimeSeconds: json['averageTimeSeconds'] as int,
+        freezeCount: json['freezeCount'] as int,
+        lastFreezeUsedAt: json['lastFreezeUsedAt'] as String?,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
   final int currentStreak;
   final int longestStreak;

@@ -390,6 +390,28 @@ abstract final class StorageService {
         jsonEncode(result),
       );
 
+  // Last successfully fetched server stats (per player), shown when the
+  // backend is unreachable. [name] is e.g. `overview` or `history`.
+  static Map<String, dynamic>? getStatsCache(String name, {String? userId}) {
+    final data = _prefs.getString('${_prefixFor(userId)}stats_cache_$name');
+    if (data == null) return null;
+    try {
+      return jsonDecode(data) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> saveStatsCache(
+    String name,
+    Map<String, dynamic> value, {
+    String? userId,
+  }) =>
+      _prefs.setString(
+        '${_prefixFor(userId)}stats_cache_$name',
+        jsonEncode(value),
+      );
+
   // Practice stats
   static Map<String, dynamic> get practiceStats {
     final data = _prefs.getString('${_prefix}practice_stats');
