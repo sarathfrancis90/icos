@@ -164,16 +164,22 @@ abstract final class AuthStrategy {
   }) {
     final c = (code ?? '').toLowerCase();
     final m = (message ?? '').toLowerCase();
+    // The per-email send limit ("For security purposes, you can only request
+    // this after N seconds") only trips for an address that really got a mail,
+    // so reporting it differently would reveal that the account exists. It
+    // gets the same neutral confirmation. Only request/IP-wide limits are
+    // shown as "try again later".
     if (c == 'user_not_found' ||
+        c == 'over_email_send_rate_limit' ||
         m.contains('user not found') ||
-        m.contains('unable to validate email')) {
+        m.contains('unable to validate email') ||
+        m.contains('security purposes')) {
       return PasswordResetFailure.unknownEmail;
     }
     if (c.contains('rate_limit') ||
         statusCode == '429' ||
         m.contains('rate limit') ||
-        m.contains('too many') ||
-        m.contains('security purposes')) {
+        m.contains('too many')) {
       return PasswordResetFailure.rateLimited;
     }
     if (m.contains('network') ||

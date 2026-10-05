@@ -64,8 +64,26 @@ void main() {
         AuthStrategy.classifyPasswordReset(message: 'User not found'),
         PasswordResetFailure.unknownEmail,
       );
+      // Per-email limit: neutral, or asking twice reveals the account.
       expect(
         AuthStrategy.classifyPasswordReset(code: 'over_email_send_rate_limit'),
+        PasswordResetFailure.unknownEmail,
+      );
+      expect(
+        AuthStrategy.classifyPasswordReset(
+          statusCode: '429',
+          message:
+              'For security purposes, you can only request this after 43 seconds.',
+        ),
+        PasswordResetFailure.unknownEmail,
+      );
+      // Request / IP-wide limit: genuinely retry later.
+      expect(
+        AuthStrategy.classifyPasswordReset(code: 'over_request_rate_limit'),
+        PasswordResetFailure.rateLimited,
+      );
+      expect(
+        AuthStrategy.classifyPasswordReset(message: 'Request rate limit reached'),
         PasswordResetFailure.rateLimited,
       );
       expect(
