@@ -64,6 +64,14 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   /// the grid under the player's finger; the next visit picks it up.
   Puzzle? _pinnedPuzzle;
 
+  late final ProviderContainer _container;
+
+  @override
+  void initState() {
+    super.initState();
+    _container = ProviderScope.containerOf(context, listen: false);
+  }
+
   PuzzleSource get source => widget.source;
 
   AutoDisposeFutureProvider<Puzzle> get _puzzleProvider => switch (source) {
@@ -77,9 +85,11 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
 
   @override
   void dispose() {
-    // Timer stops while the screen is away; startGame resumes it.
-    if (ref.exists(gameNotifierProvider(source))) {
-      ref.read(gameNotifierProvider(source).notifier).pauseTimer();
+    // Timer stops while the screen is away; startGame resumes it. `ref` is
+    // already unusable here (the element is unmounted), so go through the
+    // container captured in initState.
+    if (_container.exists(gameNotifierProvider(source))) {
+      _container.read(gameNotifierProvider(source).notifier).pauseTimer();
     }
     super.dispose();
   }
@@ -235,6 +245,22 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
         _adoptResult(puzzle, result);
       });
     }
+
+    // The kept-alive game was reset underneath this screen (e.g. the signed-in
+    // user changed): start it again for the same puzzle instead of waiting on
+    // a spinner for a start that was already scheduled once.
+    ref.listen(gameNotifierProvider(source), (prev, next) {
+      final pinned = _pinnedPuzzle;
+      if (prev == null || next != null || pinned == null) return;
+      _startScheduled = false;
+      _scoreSubmitted = false;
+      _postSolvePromptsShown = false;
+      _showCelebration = false;
+      _scheduleStart(
+        pinned,
+        date == null ? null : ref.read(puzzleResultProvider(date)).valueOrNull,
+      );
+    });
 
     ref.listen(hintUiProvider(source), (prev, next) {
       if (next.wrongCell != null && prev?.wrongCell != next.wrongCell) {

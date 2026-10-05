@@ -26,13 +26,16 @@ class ScoreSubmitter extends _$ScoreSubmitter {
   AsyncValue<bool> build() => const AsyncValue.data(false);
 
   Future<void> submitScore(GameState gameState, PuzzleSource source) async {
+    // Whoever solved owns the result, even if the user changes mid-way.
+    final userId = StorageService.activeUserId;
     if (gameState.puzzle.origin == PuzzleOrigin.bundled) {
-      await _recordBundledSolve(gameState, source);
+      await _recordBundledSolve(gameState, source, userId);
       return;
     }
 
     // Already recorded (screen rebuilt, keepAlive state re-attached, …).
-    if (StorageService.getSubmissionResult(source.storageKey) != null) {
+    if (StorageService.getSubmissionResult(source.storageKey, userId: userId) !=
+        null) {
       state = const AsyncValue.data(true);
       return;
     }
@@ -56,6 +59,7 @@ class ScoreSubmitter extends _$ScoreSubmitter {
               path: path,
               completedAt: now,
             ).toJson(),
+            userId: userId,
           );
           await ref.read(practiceStatsNotifierProvider.notifier).recordSolve(
                 size: source.size,
@@ -64,7 +68,7 @@ class ScoreSubmitter extends _$ScoreSubmitter {
         case DailyPuzzleSource():
         case ArchivePuzzleSource():
           final inWindow = AppDateUtils.daysAgo(date!) <= submitWindowDays;
-          final nonce = StorageService.getSessionNonce(date);
+          final nonce = StorageService.getSessionNonce(date, userId: userId);
           final signature = nonce == null
               ? null
               : computeScoreSignature(
@@ -89,6 +93,7 @@ class ScoreSubmitter extends _$ScoreSubmitter {
               completedAt: now,
               isArchive: source.isArchive,
             ).toJson(),
+            userId: userId,
           );
           if (inWindow) {
             await ref.read(syncNotifierProvider.notifier).queueScoreSubmission(
@@ -98,6 +103,7 @@ class ScoreSubmitter extends _$ScoreSubmitter {
                   undosUsed: gameState.undosUsed,
                   path: path,
                   signature: signature,
+                  userId: userId,
                 );
           } else {
             AppLogger.info(
@@ -107,8 +113,8 @@ class ScoreSubmitter extends _$ScoreSubmitter {
           }
       }
 
-      await StorageService.incrementSolveCount();
-      await StorageService.clearGameState(source.storageKey);
+      await StorageService.incrementSolveCount(userId: userId);
+      await StorageService.clearGameState(source.storageKey, userId: userId);
       ref.read(submissionResultsVersionProvider.notifier).bump();
       state = const AsyncValue.data(true);
     } catch (e, st) {
@@ -123,6 +129,7 @@ class ScoreSubmitter extends _$ScoreSubmitter {
   Future<void> _recordBundledSolve(
     GameState gameState,
     PuzzleSource source,
+    String? userId,
   ) async {
     state = const AsyncValue.loading();
     try {
@@ -139,8 +146,12 @@ class ScoreSubmitter extends _$ScoreSubmitter {
           completedAt: DateTime.now().toUtc(),
           isArchive: source.isArchive,
         ).toJson(),
+        userId: userId,
       );
-      await StorageService.clearGameState('bundled_${source.storageKey}');
+      await StorageService.clearGameState(
+        'bundled_${source.storageKey}',
+        userId: userId,
+      );
       state = const AsyncValue.data(true);
     } catch (e, st) {
       AppLogger.error('bundled solve record failed', error: e, st: st);

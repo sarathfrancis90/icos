@@ -125,4 +125,66 @@ void main() {
     expect(after, isNotNull);
     expect(after!.path, before.path);
   });
+
+  test('A to B resets before the switch I/O: a timer tick cannot save A\'s '
+      'game under B', () async {
+    playOneMove();
+    final before = container.read(gameNotifierProvider(source))!;
+    expect(before.path, isNotEmpty);
+
+    // main()'s listener switches the scope first; the keeper then runs.
+    await StorageService.setActiveUser('user-b');
+    events.add(_event(AuthChangeEvent.signedIn, 'user-b'));
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(StorageService.getGameState(date), isNull);
+  });
+
+  group('with no session at first', () {
+    setUp(() async {
+      // Replace the signed-in setup: the device has no session yet.
+      container.dispose();
+      await StorageService.setActiveUser(null);
+      container = ProviderContainer(
+        overrides: [
+          authStateChangesProvider.overrideWith((ref) => events.stream),
+          authSessionProvider.overrideWithValue(
+            const FakeAuthSessionInfo(userId: null, hasSession: false),
+          ),
+          edgeInvokerProvider.overrideWithValue(
+            (fn, body) async => const EdgeResponse(200, {'nonce': 'n'}),
+          ),
+          connectivityNotifierProvider.overrideWith(_Online.new),
+          sessionEnsurerProvider.overrideWithValue(
+            SessionEnsurer(gateway: _SignedIn()),
+          ),
+        ],
+      );
+      container.read(userScopeKeeperProvider);
+    });
+
+    test('the first user is not an account switch: the open game keeps '
+        'going and auto-saves under that user', () async {
+      playOneMove();
+      expect(StorageService.getGameState(date), isNotNull); // under u.none.
+      final before = container.read(gameNotifierProvider(source))!;
+
+      await StorageService.setActiveUser('user-a'); // main()'s listener
+      events.add(_event(AuthChangeEvent.signedIn, 'user-a'));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      final after = container.read(gameNotifierProvider(source));
+      expect(after, isNotNull);
+      expect(after!.path, before.path);
+      // The no-session record was carried over to A...
+      expect(StorageService.getGameState(date), isNotNull);
+      expect(
+        StorageService.prefs.getKeys().where((k) => k.startsWith('u.none.')),
+        isEmpty,
+      );
+      // ...and the next move saves under A.
+      container.read(gameNotifierProvider(source).notifier).handleCellTap(0, 1);
+      expect(StorageService.getGameState(date)!['path'], hasLength(2));
+    });
+  });
 }

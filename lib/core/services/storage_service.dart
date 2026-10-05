@@ -181,8 +181,10 @@ abstract final class StorageService {
       _prefs.setString('colorblind_mode', value);
 
   static int get solveCount => _prefs.getInt('${_prefix}solve_count') ?? 0;
-  static Future<bool> incrementSolveCount() =>
-      _prefs.setInt('${_prefix}solve_count', solveCount + 1);
+  static Future<bool> incrementSolveCount({String? userId}) {
+    final key = '${_prefixFor(userId)}solve_count';
+    return _prefs.setInt(key, (_prefs.getInt(key) ?? 0) + 1);
+  }
 
   static bool get hasSeenOnboarding =>
       _prefs.getBool('has_seen_onboarding') ?? false;
@@ -319,8 +321,8 @@ abstract final class StorageService {
     return jsonDecode(data) as Map<String, dynamic>;
   }
 
-  static Future<void> clearGameState(String key) async {
-    await _prefs.remove('${_prefix}game_state_$key');
+  static Future<void> clearGameState(String key, {String? userId}) async {
+    await _prefs.remove('${_prefixFor(userId)}game_state_$key');
   }
 
   // Puzzle sessions (start-puzzle nonce per date)
@@ -380,9 +382,13 @@ abstract final class StorageService {
 
   static Future<void> saveBundledResult(
     String date,
-    Map<String, dynamic> result,
-  ) =>
-      _prefs.setString('${_prefix}bundled_result_$date', jsonEncode(result));
+    Map<String, dynamic> result, {
+    String? userId,
+  }) =>
+      _prefs.setString(
+        '${_prefixFor(userId)}bundled_result_$date',
+        jsonEncode(result),
+      );
 
   // Practice stats
   static Map<String, dynamic> get practiceStats {

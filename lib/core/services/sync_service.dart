@@ -94,8 +94,10 @@ class SyncNotifier extends _$SyncNotifier {
     required int undosUsed,
     required List<List<int>> path,
     String? signature,
+    String? userId,
   }) async {
     await StorageService.addToSyncQueue({
+      'user_id': ?userId,
       'type': 'submit_score',
       'puzzle_date': puzzleDate,
       'time_seconds': timeSeconds,

@@ -61,6 +61,16 @@ class _FakeEdge {
   }
 }
 
+class _MutableAuth extends AuthSessionInfo {
+  _MutableAuth(this.userId);
+
+  @override
+  String? userId;
+
+  @override
+  bool get hasSession => userId != null;
+}
+
 class _AlreadySignedIn implements SessionGateway {
   @override
   bool get hasSession => true;
@@ -160,6 +170,39 @@ void main() {
       expect(stored.isAccepted, isTrue);
       expect(StorageService.getBundledResult(today), isNotNull);
       expect(StorageService.solveCount, 1);
+    });
+  });
+
+  group('ScoreSubmitter pins its saves to the user who solved', () {
+    test('a user switch during submission does not move the saves', () async {
+      final auth = _MutableAuth('test-user');
+      container.dispose();
+      container = ProviderContainer(
+        overrides: [
+          edgeInvokerProvider.overrideWithValue(edge.call),
+          connectivityNotifierProvider.overrideWith(_ControlledConnectivity.new),
+          authSessionProvider.overrideWithValue(auth),
+          sessionEnsurerProvider.overrideWithValue(
+            SessionEnsurer(gateway: _AlreadySignedIn()),
+          ),
+          puzzleRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+      final submitting = container
+          .read(scoreSubmitterProvider.notifier)
+          .submitScore(_solved(server), PuzzleSource.daily(today));
+      auth.userId = 'someone-else';
+      await StorageService.setActiveUser('someone-else');
+      await submitting;
+
+      expect(StorageService.solveCount, 0);
+      expect(StorageService.getSubmissionResult(today), isNull);
+      await StorageService.setActiveUser('test-user');
+      expect(StorageService.solveCount, 1);
+      expect(
+        StorageService.getSyncQueueItems().map((e) => e.value['user_id']),
+        everyElement('test-user'),
+      );
     });
   });
 
