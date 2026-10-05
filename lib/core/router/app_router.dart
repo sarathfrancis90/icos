@@ -40,42 +40,14 @@ GoRouter appRouter(Ref ref) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
-    redirect: (context, state) {
-      final path = state.uri.path;
-      final gate = ref.read(appGateProvider);
-      if (gate == AppGate.maintenance && path != '/maintenance') {
-        return '/maintenance';
-      }
-      if (gate == AppGate.forceUpdate && path != '/force-update') {
-        return '/force-update';
-      }
-      if (gate == AppGate.ok &&
-          (path == '/maintenance' || path == '/force-update')) {
-        return '/';
-      }
-      final banned = ref.read(isBannedProvider);
-      if (banned && path != '/banned') {
-        return '/banned';
-      }
-      if (!banned && path == '/banned') {
-        return '/';
-      }
-      // Onboarding only applies once no blocking gate is active.
-      final deletion = deletionRedirect(
-        path: path,
-        pending: ref.read(pendingDeletionDateProvider) != null,
-      );
-      if (deletion != null) return deletion;
-      final recovery = recoveryRedirect(
-        path: path,
-        pending: ref.read(passwordRecoveryPendingProvider),
-      );
-      if (recovery != null) return recovery;
-      return onboardingRedirect(
-        uri: state.uri,
-        hasSeenOnboarding: StorageService.hasSeenOnboarding,
-      );
-    },
+    redirect: (context, state) => appRedirect(
+      uri: state.uri,
+      gate: ref.read(appGateProvider),
+      banned: ref.read(isBannedProvider),
+      pendingDeletion: ref.read(pendingDeletionDateProvider) != null,
+      recoveryPending: ref.read(passwordRecoveryPendingProvider),
+      hasSeenOnboarding: StorageService.hasSeenOnboarding,
+    ),
     refreshListenable: _RouterRefresh(ref),
     routes: [
       GoRoute(

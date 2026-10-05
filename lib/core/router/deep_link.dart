@@ -1,3 +1,5 @@
+import '../services/app_config_provider.dart';
+
 /// Deep-link locations that may be resumed after onboarding.
 final RegExp _joinLink = RegExp(r'^/join/[A-Za-z0-9]{6}$');
 final RegExp _puzzleLink = RegExp(r'^/puzzle/\d{4}-\d{2}-\d{2}$');
@@ -46,4 +48,38 @@ String? deletionRedirect({required String path, required bool pending}) {
   if (pending && path != kDeletionPendingPath) return kDeletionPendingPath;
   if (!pending && path == kDeletionPendingPath) return '/';
   return null;
+}
+
+/// The single app-level redirect. Gates are checked in priority order
+/// (maintenance, force update, banned, pending deletion, password recovery,
+/// onboarding) and every active gate is terminal: it either holds the player
+/// on its own screen (`null`) or sends them there, so a lower gate can never
+/// bounce them away and cause a redirect loop.
+String? appRedirect({
+  required Uri uri,
+  required AppGate gate,
+  required bool banned,
+  required bool pendingDeletion,
+  required bool recoveryPending,
+  required bool hasSeenOnboarding,
+}) {
+  final path = uri.path;
+  if (gate == AppGate.maintenance) {
+    return path == '/maintenance' ? null : '/maintenance';
+  }
+  if (gate == AppGate.forceUpdate) {
+    return path == '/force-update' ? null : '/force-update';
+  }
+  if (path == '/maintenance' || path == '/force-update') return '/';
+  if (banned) return path == '/banned' ? null : '/banned';
+  if (path == '/banned') return '/';
+  if (pendingDeletion) {
+    return deletionRedirect(path: path, pending: true);
+  }
+  if (path == kDeletionPendingPath) return '/';
+  if (recoveryPending) {
+    return recoveryRedirect(path: path, pending: true);
+  }
+  if (path == kNewPasswordPath) return '/';
+  return onboardingRedirect(uri: uri, hasSeenOnboarding: hasSeenOnboarding);
 }
