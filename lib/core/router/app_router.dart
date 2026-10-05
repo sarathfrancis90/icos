@@ -141,7 +141,10 @@ GoRouter appRouter(Ref ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) {
           final code = state.pathParameters['code']!;
-          return JoinGroupScreen(inviteCode: code);
+          return JoinGroupScreen(
+            inviteCode: code,
+            autoJoin: state.extra != JoinEntry.resumedInvite,
+          );
         },
       ),
       GoRoute(

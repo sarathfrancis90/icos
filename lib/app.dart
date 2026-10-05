@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_sizes.dart';
 import 'core/router/app_router.dart';
+import 'core/router/pending_invite_sweeper.dart';
 import 'core/services/app_config_provider.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/sync_service.dart';
@@ -97,8 +98,10 @@ class _IcosAppState extends ConsumerState<IcosApp>
       routerConfig: router,
       // Layouts are verified to 200% text scale; larger system sizes (iOS
       // accessibility sizes reach ~310%) are clamped rather than broken.
-      builder: (context, child) =>
-          TextScaleLimit(child: child ?? const SizedBox()),
+      builder: (context, child) => PendingInviteSweeper(
+        router: router,
+        child: TextScaleLimit(child: child ?? const SizedBox()),
+      ),
     );
   }
 }

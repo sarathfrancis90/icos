@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/deep_link.dart';
+import '../../../../core/router/invite_continuation.dart';
 import '../../../groups/domain/pending_invite.dart';
 import '../../providers/auth_provider.dart';
 
@@ -58,7 +59,11 @@ Future<bool> handleAuthOutcome(
       // An invite stored before leaving for sign-in is used (and cleared)
       // here too, so it cannot fire a second time from the auth event.
       final stored = await PendingInvite.consume();
-      if (next == '/' && stored != null) next = '/join/$stored';
+      var resumed = false;
+      if (next == '/' && stored != null) {
+        next = '/join/$stored';
+        resumed = true;
+      }
       if (!context.mounted) return true;
       messenger.showSnackBar(
         SnackBar(
@@ -69,7 +74,7 @@ Future<bool> handleAuthOutcome(
           ),
         ),
       );
-      context.go(next);
+      context.go(next, extra: resumed ? JoinEntry.resumedInvite : null);
       return true;
 
     case AuthRedirected():

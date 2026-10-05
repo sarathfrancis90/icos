@@ -21,19 +21,33 @@ import 'widgets/group_ui.dart';
 ///
 /// Anonymous users see the account gate; signed-in users are joined
 /// automatically and forwarded to the group.
+///
+/// When the screen is reached by resuming a stored invite after sign-in
+/// ([autoJoin] false) nothing happens until the player taps "Join group": the
+/// invite may be stale, and joining a group is not something to do silently.
 class JoinGroupScreen extends ConsumerStatefulWidget {
-  const JoinGroupScreen({required this.inviteCode, super.key});
+  const JoinGroupScreen({
+    required this.inviteCode,
+    this.autoJoin = true,
+    super.key,
+  });
 
   final String inviteCode;
+
+  /// Join as soon as the player has an account (a tapped link, or back from
+  /// sign-up in the same visit) instead of asking first.
+  final bool autoJoin;
 
   @override
   ConsumerState<JoinGroupScreen> createState() => _JoinGroupScreenState();
 }
 
-enum _JoinPhase { idle, joining, joined, failed }
+enum _JoinPhase { confirm, idle, joining, joined, failed }
 
 class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
-  _JoinPhase _phase = _JoinPhase.idle;
+  late _JoinPhase _phase = widget.autoJoin
+      ? _JoinPhase.idle
+      : _JoinPhase.confirm;
   String? _errorMessage;
   bool _attempted = false;
 
@@ -45,7 +59,7 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
 
     // Auto-join once the user has an account (also fires when they return
     // from /auth after upgrading a guest session).
-    if (session.canUseGroups && !_attempted) {
+    if (session.canUseGroups && widget.autoJoin && !_attempted) {
       _attempted = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _join());
     }
@@ -94,6 +108,31 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
                         'stats come with you.',
                   )
                 : switch (_phase) {
+                    _JoinPhase.confirm => _Status(
+                        icon: const Icon(
+                          Icons.group_add_rounded,
+                          size: 64,
+                          color: AppColors.purpleLight,
+                        ),
+                        title: AppStrings.joinGroupConfirmTitle,
+                        subtitle: 'Invite code $_code',
+                        actions: [
+                          FilledButton(
+                            key: const Key('join_confirm'),
+                            onPressed: () {
+                              _attempted = true;
+                              _join();
+                            },
+                            child: const Text(AppStrings.joinGroupAction),
+                          ),
+                          const SizedBox(height: AppSizes.sm),
+                          OutlinedButton(
+                            key: const Key('join_decline'),
+                            onPressed: () => context.go('/groups'),
+                            child: const Text(AppStrings.notNow),
+                          ),
+                        ],
+                      ),
                     _JoinPhase.idle || _JoinPhase.joining => _Status(
                         icon: const SizedBox(
                           width: 48,

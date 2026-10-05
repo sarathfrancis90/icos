@@ -85,6 +85,8 @@ abstract final class AppStrings {
   // Groups
   static const createGroup = 'Create Group';
   static const joinGroup = 'Join Group';
+  static const joinGroupAction = 'Join group';
+  static const joinGroupConfirmTitle = 'Join this group?';
   static const groupInviteCode = 'Invite Code';
   static const groupLeaderboard = 'Leaderboard';
   static const groupMembers = 'Members';

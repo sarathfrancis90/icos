@@ -1,3 +1,4 @@
+import '../../../core/router/deep_link.dart';
 import '../../../core/services/storage_service.dart';
 
 /// The invite a guest was joining when they went off to create an account.
@@ -48,5 +49,37 @@ abstract final class PendingInvite {
     );
     if (age.isNegative || age > maxAge) return null;
     return code;
+  }
+
+  /// Whether [location] is a screen the stored invite for [code] belongs to:
+  /// the join screen for that code, or an auth screen opened from it
+  /// (`/auth…?from=/join/<code>`).
+  static bool isActiveFor(String code, Uri location) {
+    final join = '/join/$code'.toLowerCase();
+    if (location.path.toLowerCase() == join) return true;
+    final onAuth =
+        location.path == '/auth' || location.path.startsWith('/auth/');
+    if (!onAuth) return false;
+    final from = sanitizeJoinLink(location.queryParameters['from']);
+    return from != null && from.toLowerCase() == join;
+  }
+
+  /// Drops the stored invite unless [location] is the join screen for it or
+  /// an auth screen opened from it. The invite is only meant to bridge the
+  /// short detour through sign-up; one left behind (app killed, back at the
+  /// root of a cold-start link, `go()` elsewhere) would otherwise send a later
+  /// sign-in to a group the player has since walked away from.
+  static Future<void> clearUnlessActive(Uri location) async {
+    String? code;
+    int? at;
+    try {
+      code = StorageService.pendingInviteCode;
+      at = StorageService.pendingInviteAtMs;
+    } catch (_) {
+      return;
+    }
+    if (code == null && at == null) return;
+    if (code != null && isActiveFor(code, location)) return;
+    await clear();
   }
 }
