@@ -1,17 +1,19 @@
 # Reusable subflow: Get past onboarding to home screen
 # App auto-signs in as anonymous, so no auth screen needed.
+# Onboarding may take a moment to render after a cold start, so wait for either
+# its "Next" button or the home tab bar before deciding.
 appId: com.icos.game
 
 ---
 
-# If onboarding is showing, skip it
-- tapOn:
-    text: "Skip"
-    optional: true
-- waitForAnimationToEnd
-
-# If Get Started is showing (page 3 of onboarding)
-- tapOn:
-    text: "Get Started"
-    optional: true
+- extendedWaitUntil:
+    visible: "(?s)(Next|Home\nTab 1 of 4)"
+    timeout: 20000
+- runFlow:
+    when:
+      visible: "Next"
+    commands:
+      - tapOn: "Next"
+      - tapOn: "Next"
+      - tapOn: "Get Started"
 - waitForAnimationToEnd

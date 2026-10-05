@@ -26,7 +26,11 @@ appId: com.icos.game
 - takeScreenshot: 14_colorblind/deuteranopia_selected
 
 # Dismiss bottom sheet (back or tap outside)
-- back
+- runFlow:
+    when:
+      notVisible: "Home\nTab 1 of 4"
+    commands:
+      - back
 - waitForAnimationToEnd
 
 # See puzzle in deuteranopia
@@ -69,7 +73,11 @@ appId: com.icos.game
 - takeScreenshot: 14_colorblind/protanopia_selected
 
 # Dismiss bottom sheet
-- back
+- runFlow:
+    when:
+      notVisible: "Home\nTab 1 of 4"
+    commands:
+      - back
 - waitForAnimationToEnd
 
 - tapOn:
@@ -106,7 +114,11 @@ appId: com.icos.game
 - takeScreenshot: 14_colorblind/tritanopia_selected
 
 # Dismiss bottom sheet
-- back
+- runFlow:
+    when:
+      notVisible: "Home\nTab 1 of 4"
+    commands:
+      - back
 - waitForAnimationToEnd
 
 - tapOn:

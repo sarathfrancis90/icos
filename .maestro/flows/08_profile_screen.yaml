@@ -29,7 +29,6 @@ appId: com.icos.game
 - scrollUntilVisible:
     element: "(?s).*Daily reminder.*"
 - assertVisible: "(?s).*Daily reminder.*"
-- assertVisible: "(?s)Blocked users.*"
 - takeScreenshot: 08_profile/settings_section
 
 # -- Scroll to App section --
@@ -38,6 +37,9 @@ appId: com.icos.game
 - assertVisible: "App"
 - assertVisible:
     text: "(?s)About\nVersion.*"
+- scrollUntilVisible:
+    element: "(?s)Blocked users.*"
+- assertVisible: "(?s)Blocked users.*"
 - takeScreenshot: 08_profile/app_section
 
 # -- Scroll back up --
