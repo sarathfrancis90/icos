@@ -240,6 +240,12 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Daily rollover is midnight UTC: a date after today's has not been
+    // released (tomorrow's puzzle is pre-cached, so it must not be shown).
+    final requested = source.date;
+    if (requested != null && requested.compareTo(AppDateUtils.todayUtc()) > 0) {
+      return const _NotYetAvailable();
+    }
     final puzzleAsync = ref.watch(_puzzleProvider);
     final gameState = ref.watch(gameNotifierProvider(source));
     final hintUi = ref.watch(hintUiProvider(source));
@@ -310,9 +316,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
           final result = resultAsync.valueOrNull;
           if (gameState == null || gameState.puzzle != puzzle) {
             _scheduleStart(puzzle, result);
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.purpleLight),
-            );
+            return const _LoadingWithExit();
           }
 
           final notifier = ref.read(gameNotifierProvider(source).notifier);
@@ -465,9 +469,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
             ],
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.purpleLight),
-        ),
+        loading: () => const _LoadingWithExit(),
         error: (error, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -498,6 +500,95 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Spinner shown while the puzzle loads, with a way out.
+class _LoadingWithExit extends StatelessWidget {
+  const _LoadingWithExit();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        const Center(
+          child: CircularProgressIndicator(color: AppColors.purpleLight),
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsetsDirectional.only(
+              start: AppSizes.md,
+              top: AppSizes.sm,
+            ),
+            child: Align(
+              alignment: AlignmentDirectional.topStart,
+              child: _GlassCircleButton(
+                icon: Icons.home_rounded,
+                onPressed: () => leaveScreen(context, '/'),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shown for a date that has not been released yet (after today, UTC).
+class _NotYetAvailable extends StatelessWidget {
+  const _NotYetAvailable();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.deepBlack,
+      body: Stack(
+        children: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsetsDirectional.all(AppSizes.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.lock_clock_rounded,
+                    size: 48,
+                    color: AppColors.textSecondaryDark,
+                  ),
+                  const SizedBox(height: AppSizes.md),
+                  Text(
+                    'This puzzle is not available yet',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSizes.sm),
+                  const Text(
+                    'Each day\'s puzzle unlocks at midnight UTC.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textSecondaryDark),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsetsDirectional.only(
+                start: AppSizes.md,
+                top: AppSizes.sm,
+              ),
+              child: Align(
+                alignment: AlignmentDirectional.topStart,
+                child: _GlassCircleButton(
+                  icon: Icons.home_rounded,
+                  onPressed: () => leaveScreen(context, '/'),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

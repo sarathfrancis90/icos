@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -19,6 +20,8 @@ import 'package:icos/features/puzzle/data/puzzle_repository.dart';
 import 'package:icos/features/puzzle/data/puzzle_source.dart';
 import 'package:icos/features/puzzle/data/submission_result.dart';
 import 'package:icos/features/puzzle/presentation/puzzle_screen.dart';
+import 'package:icos/features/puzzle/domain/models/puzzle.dart';
+import 'package:icos/features/puzzle/presentation/widgets/puzzle_grid.dart';
 import 'package:icos/features/puzzle/providers/daily_puzzle_provider.dart';
 
 import '../../helpers/storage_test_helpers.dart';
@@ -246,6 +249,81 @@ void main() {
       await tester.pumpAndSettle();
       expect(_location(router), '/');
       await tester.pumpWidget(const SizedBox());
+    });
+  });
+
+  group('/puzzle/<date> edge states', () {
+    late Directory dir;
+    setUp(() async => dir = await initTestStorage());
+    tearDown(() async => dir.delete(recursive: true));
+
+    Future<GoRouter> open(
+      WidgetTester tester,
+      String date,
+      Future<Puzzle> Function() load,
+    ) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final router = _router(
+        '/puzzle/$date',
+        (d) => PuzzleScreen(source: PuzzleSource.forDate(d)),
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        buildTestWidgetWithRouter(
+          router,
+          overrides: [
+            puzzleForDateProvider(date).overrideWith((ref) => load()),
+            puzzleRepositoryProvider.overrideWithValue(_NoAttempts()),
+            authSessionProvider.overrideWithValue(const FakeAuthSessionInfo()),
+            connectivityNotifierProvider.overrideWith(_Online.new),
+            edgeInvokerProvider.overrideWithValue(
+              (fn, body) async => const EdgeResponse(200, {'nonce': 'n'}),
+            ),
+            sessionEnsurerProvider.overrideWithValue(
+              SessionEnsurer(gateway: _SignedIn()),
+            ),
+          ],
+        ),
+      );
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      return router;
+    }
+
+    for (final entry in {
+      'tomorrow (UTC)': AppDateUtils.tomorrowUtc(),
+      'far future': '2099-01-01',
+    }.entries) {
+      testWidgets('a ${entry.key} date is not loaded or shown', (tester) async {
+        var loads = 0;
+        final router = await open(tester, entry.value, () async {
+          loads++;
+          return smallTestPuzzle.copyWith(puzzleDate: entry.value);
+        });
+
+        expect(loads, 0, reason: 'a future puzzle must not even be fetched');
+        expect(find.byType(PuzzleGrid), findsNothing);
+        expect(find.text('This puzzle is not available yet'), findsOneWidget);
+        expect(find.text('Archive'), findsNothing);
+
+        await tester.tap(find.bySemanticsLabel('Go back'));
+        await tester.pumpAndSettle();
+        expect(_location(router), '/');
+      });
+    }
+
+    testWidgets('the loading spinner has a way out', (tester) async {
+      final today = AppDateUtils.todayUtc();
+      final never = Completer<Puzzle>();
+      final router = await open(tester, today, () => never.future);
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Go back'));
+      await tester.pumpAndSettle();
+      expect(_location(router), '/');
     });
   });
 }
