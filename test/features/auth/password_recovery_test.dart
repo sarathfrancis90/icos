@@ -166,8 +166,8 @@ void main() {
     }
 
     const neutral =
-        "If an account exists for that email, we've sent a link to reset your "
-        'password.';
+        'If an account exists for that email, a reset link is on its way. '
+        'It can take a few minutes — check your spam folder too.';
 
     testWidgets('shows the neutral confirmation on success', (tester) async {
       await open(tester);

@@ -10,8 +10,8 @@ SAFEGUARDS (guideline 1.2)
 - Terms agreement: the sign-in and create-account screens show "By continuing, you agree to our Terms of Service and Privacy Policy" with links. The Terms (section 4A) state zero tolerance for objectionable content and abusive users.
 - Filtering: display names and group names go through a profanity filter, applied in the app and again on our server.
 - Report: Groups tab > open a group > Members tab > the three-dot menu on a member > "Report user". To report a group: open the group > the three-dot menu at the top right > "Report group".
-- Block: Groups tab > open a group > Members tab > the three-dot menu on a member > "Block user", then confirm. The blocked user's scores and activity disappear from your leaderboards and activity feed immediately. They are not told. Blocking also notifies us automatically. To manage or undo blocks: Profile tab > "Blocked users" > "Unblock".
-- Response: every report (including every block) is reviewed within 24 hours. Content that breaks the Terms is removed and the offending user is ejected from the app.
+- Block: Groups tab > open a group > Members tab > the three-dot menu on a member > "Block user", then confirm. The blocked user's scores and activity disappear from your leaderboards and activity feed immediately. They are not told. Blocking also flags the account to us for review. To manage or undo blocks: Profile tab > "Blocked users" > "Unblock".
+- Response: reports made with "Report user" or "Report group" are reviewed within 24 hours. Content that breaks the Terms is removed and the offending user is ejected from the app.
 - Contact: sarathfrancis90@gmail.com
 
 ACCOUNT DELETION
