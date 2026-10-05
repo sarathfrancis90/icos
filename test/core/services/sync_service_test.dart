@@ -288,6 +288,60 @@ void main() {
     });
   });
 
+  group('per-user queue', () {
+    test('an entry created under another user is not submitted for this one',
+        () async {
+      // Guest solved offline, then signed in to an existing account.
+      await StorageService.setActiveUser('guest-user');
+      await StorageService.addToSyncQueue(_submitItem());
+      await StorageService.setActiveUser('test-user');
+
+      await container.read(syncNotifierProvider.notifier).flush();
+
+      expect(edge.calls, isEmpty);
+      final left = StorageService.getSyncQueueItems();
+      expect(left, hasLength(1));
+      expect(left.single.value['user_id'], 'guest-user');
+    });
+
+    test('own entries still go out past another user\'s entry', () async {
+      await StorageService.setActiveUser('guest-user');
+      await StorageService.addToSyncQueue(_submitItem());
+      await StorageService.setActiveUser('test-user');
+      await StorageService.addToSyncQueue(_submitItem());
+      edge.handlers['submit-score'] = (_) async =>
+          const EdgeResponse(200, {'completed': true, 'verified': true});
+
+      await container.read(syncNotifierProvider.notifier).flush();
+
+      expect(edge.calls.where((c) => c.$1 == 'submit-score'), hasLength(1));
+      expect(
+        StorageService.getSyncQueueItems().map((e) => e.value['user_id']),
+        ['guest-user'],
+      );
+    });
+
+    test('the guest\'s entry syncs when the guest signs back in', () async {
+      await StorageService.setActiveUser('guest-user');
+      await StorageService.addToSyncQueue(_submitItem());
+      final asGuest = ProviderContainer(
+        overrides: [
+          edgeInvokerProvider.overrideWithValue(edge.call),
+          connectivityNotifierProvider.overrideWith(_Online.new),
+          authSessionProvider.overrideWithValue(
+            const FakeAuthSessionInfo(userId: 'guest-user'),
+          ),
+        ],
+      );
+      addTearDown(asGuest.dispose);
+
+      await asGuest.read(syncNotifierProvider.notifier).flush();
+
+      expect(edge.calls.where((c) => c.$1 == 'submit-score'), hasLength(1));
+      expect(StorageService.getSyncQueueItems(), isEmpty);
+    });
+  });
+
   group('syncQueueLength', () {
     test('emits the current length and updates on change', () async {
       final seen = <int>[];

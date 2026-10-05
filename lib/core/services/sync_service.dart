@@ -68,8 +68,12 @@ class SyncNotifier extends _$SyncNotifier {
   Future<void> ensureSessionStarted(String date) async {
     final outcome = await _sessions.ensureStarted(date);
     if (outcome == StartSessionOutcome.retry) {
+      final userId = StorageService.activeUserId;
       final alreadyQueued = StorageService.getSyncQueueItems().any(
-        (e) => e.value['type'] == 'start_puzzle' && e.value['puzzle_date'] == date,
+        (e) =>
+            e.value['type'] == 'start_puzzle' &&
+            e.value['puzzle_date'] == date &&
+            e.value['user_id'] == userId,
       );
       if (!alreadyQueued) {
         await StorageService.addToSyncQueue({
@@ -130,7 +134,18 @@ class SyncNotifier extends _$SyncNotifier {
     _retryTimer?.cancel();
     state = true;
     try {
+      final sessionUserId = ref.read(authSessionProvider).userId;
+      // Records are scoped to the storage's active user: it must be the
+      // session's before anything is read or submitted.
+      if (sessionUserId != null &&
+          sessionUserId != StorageService.activeUserId) {
+        await StorageService.setActiveUser(sessionUserId);
+      }
+      await StorageService.purgeStaleForeignSyncEntries();
       for (final entry in items) {
+        // Another account's entries stay untouched: they sync if that user
+        // signs back in, and are purged after the server's date window.
+        if (entry.value['user_id'] != sessionUserId) continue;
         final done = await _processQueueItem(entry.value);
         if (!done) {
           _scheduleRetry();

@@ -36,6 +36,14 @@ Future<void> main() async {
   await AnalyticsService.initialize();
   await SupabaseService.initialize();
 
+  // Per-user local data follows the signed-in user. Registered before anything
+  // else listens so the scope is already switched when providers react.
+  await StorageService.setActiveUser(SupabaseService.auth.currentUser?.id);
+  SupabaseService.auth.onAuthStateChange.listen(
+    (state) => StorageService.setActiveUser(state.session?.user.id),
+    onError: (Object _) {},
+  );
+
   // Auto sign in anonymously if no session exists
   if (SupabaseService.auth.currentSession == null) {
     try {
@@ -45,6 +53,7 @@ Future<void> main() async {
     } catch (_) {
       // Offline or timeout — continue without auth
     }
+    await StorageService.setActiveUser(SupabaseService.auth.currentUser?.id);
   }
 
   // Notifications (local reminders + optional FCM); never throws.
