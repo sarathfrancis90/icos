@@ -11,11 +11,13 @@ import 'package:icos/core/utils/app_error.dart';
 import 'package:icos/core/utils/result.dart';
 import 'package:icos/features/auth/presentation/widgets/auth_outcome_handler.dart';
 import 'package:icos/features/auth/domain/auth_outcome.dart';
+import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:icos/features/groups/domain/models/group.dart';
 import 'package:icos/features/groups/domain/pending_invite.dart';
 import 'package:icos/features/groups/presentation/join_group_screen.dart';
 import 'package:icos/features/groups/providers/groups_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show AuthChangeEvent, AuthState, Session, User;
 
 import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
@@ -31,6 +33,11 @@ final _group = Group(
   isActive: true,
   createdAt: DateTime.utc(2026, 9, 1),
 );
+
+class _FakeAuth extends AuthNotifier {
+  @override
+  AsyncValue<User?> build() => const AsyncValue.data(null);
+}
 
 class _RecordingGroups extends MyGroups {
   static final joined = <String>[];
@@ -131,12 +138,25 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     }
 
-    testWidgets('an invite left behind is cleared on app start', (
+    testWidgets('an invite older than 10 minutes is cleared on app start', (
       tester,
     ) async {
-      await PendingInvite.save('ABC123');
+      await PendingInvite.save(
+        'ABC123',
+        now: DateTime.now().subtract(const Duration(minutes: 11)),
+      );
       await start(tester, '/');
       expect(StorageService.pendingInviteCode, isNull);
+    });
+
+    testWidgets('a younger invite survives a cold start on any route (the '
+        'auth callback may be what started the app)', (tester) async {
+      await PendingInvite.save(
+        'ABC123',
+        now: DateTime.now().subtract(const Duration(minutes: 1)),
+      );
+      await start(tester, '/');
+      expect(StorageService.pendingInviteCode, 'ABC123');
     });
 
     testWidgets('a cold start straight into that join link keeps it', (
@@ -329,6 +349,94 @@ void main() {
         isNull,
         reason: 'back from sign-up within the same visit: join at once',
       );
+    });
+  });
+
+  group('a cold start from the auth callback', () {
+    final linked = AuthState(
+      AuthChangeEvent.userUpdated,
+      Session(accessToken: 't', tokenType: 'bearer', user: _user),
+    );
+
+    GoRouter newRouter(List<Object?> extras) => GoRouter(
+      routes: [
+        GoRoute(path: '/', builder: (_, _) => const SizedBox()),
+        GoRoute(
+          path: '/join/:code',
+          builder: (_, s) {
+            extras.add(s.extra);
+            return const SizedBox();
+          },
+        ),
+      ],
+    );
+
+    testWidgets('a 1-minute-old invite is kept at start, and the linked event '
+        'then goes to the join confirmation once', (tester) async {
+      await PendingInvite.save(
+        'ABC123',
+        now: DateTime.now().subtract(const Duration(minutes: 1)),
+      );
+      final extras = <Object?>[];
+      final router = newRouter(extras);
+      addTearDown(router.dispose);
+      final container = ProviderContainer(
+        overrides: [authNotifierProvider.overrideWith(_FakeAuth.new)],
+      );
+      addTearDown(container.dispose);
+      container.read(
+        Provider<GoRouter>((ref) {
+          wireInviteContinuation(ref, router);
+          return router;
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp.router(
+          routerConfig: router,
+          builder: (_, child) =>
+              PendingInviteSweeper(router: router, child: child!),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(StorageService.pendingInviteCode, 'ABC123');
+
+      container.read(authNotifierProvider.notifier).handleAuthEvent(linked);
+      await tester.pumpAndSettle();
+      expect(_at(router), '/join/ABC123');
+      expect(extras, [JoinEntry.resumedInvite]);
+      expect(StorageService.pendingInviteCode, isNull);
+
+      container.read(authNotifierProvider.notifier).handleAuthEvent(linked);
+      await tester.pumpAndSettle();
+      expect(extras, hasLength(1), reason: 'consumed exactly once');
+    });
+
+    testWidgets('a linked event that arrives before the router exists still '
+        'navigates once it does', (tester) async {
+      await PendingInvite.save('ABC123');
+      final container = ProviderContainer(
+        overrides: [authNotifierProvider.overrideWith(_FakeAuth.new)],
+      );
+      addTearDown(container.dispose);
+      container.read(authNotifierProvider.notifier).handleAuthEvent(linked);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(container.read(inviteContinuationProvider), 'ABC123');
+
+      final extras = <Object?>[];
+      final router = newRouter(extras);
+      addTearDown(router.dispose);
+      container.read(
+        Provider<GoRouter>((ref) {
+          wireInviteContinuation(ref, router);
+          return router;
+        }),
+      );
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+      expect(_at(router), '/join/ABC123');
+      expect(extras, [JoinEntry.resumedInvite]);
+      expect(container.read(inviteContinuationProvider), isNull);
     });
   });
 }

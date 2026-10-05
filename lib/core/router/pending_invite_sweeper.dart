@@ -5,6 +5,10 @@ import '../../features/groups/domain/pending_invite.dart';
 
 /// Clears a stored invite that has outlived the visit it was saved for.
 ///
+/// On app start only an invite older than [PendingInvite.startKeepFor] goes
+/// (a cold start from the auth callback must still find its invite); on
+/// resume the route rule below applies.
+///
 /// The invite bridges the detour through sign-up (browser or email link). On
 /// app start and on every resume it is dropped unless the player is on the
 /// join screen for that code or on an auth screen opened from it, so an invite
@@ -30,7 +34,9 @@ class _PendingInviteSweeperState extends State<PendingInviteSweeper>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _sweep());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) PendingInvite.clearStaleOnStart();
+    });
   }
 
   @override

@@ -9,6 +9,11 @@ import '../../../core/services/storage_service.dart';
 /// after [maxAge], and a stored value that is not a valid code is discarded.
 abstract final class PendingInvite {
   static const Duration maxAge = Duration(minutes: 30);
+
+  /// On app start a stored invite younger than this is kept: the auth
+  /// callback that finishes a browser/email sign-up can cold-start the app,
+  /// and the linked event that consumes the invite follows the first frame.
+  static const Duration startKeepFor = Duration(minutes: 10);
   static final RegExp _code = RegExp(r'^[A-Za-z0-9]{6}$');
 
   /// Remembers [code] (ignored unless it is 6 alphanumerics).
@@ -80,6 +85,29 @@ abstract final class PendingInvite {
     }
     if (code == null && at == null) return;
     if (code != null && isActiveFor(code, location)) return;
+    await clear();
+  }
+
+  /// App start: drop a stored invite older than [startKeepFor] (or one that
+  /// is malformed); never drop a younger one, whatever the route. The
+  /// confirmation on the join screen prevents surprise joins, so this only
+  /// needs to stop a long-forgotten invite from lingering.
+  static Future<void> clearStaleOnStart({DateTime? now}) async {
+    int? at;
+    String? code;
+    try {
+      code = StorageService.pendingInviteCode;
+      at = StorageService.pendingInviteAtMs;
+    } catch (_) {
+      return;
+    }
+    if (code == null && at == null) return;
+    if (code != null && at != null) {
+      final age = (now ?? DateTime.now()).difference(
+        DateTime.fromMillisecondsSinceEpoch(at),
+      );
+      if (!age.isNegative && age <= startKeepFor) return;
+    }
     await clear();
   }
 }
