@@ -112,6 +112,7 @@ class AudioService {
   /// Effects that loaded and can be played.
   final Map<SoundEffect, SoundPlayer> _players = {};
   bool _started = false;
+  bool _deferred = false;
   bool _loggedFailure = false;
   Future<void>? _preparing;
 
@@ -149,7 +150,12 @@ class AudioService {
   /// the sound setting is off (preparation then happens on the first play
   /// after it is switched on).
   Future<void> initialize() async {
-    if (_started || !_soundEnabled()) return;
+    if (_started) return;
+    if (!_soundEnabled()) {
+      // Prepared on the first play after the setting is switched on.
+      _deferred = true;
+      return;
+    }
     _started = true;
     _preparing = _prepareAll();
   }
@@ -183,7 +189,10 @@ class AudioService {
   Future<void> play(SoundEffect effect) async {
     if (!_soundEnabled()) return;
     if (!_started) {
-      unawaited(initialize());
+      if (_deferred) {
+        _deferred = false;
+        unawaited(initialize());
+      }
       return;
     }
     final player = _players[effect];
@@ -198,8 +207,10 @@ class AudioService {
   void _logOnce(String message, Object error) {
     if (_loggedFailure) return;
     _loggedFailure = true;
-    AppLogger.debug('$message (further sound errors are not logged)',
-        error: error);
+    AppLogger.debug(
+      '$message (further sound errors are not logged)',
+      error: error,
+    );
   }
 
   static bool _storageSoundEnabled() {
