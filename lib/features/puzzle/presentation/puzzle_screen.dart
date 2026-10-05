@@ -56,6 +56,14 @@ class PuzzleScreen extends ConsumerStatefulWidget {
 class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   bool _scoreSubmitted = false;
   bool _showCelebration = false;
+
+  /// Set while this screen deliberately tears its own game down (new practice
+  /// puzzle, done): the restart-on-reset listener must not revive it.
+  bool _discarding = false;
+
+  /// Bumped whenever the game is reset or replaced, so a celebration or
+  /// prompt scheduled for the previous game cannot appear on the next one.
+  int _generation = 0;
   bool _startScheduled = false;
   bool _postSolvePromptsShown = false;
 
@@ -129,6 +137,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
         .loadCompleted(puzzle, result);
     _scoreSubmitted = true;
     _postSolvePromptsShown = true;
+    _generation++;
     if (mounted) setState(() => _showCelebration = false);
   }
 
@@ -140,10 +149,12 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
       AudioService.instance.play(SoundEffect.completion);
       Haptics.heavy();
       ref.read(scoreSubmitterProvider.notifier).submitScore(gameState, source);
+      final generation = _generation;
       Future.delayed(
         const Duration(milliseconds: AppSizes.completionRippleMs),
         () {
-          if (mounted) setState(() => _showCelebration = true);
+          if (!mounted || generation != _generation) return;
+          setState(() => _showCelebration = true);
           _showPostSolvePrompts();
         },
       );
@@ -196,9 +207,16 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     }
   }
 
+  /// Drops this screen's game on purpose (the reset listener ignores it).
+  void _discard() {
+    _discarding = true;
+    _generation++;
+    ref.read(gameNotifierProvider(source).notifier).discard();
+  }
+
   void _onNewPracticePuzzle() {
     final current = source as PracticePuzzleSource;
-    ref.read(gameNotifierProvider(source).notifier).discard();
+    _discard();
     context.pushReplacement(
       '/practice/play?size=${current.size}&difficulty=${current.difficulty}'
       '&seed=${newPracticeSeed()}',
@@ -252,6 +270,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     ref.listen(gameNotifierProvider(source), (prev, next) {
       final pinned = _pinnedPuzzle;
       if (prev == null || next != null || pinned == null) return;
+      if (_discarding) return;
+      _generation++;
       _startScheduled = false;
       _scoreSubmitted = false;
       _postSolvePromptsShown = false;
@@ -424,7 +444,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                   ],
                   onNewPuzzle: source.isPractice ? _onNewPracticePuzzle : null,
                   onDone: () {
-                    if (source.isPractice) notifier.discard();
+                    if (source.isPractice) _discard();
                     Navigator.of(context).pop();
                   },
                 ),
