@@ -388,6 +388,21 @@ BEGIN
   RAISE NOTICE 'PASS 9B-4: unblock restores visibility';
 END $$;
 
+-- block -> unblock -> block again still leaves exactly one notice report.
+DO $$
+DECLARE n int;
+BEGIN
+  PERFORM public.block_user('22222222-2222-2222-2222-222222222222');
+  PERFORM public.unblock_user('22222222-2222-2222-2222-222222222222');
+  PERFORM public.block_user('22222222-2222-2222-2222-222222222222');
+  SELECT count(*) INTO n FROM public.reports
+   WHERE reporter_id = auth.uid() AND reported_user_id = '22222222-2222-2222-2222-222222222222'
+     AND reason = 'blocked_by_user';
+  IF n <> 1 THEN RAISE EXCEPTION 'FAIL 9B-w: % block reports after block/unblock/block', n; END IF;
+  PERFORM public.unblock_user('22222222-2222-2222-2222-222222222222');
+  RAISE NOTICE 'PASS 9B-5: repeat block/unblock cannot file extra reports';
+END $$;
+
 -- Remove the section's fixtures so later sections see the original state.
 SELECT pg_temp.reset_role();
 DELETE FROM public.group_feed WHERE group_id = current_setting('test.group_id')::uuid;

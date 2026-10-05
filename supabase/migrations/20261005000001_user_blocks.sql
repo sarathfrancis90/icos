@@ -74,8 +74,15 @@ BEGIN
   VALUES (v_uid, p_user_id)
   ON CONFLICT DO NOTHING;
 
-  -- Only a new block notifies the developer (a repeat call is a no-op).
-  IF FOUND THEN
+  -- Only a new block notifies the developer, and at most one notice per
+  -- (reporter, target) pair ever, so block/unblock/block cannot flood the
+  -- review queue.
+  IF FOUND AND NOT EXISTS (
+    SELECT 1 FROM public.reports r
+    WHERE r.reporter_id = v_uid
+      AND r.reported_user_id = p_user_id
+      AND r.reason = 'blocked_by_user'
+  ) THEN
     INSERT INTO public.reports (reporter_id, reported_user_id, reason, details)
     VALUES (v_uid, p_user_id, 'blocked_by_user', 'Automatic notice: the reporter blocked this user.');
   END IF;

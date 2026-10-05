@@ -126,4 +126,40 @@ void main() {
     expect(result, isA<Success<void, AppError>>());
     expect(container.read(blockedUserIdsProvider), isEmpty);
   });
+
+  test('a failed refetch after block keeps the id blocked', () async {
+    var listCalls = 0;
+    when(() => repo.listBlockedUsers()).thenAnswer((_) async {
+      listCalls++;
+      return listCalls == 1
+          ? const Result.success(<BlockedUser>[])
+          : const Result.failure(AppError.network('offline'));
+    });
+    when(() => repo.blockUser('u-2'))
+        .thenAnswer((_) async => const Result.success(null));
+    await container.read(blockedUsersProvider.future);
+
+    final result = await container.read(blockedUsersProvider.notifier).block('u-2');
+
+    expect(result, isA<Success<void, AppError>>());
+    expect(container.read(blockedUsersProvider).hasError, isFalse);
+    expect(container.read(blockedUserIdsProvider), {'u-2'});
+  });
+
+  test('a failed refetch after unblock keeps the id unblocked', () async {
+    var listCalls = 0;
+    when(() => repo.listBlockedUsers()).thenAnswer((_) async {
+      listCalls++;
+      return listCalls == 1
+          ? Result.success([_bob])
+          : const Result.failure(AppError.network('offline'));
+    });
+    when(() => repo.unblockUser('u-2'))
+        .thenAnswer((_) async => const Result.success(null));
+    await container.read(blockedUsersProvider.future);
+
+    await container.read(blockedUsersProvider.notifier).unblock('u-2');
+
+    expect(container.read(blockedUserIdsProvider), isEmpty);
+  });
 }

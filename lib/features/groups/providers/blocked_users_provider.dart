@@ -33,26 +33,36 @@ class BlockedUsers extends _$BlockedUsers {
 
   Future<Result<void, AppError>> block(String userId) async {
     final result = await ref.read(groupRepositoryProvider).blockUser(userId);
-    if (result is Success) await _afterChange();
+    if (result is Success) await _afterChange(blockedId: userId);
     return result;
   }
 
   Future<Result<void, AppError>> unblock(String userId) async {
     final result = await ref.read(groupRepositoryProvider).unblockUser(userId);
-    if (result is Success) await _afterChange();
+    if (result is Success) await _afterChange(unblockedId: userId);
     return result;
   }
 
-  Future<void> _afterChange() async {
-    // Refetch quietly (no loading flash), then drop everything the server now
-    // filters differently for this user.
+  Future<void> _afterChange({String? blockedId, String? unblockedId}) async {
+    // The RPC succeeded, so apply its known effect immediately. If the
+    // background refetch below fails we keep this state rather than dropping
+    // to an error (which would show the user as unblocked again).
+    final current = state.valueOrNull ?? const <BlockedUser>[];
+    state = AsyncValue.data([
+      if (blockedId != null && !current.any((u) => u.userId == blockedId))
+        BlockedUser(
+          userId: blockedId,
+          displayName: 'Player',
+          blockedAt: DateTime.now().toUtc(),
+        ),
+      for (final u in current)
+        if (u.userId != unblockedId) u,
+    ]);
     final refreshed = await ref
         .read(groupRepositoryProvider)
         .listBlockedUsers();
     if (refreshed case Success(data: final users)) {
       state = AsyncValue.data(users);
-    } else {
-      ref.invalidateSelf();
     }
     ref.invalidate(dailyLeaderboardProvider);
     ref.invalidate(weeklyLeaderboardProvider);
