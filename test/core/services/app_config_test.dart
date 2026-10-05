@@ -116,6 +116,24 @@ void main() {
       expect(config.storeUrlFor('other'), AppConfig.androidPlayStoreFallback);
     });
 
+    test('empty store_urls resolves to the real store listings', () {
+      const config = AppConfig();
+      expect(
+        config.storeUrlFor('ios'),
+        'https://apps.apple.com/app/id6810895361',
+      );
+      expect(
+        config.storeUrlFor('android'),
+        'https://play.google.com/store/apps/details?id=com.icos.game',
+      );
+    });
+
+    test('store_urls entries win per platform over fallbacks', () {
+      const config = AppConfig(storeUrls: {'ios': 'https://x.test/ios'});
+      expect(config.storeUrlFor('ios'), 'https://x.test/ios');
+      expect(config.storeUrlFor('android'), AppConfig.androidPlayStoreFallback);
+    });
+
     test('ignores malformed rows', () {
       final config = AppConfig.fromRows(const [
         {'nope': 1},
