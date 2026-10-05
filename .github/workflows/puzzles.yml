@@ -23,12 +23,17 @@ jobs:
         with:
           deno-version: v2.x
 
+      # stdout is the generated rows INCLUDING solution paths; never let it
+      # reach the job log. Progress and errors go to stderr.
       - name: Generate puzzles
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PUZZLE_SEED_SALT: ${{ secrets.PUZZLE_SEED_SALT }}
         run: |
+          test -n "$SUPABASE_URL" && test -n "$SUPABASE_SERVICE_ROLE_KEY" && test -n "$PUZZLE_SEED_SALT" \
+            || { echo "::error::Repo secrets SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / PUZZLE_SEED_SALT are not set"; exit 1; }
           deno run -A scripts/generate_puzzles.ts daily \
+            --from "$(date -u +%F)" \
             --days "${{ inputs.days || '14' }}" \
-            --salt "$PUZZLE_SEED_SALT"
+            --salt "$PUZZLE_SEED_SALT" > /dev/null
