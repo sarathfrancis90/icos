@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/router/deep_link.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/legal_consent_text.dart';
 import '../domain/password_rules.dart';
@@ -13,7 +14,15 @@ import 'widgets/auth_outcome_handler.dart';
 import 'widgets/forgot_password_dialog.dart';
 
 class EmailAuthScreen extends ConsumerStatefulWidget {
-  const EmailAuthScreen({super.key, this.initialSignUp = true});
+  const EmailAuthScreen({
+    super.key,
+    this.initialSignUp = true,
+    this.nextLocation,
+  });
+
+  /// Where to go once signed in (a whitelisted deep link; see
+  /// [sanitizeDeepLink]), e.g. the invite the guest was joining.
+  final String? nextLocation;
 
   /// When false the form opens in "sign in" mode.
   final bool initialSignUp;
@@ -367,6 +376,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
       outcome,
       emailForExisting: email,
       passwordForExisting: password,
+      nextLocation: widget.nextLocation,
     );
     if (mounted && !done) {
       setState(() => _isLoading = false);

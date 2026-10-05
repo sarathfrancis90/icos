@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/router/deep_link.dart';
 import '../../providers/auth_provider.dart';
 
 /// Shows one-shot messages from [authFlowMessageProvider] (deep-link
@@ -45,7 +46,11 @@ Future<bool> handleAuthOutcome(
   AuthOutcome outcome, {
   String? emailForExisting,
   String? passwordForExisting,
+  String? nextLocation,
 }) async {
+  // Only a whitelisted deep link (`/join/<code>`, `/puzzle/<date>`) is
+  // resumed after signing in; anything else goes Home.
+  final next = sanitizeDeepLink(nextLocation) ?? '/';
   final messenger = ScaffoldMessenger.of(context);
   switch (outcome) {
     case AuthSuccess(:final isNewAccount):
@@ -58,7 +63,7 @@ Future<bool> handleAuthOutcome(
           ),
         ),
       );
-      context.go('/');
+      context.go(next);
       return true;
 
     case AuthRedirected():
@@ -107,6 +112,7 @@ Future<bool> handleAuthOutcome(
         email: email ?? emailForExisting,
         password: passwordForExisting,
         provider: provider,
+        nextLocation: nextLocation,
       );
 
     case AuthCancelled():
@@ -129,6 +135,7 @@ Future<bool> _offerExistingAccount(
   required String? email,
   required String? password,
   required OAuthKind? provider,
+  String? nextLocation,
 }) async {
   final label = email ??
       switch (provider) {
@@ -168,9 +175,19 @@ Future<bool> _offerExistingAccount(
     outcome = await notifier.signInWithEmail(email, password);
   } else {
     // Email known but no password: bounce to the sign-in form.
-    if (context.mounted) context.push('/auth/email?mode=signin');
+    if (context.mounted) {
+      context.push(
+        Uri(
+          path: '/auth/email',
+          queryParameters: {
+            'mode': 'signin',
+            'from': ?sanitizeDeepLink(nextLocation),
+          },
+        ).toString(),
+      );
+    }
     return false;
   }
   if (!context.mounted) return false;
-  return handleAuthOutcome(context, ref, outcome);
+  return handleAuthOutcome(context, ref, outcome, nextLocation: nextLocation);
 }

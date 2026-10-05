@@ -61,6 +61,14 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
             padding: const EdgeInsetsDirectional.all(AppSizes.lg),
             child: !session.canUseGroups
                 ? AccountRequiredCard(
+                    // Carry the invite through account creation so the
+                    // player lands back in the join flow.
+                    onCreateAccount: () => context.push(
+                      Uri(
+                        path: '/auth',
+                        queryParameters: {'from': '/join/$_code'},
+                      ).toString(),
+                    ),
                     message: 'You were invited to a group with code $_code. '
                         'Create a free account to join it — your streak and '
                         'stats come with you.',

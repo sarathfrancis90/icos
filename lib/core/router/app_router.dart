@@ -146,7 +146,9 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/auth',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const AuthScreen(),
+        builder: (context, state) => AuthScreen(
+          nextLocation: sanitizeDeepLink(state.uri.queryParameters['from']),
+        ),
       ),
       GoRoute(
         path: kNewPasswordPath,
@@ -158,6 +160,7 @@ GoRouter appRouter(Ref ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => EmailAuthScreen(
           initialSignUp: state.uri.queryParameters['mode'] != 'signin',
+          nextLocation: sanitizeDeepLink(state.uri.queryParameters['from']),
         ),
       ),
       GoRoute(

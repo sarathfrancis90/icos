@@ -6,6 +6,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/router/deep_link.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/legal_consent_text.dart';
 import '../domain/auth_strategy.dart';
@@ -13,7 +14,11 @@ import '../providers/auth_provider.dart';
 import 'widgets/auth_outcome_handler.dart';
 
 class AuthScreen extends ConsumerWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({super.key, this.nextLocation});
+
+  /// Where to go once signed in, e.g. the invite a guest was joining. Only a
+  /// whitelisted deep link is honoured (see [sanitizeDeepLink]).
+  final String? nextLocation;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -22,6 +27,14 @@ class AuthScreen extends ConsumerWidget {
     final hasSession = authState.valueOrNull != null;
     final platform = AuthNotifier.platform;
     final showApple = AuthStrategy.showAppleButton(platform);
+    final next = sanitizeDeepLink(nextLocation);
+    String emailRoute({bool signIn = false}) => Uri(
+      path: '/auth/email',
+      queryParameters: {
+        if (signIn) 'mode': 'signin',
+        'from': ?next,
+      },
+    ).toString();
 
     listenForAuthFlowMessages(context, ref);
 
@@ -127,7 +140,12 @@ class AuthScreen extends ConsumerWidget {
                                   .read(authNotifierProvider.notifier)
                                   .signInWithGoogle();
                               if (context.mounted) {
-                                await handleAuthOutcome(context, ref, outcome);
+                                await handleAuthOutcome(
+                                  context,
+                                  ref,
+                                  outcome,
+                                  nextLocation: next,
+                                );
                               }
                             },
                             child: Container(
@@ -195,6 +213,7 @@ class AuthScreen extends ConsumerWidget {
                                     context,
                                     ref,
                                     outcome,
+                                    nextLocation: next,
                                   );
                                 }
                               },
@@ -207,7 +226,7 @@ class AuthScreen extends ConsumerWidget {
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: () => context.push('/auth/email'),
+                            onPressed: () => context.push(emailRoute()),
                             icon: const Icon(Icons.email_outlined),
                             label: const Text(AppStrings.signUpWithEmail),
                           ),
@@ -222,7 +241,7 @@ class AuthScreen extends ConsumerWidget {
                           label: AppStrings.alreadyHaveAccount,
                           child: TextButton(
                             onPressed: () =>
-                                context.push('/auth/email?mode=signin'),
+                                context.push(emailRoute(signIn: true)),
                             child: Text.rich(
                               TextSpan(
                                 text: 'Already have an account?  ',
