@@ -230,6 +230,16 @@ abstract final class NotificationService {
     }
   }
 
+  /// Cancels every pending reminder if reminders are no longer allowed (the
+  /// player turned them off, or revoked OS permission). Call on app resume so
+  /// a revoked permission does not leave scheduled notifications behind until
+  /// Home next reloads. Does nothing when reminders are allowed.
+  static Future<void> cancelPendingIfNotAllowed() async {
+    if (await _mayNotify()) return;
+    await _cancelPending(dailyReminderId);
+    await _cancelPending(streakReminderId);
+  }
+
   /// Re-arms the daily reminder when allowed (setting on + OS permission),
   /// otherwise cancels any pending one.
   static Future<void> refreshDailyReminder() async {

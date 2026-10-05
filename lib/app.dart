@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_sizes.dart';
 import 'core/router/app_router.dart';
 import 'core/services/app_config_provider.dart';
+import 'core/services/notification_service.dart';
 import 'core/services/sync_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
@@ -53,6 +56,9 @@ class _IcosAppState extends ConsumerState<IcosApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
     ref.invalidate(appConfigProvider);
+    unawaited(
+      NotificationService.cancelPendingIfNotAllowed().catchError((Object _) {}),
+    );
     ref.read(sessionKeeperProvider.notifier).ensure();
     ref.read(puzzleRepositoryProvider).preCacheTomorrowPuzzle();
     ref.read(syncNotifierProvider.notifier).flush();

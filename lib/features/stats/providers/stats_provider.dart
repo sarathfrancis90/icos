@@ -63,6 +63,19 @@ Future<StatsOverview> statsOverview(Ref ref) async {
   return loadStatsOverview(ref.read(statsRepositoryProvider), userId);
 }
 
+/// Streak from the last saved stats overview of [userId], or `null` when
+/// there is none (or storage is unavailable). Used when the server cannot be
+/// reached, e.g. to decide on the streak reminder.
+int? cachedCurrentStreak(String? userId) {
+  if (userId == null) return null;
+  try {
+    final cached = StorageService.getStatsCache('overview', userId: userId);
+    return cached == null ? null : StatsOverview.tryFromJson(cached)?.currentStreak;
+  } catch (_) {
+    return null;
+  }
+}
+
 /// Fetches the overview; caches it on success, serves the cache on failure.
 Future<StatsOverview> loadStatsOverview(
   StatsRepository repo,

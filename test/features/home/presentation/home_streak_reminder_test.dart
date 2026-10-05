@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:icos/core/services/auth_session_provider.dart';
 import 'package:icos/core/services/notification_service.dart';
+import 'package:icos/core/services/storage_service.dart';
 import 'package:icos/features/home/presentation/home_screen.dart';
 import 'package:icos/features/puzzle/providers/daily_puzzle_provider.dart';
 import 'package:icos/features/puzzle/providers/puzzle_result_provider.dart';
@@ -12,6 +14,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../../../core/services/notification_service_test.dart'
     show FakeNotificationBackend;
+import '../../../helpers/storage_test_helpers.dart';
 import '../../../helpers/test_helpers.dart';
 
 void main() {
@@ -77,6 +80,41 @@ void main() {
     expect(
       backend.scheduled.single['body'],
       "Today's puzzle closes in 4 hours.",
+    );
+  });
+
+  testWidgets('streak unreachable offline: uses the saved stats streak',
+      (tester) async {
+    await tester.runAsync(() async {
+      await initTestStorage(userId: 'u1');
+      await StorageService.saveStatsCache('overview', const {
+        'currentStreak': 9,
+        'longestStreak': 9,
+        'totalSolved': 20,
+        'averageTimeSeconds': 60,
+        'freezeCount': 1,
+        'lastFreezeUsedAt': null,
+      }, userId: 'u1');
+    });
+    SharedPreferences.setMockInitialValues({'notif_daily_enabled': true});
+    await tester.pumpWidget(
+      buildTestWidget(
+        const HomeScreen(),
+        overrides: [
+          dailyPuzzleProvider.overrideWith((ref) async => testPuzzle),
+          todayResultProvider.overrideWith((ref) async => null),
+          streakProvider.overrideWith((ref) async => throw Exception('offline')),
+          authSessionProvider.overrideWithValue(
+            const FakeAuthSessionInfo(userId: 'u1'),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(backend.scheduled, isNotEmpty);
+    expect(
+      backend.scheduled.every((e) => e['id'] == NotificationService.streakReminderId),
+      isTrue,
     );
   });
 }

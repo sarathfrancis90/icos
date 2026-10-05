@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/services/auth_session_provider.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart';
@@ -34,8 +35,14 @@ class HomeScreen extends ConsumerWidget {
       final today = ref.read(todayResultProvider);
       if (today is! AsyncData<SubmissionResult?>) return;
       final solved = today.value != null;
+      // Server streak; if the server could not be reached, the last saved
+      // stats; while still loading, unknown.
+      final streakState = ref.read(streakProvider);
       final streak = today.value?.streak?.currentStreak ??
-          ref.read(streakProvider).valueOrNull?.currentStreak;
+          streakState.valueOrNull?.currentStreak ??
+          (streakState.hasError
+              ? cachedCurrentStreak(ref.read(authSessionProvider).userId)
+              : null);
       unawaited(
         NotificationService.refreshStreakReminder(
           solvedToday: solved,

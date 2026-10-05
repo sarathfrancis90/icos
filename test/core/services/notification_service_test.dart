@@ -193,4 +193,25 @@ void main() {
       expect(backend.scheduled, hasLength(1));
     });
   });
+
+  group('cancelPendingIfNotAllowed (app resume)', () {
+    test('OS permission revoked cancels both pending reminders', () async {
+      await setEnabled(true);
+      backend.permission = false;
+      await NotificationService.cancelPendingIfNotAllowed();
+      expect(
+        backend.cancelled,
+        containsAll([
+          NotificationService.dailyReminderId,
+          NotificationService.streakReminderId,
+        ]),
+      );
+    });
+
+    test('allowed leaves pending reminders alone', () async {
+      await setEnabled(true);
+      await NotificationService.cancelPendingIfNotAllowed();
+      expect(backend.cancelled, isEmpty);
+    });
+  });
 }
