@@ -16,6 +16,15 @@ String? sanitizeDeepLink(String? raw) {
   return null;
 }
 
+/// Returns [raw] only when it is `/join/<6 alphanumerics>`. Used for the
+/// invite carried through account creation, where nothing else qualifies
+/// (unlike [sanitizeDeepLink], which onboarding uses and which also allows
+/// puzzle links).
+String? sanitizeJoinLink(String? raw) {
+  final path = sanitizeDeepLink(raw);
+  return path != null && _joinLink.hasMatch(path) ? path : null;
+}
+
 /// The location to send a first-time user to, preserving a requested deep
 /// link through onboarding. Returns `null` when no redirect is needed.
 String? onboardingRedirect({

@@ -18,7 +18,7 @@ class AuthScreen extends ConsumerWidget {
   const AuthScreen({super.key, this.nextLocation});
 
   /// Where to go once signed in, e.g. the invite a guest was joining. Only a
-  /// whitelisted deep link is honoured (see [sanitizeDeepLink]).
+  /// whitelisted deep link is honoured (see [sanitizeJoinLink]).
   final String? nextLocation;
 
   @override
@@ -28,7 +28,7 @@ class AuthScreen extends ConsumerWidget {
     final hasSession = authState.valueOrNull != null;
     final platform = AuthNotifier.platform;
     final showApple = AuthStrategy.showAppleButton(platform);
-    final next = sanitizeDeepLink(nextLocation);
+    final next = sanitizeJoinLink(nextLocation);
     Future<void> googleSignIn() async {
       final outcome = await ref
           .read(authNotifierProvider.notifier)

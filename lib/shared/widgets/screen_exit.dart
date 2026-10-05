@@ -25,6 +25,7 @@ Widget? deepLinkLeading(
   BuildContext context, {
   required String fallback,
   required String label,
+  VoidCallback? onExit,
 }) {
   if (Navigator.of(context).canPop()) return null;
   return IconButton(
@@ -35,6 +36,9 @@ Widget? deepLinkLeading(
       minWidth: AppSizes.minTouchTarget,
       minHeight: AppSizes.minTouchTarget,
     ),
-    onPressed: () => GoRouter.of(context).go(fallback),
+    onPressed: () {
+      onExit?.call();
+      GoRouter.of(context).go(fallback);
+    },
   );
 }

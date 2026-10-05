@@ -29,6 +29,7 @@ import '../services/app_config_service.dart';
 import '../services/storage_service.dart';
 import '../utils/result.dart';
 import 'deep_link.dart';
+import 'invite_continuation.dart';
 
 part 'app_router.g.dart';
 
@@ -37,7 +38,7 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 @riverpod
 GoRouter appRouter(Ref ref) {
-  return GoRouter(
+  final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     redirect: (context, state) => appRedirect(
@@ -147,7 +148,7 @@ GoRouter appRouter(Ref ref) {
         path: '/auth',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => AuthScreen(
-          nextLocation: sanitizeDeepLink(state.uri.queryParameters['from']),
+          nextLocation: sanitizeJoinLink(state.uri.queryParameters['from']),
         ),
       ),
       GoRoute(
@@ -160,7 +161,7 @@ GoRouter appRouter(Ref ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => EmailAuthScreen(
           initialSignUp: state.uri.queryParameters['mode'] != 'signin',
-          nextLocation: sanitizeDeepLink(state.uri.queryParameters['from']),
+          nextLocation: sanitizeJoinLink(state.uri.queryParameters['from']),
         ),
       ),
       GoRoute(
@@ -217,6 +218,8 @@ GoRouter appRouter(Ref ref) {
       ),
     ],
   );
+  wireInviteContinuation(ref, router);
+  return router;
 }
 
 /// Re-evaluates router redirects when gating providers change.

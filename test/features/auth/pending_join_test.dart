@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,10 +8,13 @@ import 'package:icos/features/auth/domain/auth_outcome.dart';
 import 'package:icos/features/auth/presentation/auth_screen.dart';
 import 'package:icos/features/auth/presentation/widgets/auth_outcome_handler.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
+import 'package:icos/core/services/storage_service.dart';
+import 'package:icos/features/groups/domain/pending_invite.dart';
 import 'package:icos/features/groups/presentation/join_group_screen.dart';
 import 'package:icos/features/groups/providers/groups_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show User;
 
+import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
 
 class _FakeAuth extends AuthNotifier {
@@ -30,6 +35,10 @@ String _at(GoRouter r) =>
 
 void main() {
   setUpTestEnvironment();
+
+  late Directory dir;
+  setUp(() async => dir = await initTestStorage());
+  tearDown(() async => dir.delete(recursive: true));
 
   group('pending join survives account creation', () {
     testWidgets('the join screen sends the invite along to /auth', (
@@ -167,6 +176,17 @@ void main() {
     ) async {
       expect(_at(await finishAuth(tester, null)), '/');
       expect(_at(await finishAuth(tester, '/groups/steal')), '/');
+      // Only an invite qualifies here, not a puzzle link.
+      expect(_at(await finishAuth(tester, '/puzzle/2026-10-05')), '/');
+    });
+
+    testWidgets('a stored invite is resumed (and cleared) on sign-up', (
+      tester,
+    ) async {
+      await PendingInvite.save('ABC123');
+      final router = await finishAuth(tester, null);
+      expect(_at(router), '/join/ABC123');
+      expect(StorageService.pendingInviteCode, isNull);
     });
   });
 }

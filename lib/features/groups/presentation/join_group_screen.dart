@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,7 @@ import '../../../core/utils/result.dart';
 import '../../../shared/widgets/content_width.dart';
 import '../../../shared/widgets/screen_exit.dart';
 import '../domain/invite_code.dart';
+import '../domain/pending_invite.dart';
 import '../providers/groups_provider.dart';
 import 'widgets/account_required_card.dart';
 import 'widgets/group_ui.dart';
@@ -47,12 +50,23 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _join());
     }
 
+    return PopScope<Object?>(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) unawaited(PendingInvite.clear());
+      },
+      child: _scaffold(context, session),
+    );
+  }
+
+  Widget _scaffold(BuildContext context, GroupsSession session) {
     return Scaffold(
       appBar: AppBar(
         leading: deepLinkLeading(
           context,
           fallback: '/groups',
           label: 'Back to Groups',
+          // Backing out on purpose drops the invite kept for sign-up.
+          onExit: () => unawaited(PendingInvite.clear()),
         ),
         title: const Text(AppStrings.joinGroup),
       ),
@@ -64,12 +78,17 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
                 ? AccountRequiredCard(
                     // Carry the invite through account creation so the
                     // player lands back in the join flow.
-                    onCreateAccount: () => context.push(
-                      Uri(
-                        path: '/auth',
-                        queryParameters: {'from': '/join/$_code'},
-                      ).toString(),
-                    ),
+                    onCreateAccount: () {
+                      // Kept on the device: creating the account through the
+                      // browser replaces the navigation stack.
+                      unawaited(PendingInvite.save(_code));
+                      context.push(
+                        Uri(
+                          path: '/auth',
+                          queryParameters: {'from': '/join/$_code'},
+                        ).toString(),
+                      );
+                    },
                     message: 'You were invited to a group with code $_code. '
                         'Create a free account to join it — your streak and '
                         'stats come with you.',

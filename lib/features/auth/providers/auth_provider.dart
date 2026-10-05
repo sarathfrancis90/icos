@@ -12,6 +12,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/router/invite_continuation.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/app_logger.dart';
 import '../../../core/services/session_service.dart';
@@ -19,6 +20,7 @@ import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
+import '../../groups/domain/pending_invite.dart';
 import '../domain/auth_outcome.dart';
 import '../domain/auth_strategy.dart';
 
@@ -131,14 +133,16 @@ class AuthNotifier extends _$AuthNotifier {
   AsyncValue<User?> build() {
     _subscription?.cancel();
     _subscription = SupabaseService.auth.onAuthStateChange.listen(
-      _onAuthEvent,
+      handleAuthEvent,
       onError: _onAuthError,
     );
     ref.onDispose(() => _subscription?.cancel());
     return AsyncValue.data(SupabaseService.auth.currentUser);
   }
 
-  void _onAuthEvent(AuthState data) {
+  /// Handles a Supabase auth event. Public only so tests can drive it.
+  @visibleForTesting
+  void handleAuthEvent(AuthState data) {
     final user = data.session?.user ?? SupabaseService.auth.currentUser;
     state = AsyncValue.data(user);
     if (data.event == AuthChangeEvent.userUpdated ||
@@ -154,6 +158,19 @@ class AuthNotifier extends _$AuthNotifier {
             'Account linked. Your progress is saved.',
           );
     }
+    // A non-guest account just got linked or signed in: resume the invite the
+    // guest was joining, if one is pending (consumed exactly once).
+    if ((data.event == AuthChangeEvent.userUpdated ||
+            data.event == AuthChangeEvent.signedIn) &&
+        user != null &&
+        !user.isAnonymous) {
+      unawaited(_resumePendingInvite());
+    }
+  }
+
+  Future<void> _resumePendingInvite() async {
+    final code = await PendingInvite.consume();
+    if (code != null) ref.read(inviteContinuationProvider.notifier).offer(code);
   }
 
   void _onAuthError(Object error, StackTrace st) {

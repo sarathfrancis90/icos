@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/deep_link.dart';
+import '../../../groups/domain/pending_invite.dart';
 import '../../providers/auth_provider.dart';
 
 /// Shows one-shot messages from [authFlowMessageProvider] (deep-link
@@ -48,12 +49,17 @@ Future<bool> handleAuthOutcome(
   String? passwordForExisting,
   String? nextLocation,
 }) async {
-  // Only a whitelisted deep link (`/join/<code>`, `/puzzle/<date>`) is
-  // resumed after signing in; anything else goes Home.
-  final next = sanitizeDeepLink(nextLocation) ?? '/';
+  // Only `/join/<6 alphanumerics>` is resumed after signing in; anything
+  // else goes Home.
+  var next = sanitizeJoinLink(nextLocation) ?? '/';
   final messenger = ScaffoldMessenger.of(context);
   switch (outcome) {
     case AuthSuccess(:final isNewAccount):
+      // An invite stored before leaving for sign-in is used (and cleared)
+      // here too, so it cannot fire a second time from the auth event.
+      final stored = await PendingInvite.consume();
+      if (next == '/' && stored != null) next = '/join/$stored';
+      if (!context.mounted) return true;
       messenger.showSnackBar(
         SnackBar(
           content: Text(
@@ -181,7 +187,7 @@ Future<bool> _offerExistingAccount(
           path: '/auth/email',
           queryParameters: {
             'mode': 'signin',
-            'from': ?sanitizeDeepLink(nextLocation),
+            'from': ?sanitizeJoinLink(nextLocation),
           },
         ).toString(),
       );

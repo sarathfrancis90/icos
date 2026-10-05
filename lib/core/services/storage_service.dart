@@ -203,6 +203,21 @@ abstract final class StorageService {
   static Future<bool> setHasSeenOnboarding(bool value) =>
       _prefs.setBool('has_seen_onboarding', value);
 
+  // Device-level (not per user): an invite a guest was joining while they
+  // create an account, resumed after the sign-in completes.
+  static String? get pendingInviteCode => _prefs.getString('pending_invite_code');
+  static int? get pendingInviteAtMs => _prefs.getInt('pending_invite_at');
+
+  static Future<void> savePendingInvite(String code, int atMs) async {
+    await _prefs.setString('pending_invite_code', code);
+    await _prefs.setInt('pending_invite_at', atMs);
+  }
+
+  static Future<void> clearPendingInvite() async {
+    await _prefs.remove('pending_invite_code');
+    await _prefs.remove('pending_invite_at');
+  }
+
   static bool get hasSeenNotificationPrompt =>
       _prefs.getBool('has_seen_notification_prompt') ?? false;
   static Future<bool> setHasSeenNotificationPrompt(bool value) =>
