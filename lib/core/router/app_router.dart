@@ -25,6 +25,7 @@ import '../../shared/widgets/blocking_screens.dart';
 import '../services/app_config_provider.dart';
 import '../services/app_config_service.dart';
 import '../services/storage_service.dart';
+import 'deep_link.dart';
 
 part 'app_router.g.dart';
 
@@ -57,17 +58,19 @@ GoRouter appRouter(Ref ref) {
         return '/';
       }
       // Onboarding only applies once no blocking gate is active.
-      if (!StorageService.hasSeenOnboarding && path != '/onboarding') {
-        return '/onboarding';
-      }
-      return null;
+      return onboardingRedirect(
+        uri: state.uri,
+        hasSeenOnboarding: StorageService.hasSeenOnboarding,
+      );
     },
     refreshListenable: _RouterRefresh(ref),
     routes: [
       GoRoute(
         path: '/onboarding',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const OnboardingScreen(),
+        builder: (context, state) => OnboardingScreen(
+          nextLocation: sanitizeDeepLink(state.uri.queryParameters['from']),
+        ),
       ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
@@ -75,27 +78,23 @@ GoRouter appRouter(Ref ref) {
         routes: [
           GoRoute(
             path: '/',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: HomeScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: HomeScreen()),
           ),
           GoRoute(
             path: '/groups',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: GroupsScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: GroupsScreen()),
           ),
           GoRoute(
             path: '/stats',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: StatsScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: StatsScreen()),
           ),
           GoRoute(
             path: '/profile',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: ProfileScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProfileScreen()),
           ),
         ],
       ),

@@ -5,12 +5,17 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/router/deep_link.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/utils/motion.dart';
 import '../../../shared/widgets/spring_button.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({super.key, this.nextLocation});
+
+  /// Deep link the player originally opened (already sanitised); resumed
+  /// once onboarding finishes. Defaults to Home.
+  final String? nextLocation;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -52,7 +57,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _finish() async {
     await StorageService.setHasSeenOnboarding(true);
     if (mounted) {
-      context.go('/');
+      context.go(sanitizeDeepLink(widget.nextLocation) ?? '/');
     }
   }
 
