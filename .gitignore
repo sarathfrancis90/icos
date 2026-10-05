@@ -86,3 +86,7 @@ release/**/mapping-*.txt
 
 # Maestro run output (screenshots + logs, regenerated per run)
 maestro-out/
+
+# Python bytecode
+__pycache__/
+*.pyc
