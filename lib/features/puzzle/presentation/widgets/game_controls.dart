@@ -122,24 +122,31 @@ class _GradientPillButton extends StatelessWidget {
                     ]
                   : null,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isEnabled ? Colors.white : AppColors.textTertiaryDark,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+            // Shrinks to fit at large text sizes (the pill height is fixed).
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: isEnabled ? Colors.white : AppColors.textTertiaryDark,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      icon,
+                      color: isEnabled ? Colors.white.withValues(alpha: 0.8) : AppColors.textTertiaryDark,
+                      size: 20,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  icon,
-                  color: isEnabled ? Colors.white.withValues(alpha: 0.8) : AppColors.textTertiaryDark,
-                  size: 20,
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -185,39 +192,46 @@ class _OutlinedPillButton extends StatelessWidget {
               ),
               color: AppColors.deepBlack.withValues(alpha: 0.5),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isEnabled ? AppColors.textPrimaryDark : AppColors.textTertiaryDark,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (badgeCount > 0) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: const BoxDecoration(
-                      color: AppColors.hintPurple,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '$badgeCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
+            // Shrinks to fit at large text sizes (the pill height is fixed).
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: isEnabled ? AppColors.textPrimaryDark : AppColors.textTertiaryDark,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                ],
-              ],
+                    if (badgeCount > 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: const BoxDecoration(
+                          color: AppColors.hintPurple,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$badgeCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                      ],
+                ),
+              ),
             ),
           ),
         ),

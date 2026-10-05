@@ -552,7 +552,13 @@ class _GlassInfoBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
             border: Border.all(color: AppColors.glassBorder, width: 0.5),
           ),
-          child: Row(
+          // A Wrap, not a Row: at large text sizes the three readings drop
+          // onto further lines instead of overflowing.
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSizes.md,
+            runSpacing: AppSizes.xs,
             children: [
               Text(
                 timer,
@@ -563,7 +569,6 @@ class _GlassInfoBar extends StatelessWidget {
                   fontFeatures: [FontFeature.tabularFigures()],
                 ),
               ),
-              const Spacer(),
               Text(
                 '${gridSize}x$gridSize · ${difficulty[0].toUpperCase()}${difficulty.substring(1)}',
                 style: const TextStyle(
@@ -572,7 +577,6 @@ class _GlassInfoBar extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const Spacer(),
               Text(
                 'Par ${AppDateUtils.formatTimeHuman(parTimeSeconds)}',
                 style: TextStyle(

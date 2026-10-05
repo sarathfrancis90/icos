@@ -118,12 +118,16 @@ void main() {
 
   Finder closeControl() => find.byTooltip('Back to Groups');
 
-  testWidgets('/join/<code> as a guest on an empty stack offers a way out',
-      (tester) async {
+  testWidgets('/join/<code> as a guest on an empty stack offers a way out', (
+    tester,
+  ) async {
     final router = _router('/join/ABC123', (_) => const SizedBox());
     addTearDown(router.dispose);
     await tester.pumpWidget(
-      buildTestWidgetWithRouter(router, overrides: groupOverrides(signedIn: false)),
+      buildTestWidgetWithRouter(
+        router,
+        overrides: groupOverrides(signedIn: false),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -137,12 +141,16 @@ void main() {
     expect(_location(router), '/groups');
   });
 
-  testWidgets('a successful join lands on the group with Groups underneath',
-      (tester) async {
+  testWidgets('a successful join lands on the group with Groups underneath', (
+    tester,
+  ) async {
     final router = _router('/join/ABC123', (_) => const SizedBox());
     addTearDown(router.dispose);
     await tester.pumpWidget(
-      buildTestWidgetWithRouter(router, overrides: groupOverrides(signedIn: true)),
+      buildTestWidgetWithRouter(
+        router,
+        overrides: groupOverrides(signedIn: true),
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
@@ -157,12 +165,16 @@ void main() {
     expect(find.text('GROUPS TAB'), findsOneWidget);
   });
 
-  testWidgets('/groups/<id> on an empty stack offers a way out',
-      (tester) async {
+  testWidgets('/groups/<id> on an empty stack offers a way out', (
+    tester,
+  ) async {
     final router = _router('/groups/g-1', (_) => const SizedBox());
     addTearDown(router.dispose);
     await tester.pumpWidget(
-      buildTestWidgetWithRouter(router, overrides: groupOverrides(signedIn: true)),
+      buildTestWidgetWithRouter(
+        router,
+        overrides: groupOverrides(signedIn: true),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -172,12 +184,16 @@ void main() {
     expect(_location(router), '/groups');
   });
 
-  testWidgets('/groups/<id> pushed over Groups keeps the normal back button',
-      (tester) async {
+  testWidgets('/groups/<id> pushed over Groups keeps the normal back button', (
+    tester,
+  ) async {
     final router = _router('/groups', (_) => const SizedBox());
     addTearDown(router.dispose);
     await tester.pumpWidget(
-      buildTestWidgetWithRouter(router, overrides: groupOverrides(signedIn: true)),
+      buildTestWidgetWithRouter(
+        router,
+        overrides: groupOverrides(signedIn: true),
+      ),
     );
     await tester.pumpAndSettle();
     router.push('/groups/g-1');

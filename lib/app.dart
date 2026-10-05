@@ -16,6 +16,7 @@ import 'features/auth/providers/user_scope_keeper.dart';
 import 'features/puzzle/domain/models/puzzle.dart';
 import 'features/puzzle/providers/daily_puzzle_provider.dart';
 import 'features/puzzle/providers/puzzle_result_provider.dart';
+import 'shared/widgets/text_scale_limit.dart';
 
 class IcosApp extends ConsumerStatefulWidget {
   const IcosApp({super.key});
@@ -94,6 +95,9 @@ class _IcosAppState extends ConsumerState<IcosApp>
       themeAnimationDuration:
           const Duration(milliseconds: AppSizes.themeTransitionMs),
       routerConfig: router,
+      // Layouts are verified to 200% text scale; larger system sizes (iOS
+      // accessibility sizes reach ~310%) are clamped rather than broken.
+      builder: (context, child) => TextScaleLimit(child: child ?? const SizedBox()),
     );
   }
 }

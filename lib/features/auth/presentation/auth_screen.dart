@@ -175,19 +175,30 @@ class AuthScreen extends ConsumerWidget {
                         // as Google, directly under it: Apple's branding rules forbid
                         // making it less prominent.
                         if (showApple) ...[
-                          SignInWithAppleButton(
-                            text: AppStrings.signInWithApple,
-                            height: 52,
-                            style: SignInWithAppleButtonStyle.white,
-                            borderRadius: BorderRadius.circular(26),
-                            onPressed: () async {
-                              final outcome = await ref
-                                  .read(authNotifierProvider.notifier)
-                                  .signInWithApple();
-                              if (context.mounted) {
-                                await handleAuthOutcome(context, ref, outcome);
-                              }
-                            },
+                          // The package fixes the button's height, and its label
+                          // is sized from that height, so it would clip at large
+                          // text sizes. Apple's own button does not follow
+                          // Dynamic Type either; keep the label at its design
+                          // size and let everything around it scale.
+                          MediaQuery.withNoTextScaling(
+                            child: SignInWithAppleButton(
+                              text: AppStrings.signInWithApple,
+                              height: 52,
+                              style: SignInWithAppleButtonStyle.white,
+                              borderRadius: BorderRadius.circular(26),
+                              onPressed: () async {
+                                final outcome = await ref
+                                    .read(authNotifierProvider.notifier)
+                                    .signInWithApple();
+                                if (context.mounted) {
+                                  await handleAuthOutcome(
+                                    context,
+                                    ref,
+                                    outcome,
+                                  );
+                                }
+                              },
+                            ),
                           ),
                           const SizedBox(height: AppSizes.sm),
                         ],

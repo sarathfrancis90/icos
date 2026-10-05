@@ -8,6 +8,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart';
+import '../../../core/utils/text_scale.dart';
 import '../../practice/providers/practice_provider.dart';
 import '../domain/models/streak.dart';
 import '../providers/stats_provider.dart';
@@ -179,31 +180,25 @@ class _StatsOverviewCards extends StatelessWidget {
           longestStreak: overview.longestStreak,
         ),
         const SizedBox(height: AppSizes.sm),
-        Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                label: 'Puzzles Solved',
-                value: '${overview.totalSolved}',
-                icon: Icons.check_circle_rounded,
-                gradientColors: const [AppColors.success, AppColors.successDim],
-              ),
-            ),
-            const SizedBox(width: AppSizes.sm),
-            Expanded(
-              child: _StatCard(
-                label: 'Average Time',
-                value: overview.averageTimeSeconds > 0
-                    ? AppDateUtils.formatTime(overview.averageTimeSeconds)
-                    : '--:--',
-                icon: Icons.timer_rounded,
-                gradientColors: const [
-                  AppColors.purpleLight,
-                  AppColors.purpleDeep,
-                ],
-              ),
-            ),
-          ],
+        _PairOf(
+          stack: isLargeText(context),
+          first: _StatCard(
+            label: 'Puzzles Solved',
+            value: '${overview.totalSolved}',
+            icon: Icons.check_circle_rounded,
+            gradientColors: const [AppColors.success, AppColors.successDim],
+          ),
+          second: _StatCard(
+            label: 'Average Time',
+            value: overview.averageTimeSeconds > 0
+                ? AppDateUtils.formatTime(overview.averageTimeSeconds)
+                : '--:--',
+            icon: Icons.timer_rounded,
+            gradientColors: const [
+              AppColors.purpleLight,
+              AppColors.purpleDeep,
+            ],
+          ),
         ),
         const SizedBox(height: AppSizes.sm),
         _StatCard(
@@ -226,6 +221,55 @@ class _StatsOverviewCards extends StatelessWidget {
     }
     if (overview.lastFreezeUsedAt != null) return 'Used this week';
     return 'None left this week';
+  }
+}
+
+/// Two cards side by side, or one above the other when [stack] (large text
+/// leaves each card too little width).
+class _PairOf extends StatelessWidget {
+  const _PairOf({
+    required this.stack,
+    required this.first,
+    required this.second,
+  });
+
+  final bool stack;
+  final Widget first;
+  final Widget second;
+
+  @override
+  Widget build(BuildContext context) {
+    if (stack) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [first, const SizedBox(height: AppSizes.sm), second],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(child: first),
+        const SizedBox(width: AppSizes.sm),
+        Expanded(child: second),
+      ],
+    );
+  }
+}
+
+/// A number that shrinks to fit rather than overflowing or breaking.
+class _FitNumber extends StatelessWidget {
+  const _FitNumber({required this.text, required this.style, this.alignment});
+
+  final String text;
+  final TextStyle? style;
+  final AlignmentGeometry? alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: alignment ?? Alignment.center,
+      child: Text(text, maxLines: 1, style: style),
+    );
   }
 }
 
@@ -262,7 +306,21 @@ class _StreakHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final stack = isLargeText(context);
+    final current = _HeroStat(
+      value: currentStreak,
+      label: 'Current Streak',
+      icon: Icons.local_fire_department_rounded,
+      color: AppColors.pathOrange,
+      deepColor: AppColors.pathOrangeDeep,
+    );
+    final longest = _HeroStat(
+      value: longestStreak,
+      label: 'Longest Streak',
+      icon: Icons.emoji_events_rounded,
+      color: AppColors.streakGold,
+      deepColor: AppColors.streakGold,
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -271,75 +329,75 @@ class _StreakHero extends StatelessWidget {
         border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsetsDirectional.all(AppSizes.md),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
+      // Side by side normally; stacked at large text so each keeps its width.
+      child: stack
+          ? Column(
               children: [
+                current,
+                const SizedBox(height: AppSizes.sm),
                 Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.pathOrange.withValues(alpha: 0.25),
-                        AppColors.pathOrangeDeep.withValues(alpha: 0.05),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-                  ),
-                  child: const Icon(
-                    Icons.local_fire_department_rounded,
-                    color: AppColors.pathOrange,
-                    size: 36,
-                  ),
+                  width: double.infinity,
+                  height: 1,
+                  color: AppColors.cellBorder,
                 ),
                 const SizedBox(height: AppSizes.sm),
-                Text(
-                  '$currentStreak',
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    fontFeatures: [const FontFeature.tabularFigures()],
-                  ),
-                ),
-                Text('Current Streak', style: theme.textTheme.bodySmall),
+                longest,
               ],
-            ),
-          ),
-          Container(width: 1, height: 80, color: AppColors.cellBorder),
-          Expanded(
-            child: Column(
+            )
+          : Row(
               children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.streakGold.withValues(alpha: 0.25),
-                        AppColors.streakGold.withValues(alpha: 0.05),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-                  ),
-                  child: const Icon(
-                    Icons.emoji_events_rounded,
-                    color: AppColors.streakGold,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(height: AppSizes.sm),
-                Text(
-                  '$longestStreak',
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    fontFeatures: [const FontFeature.tabularFigures()],
-                  ),
-                ),
-                Text('Longest Streak', style: theme.textTheme.bodySmall),
+                Expanded(child: current),
+                Container(width: 1, height: 80, color: AppColors.cellBorder),
+                Expanded(child: longest),
               ],
             ),
+    );
+  }
+}
+
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.deepColor,
+  });
+
+  final int value;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Color deepColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              colors: [
+                color.withValues(alpha: 0.25),
+                deepColor.withValues(alpha: 0.05),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(AppSizes.radiusLg),
           ),
-        ],
-      ),
+          child: Icon(icon, color: color, size: 36),
+        ),
+        const SizedBox(height: AppSizes.sm),
+        _FitNumber(
+          text: '$value',
+          style: theme.textTheme.displayLarge?.copyWith(
+            fontFeatures: [const FontFeature.tabularFigures()],
+          ),
+        ),
+        Text(label, textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
+      ],
     );
   }
 }
@@ -390,16 +448,21 @@ class _StatCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label, style: theme.textTheme.bodySmall),
-                Text(
-                  value,
-                  style:
-                      (value.length > 12
-                              ? theme.textTheme.titleMedium
-                              : theme.textTheme.headlineMedium)
-                          ?.copyWith(
-                            fontFeatures: [const FontFeature.tabularFigures()],
-                          ),
-                ),
+                if (value.length > 12)
+                  Text(
+                    value,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontFeatures: [const FontFeature.tabularFigures()],
+                    ),
+                  )
+                else
+                  _FitNumber(
+                    text: value,
+                    alignment: AlignmentDirectional.centerStart,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontFeatures: [const FontFeature.tabularFigures()],
+                    ),
+                  ),
               ],
             ),
           ),

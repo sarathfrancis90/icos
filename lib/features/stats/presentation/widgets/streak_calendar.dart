@@ -142,12 +142,15 @@ class _CalendarDay extends StatelessWidget {
           border: border,
         ),
         child: Center(
-          child: Text(
-            '$day',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: textColor,
-              fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-              fontFeatures: [const FontFeature.tabularFigures()],
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '$day',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: textColor,
+                fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                fontFeatures: [const FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ),
@@ -160,20 +163,21 @@ class _CalendarLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
+    // Wraps onto a second line at large text sizes.
+    return Wrap(
+      spacing: AppSizes.md,
+      runSpacing: AppSizes.xs,
       children: [
         _LegendItem(
           color: AppColors.success.withValues(alpha: 0.8),
           label: 'Solved',
           textStyle: theme.textTheme.bodySmall,
         ),
-        const SizedBox(width: AppSizes.md),
         _LegendItem(
           color: AppColors.cellBackground,
           label: 'Missed',
           textStyle: theme.textTheme.bodySmall,
         ),
-        const SizedBox(width: AppSizes.md),
         _LegendItem(
           color: AppColors.success.withValues(alpha: 0.8),
           borderColor: AppColors.streakGold,

@@ -35,11 +35,18 @@ class GroupsScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  AppStrings.navGroups,
-                  style: Theme.of(context).textTheme.displayMedium,
+                // Shrinks instead of pushing the buttons off screen at large
+                // text sizes.
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      AppStrings.navGroups,
+                      style: Theme.of(context).textTheme.displayMedium,
+                    ),
+                  ),
                 ),
                 if (session.canUseGroups && hasGroups)
                   Row(
