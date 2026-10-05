@@ -8,6 +8,7 @@ import '../../../core/utils/app_error.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/result.dart';
 import '../domain/models/group.dart';
+import '../providers/blocked_users_provider.dart';
 import '../providers/groups_provider.dart';
 import 'widgets/feed_tile.dart';
 import 'widgets/group_ui.dart';
@@ -413,6 +414,7 @@ class _MembersTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = groupMembersProvider(group.id);
     final viewerIsAdmin = session.userId != null && group.adminId == session.userId;
+    final blockedIds = ref.watch(blockedUserIdsProvider);
 
     return AsyncRefreshList<GroupMember>(
       value: ref.watch(provider),
@@ -425,6 +427,7 @@ class _MembersTab extends ConsumerWidget {
       itemBuilder: (context, member, _) => MemberTile(
         member: member,
         isCurrentUser: member.userId == session.userId,
+        isBlocked: blockedIds.contains(member.userId),
         viewerIsAdmin: viewerIsAdmin,
         onAction: (action) => _onAction(context, ref, member, action),
       ),
@@ -484,6 +487,38 @@ class _MembersTab extends ConsumerWidget {
         if (sent && context.mounted) {
           showAppSnackBar(context, 'Report submitted. Thank you.');
         }
+      case MemberAction.block:
+        final ok = await showConfirmDialog(
+          context,
+          title: AppStrings.blockTitle(name),
+          message: AppStrings.blockBody,
+          confirmLabel: AppStrings.blockConfirmLabel,
+          destructive: true,
+        );
+        if (!ok || !context.mounted) return;
+        final result =
+            await ref.read(blockedUsersProvider.notifier).block(member.userId);
+        if (!context.mounted) return;
+        _showOutcome(context, result, AppStrings.userBlocked(name));
+      case MemberAction.unblock:
+        final result = await ref
+            .read(blockedUsersProvider.notifier)
+            .unblock(member.userId);
+        if (!context.mounted) return;
+        _showOutcome(context, result, AppStrings.userUnblocked(name));
+    }
+  }
+
+  void _showOutcome(
+    BuildContext context,
+    Result<void, AppError> result,
+    String successMessage,
+  ) {
+    switch (result) {
+      case Success():
+        showAppSnackBar(context, successMessage);
+      case Failure(error: final error):
+        showAppSnackBar(context, error.userMessage);
     }
   }
 

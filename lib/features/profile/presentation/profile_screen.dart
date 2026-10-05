@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/app_urls.dart';
 import '../../../core/services/app_config_provider.dart';
 import '../../../core/services/app_logger.dart';
@@ -456,6 +457,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               color: AppColors.textTertiaryDark,
             ),
             onTap: () => _openUrl(context, kTermsUrl),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.block_rounded),
+            title: const Text(AppStrings.blockedUsers),
+            subtitle: const Text(AppStrings.blockedUsersSubtitle),
+            trailing: const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textTertiaryDark,
+            ),
+            onTap: () => context.push('/blocked-users'),
           ),
           const Divider(height: 1),
           ListTile(

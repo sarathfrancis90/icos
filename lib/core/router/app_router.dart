@@ -14,6 +14,7 @@ import '../../features/groups/presentation/join_group_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/practice/presentation/practice_screen.dart';
 import '../../features/practice/providers/practice_provider.dart';
+import '../../features/profile/presentation/blocked_users_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/profile/providers/profile_provider.dart';
 import '../../features/puzzle/data/puzzle_source.dart';
@@ -131,6 +132,11 @@ GoRouter appRouter(Ref ref) {
             },
           ),
         ],
+      ),
+      GoRoute(
+        path: '/blocked-users',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const BlockedUsersScreen(),
       ),
       GoRoute(
         path: '/archive',

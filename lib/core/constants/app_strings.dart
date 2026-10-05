@@ -49,6 +49,24 @@ abstract final class AppStrings {
   static const accountRequired = 'Account Required';
   static const inviteCodeCopied = 'Invite code copied';
 
+  // Blocking
+  static const blockUser = 'Block user';
+  static const unblockUser = 'Unblock user';
+  static const blockedUserName = 'Blocked user';
+  static const blockConfirmLabel = 'Block';
+  static const blockedUsers = 'Blocked users';
+  static const blockedUsersSubtitle = 'Manage people you have blocked';
+  static const noBlockedUsers = "You haven't blocked anyone.";
+  static const unblockButton = 'Unblock';
+  static const retry = 'Retry';
+  static const blockedUsersLoadFailed = 'Could not load blocked users.';
+  static const blockBody =
+      "You won't see their scores or activity in any group. They won't be "
+      "told. We'll also be notified so we can review their account.";
+  static String blockTitle(String name) => 'Block $name?';
+  static String userBlocked(String name) => '$name blocked';
+  static String userUnblocked(String name) => '$name unblocked';
+
   // Stats
   static const currentStreak = 'Current Streak';
   static const longestStreak = 'Longest Streak';
