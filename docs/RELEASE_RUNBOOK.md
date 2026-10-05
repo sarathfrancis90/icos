@@ -278,7 +278,7 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
     | Device or other IDs (Firebase instance id) | Yes | No | Required | Analytics |
     Encrypted in transit: **Yes**. Deletion mechanism: **Yes** (in-app, Profile > Delete account). Security practices: independent review **No**
   - News app: No; COVID: No; Government app: No; Financial features: No; Health: No
-  - Advertising ID: **No** (we do not use AAID; if Firebase Analytics is enabled, answer *Yes* and state Analytics)
+  - Advertising ID: **No** — not used. The `AD_ID`, `ACCESS_ADSERVICES_AD_ID` and `ACCESS_ADSERVICES_ATTRIBUTION` permissions are removed in `android/app/src/main/AndroidManifest.xml` (`tools:node="remove"`) and Firebase's `google_analytics_adid_collection_enabled` is `false`; re-check the merged manifest after adding SDKs.
 - [ ] **(once)** Grow > Store presence > Main store listing: short/full description (`release/google-play/store_listing.txt`),
       icon `release/google-play/hi_res_icon.png` (512x512), feature graphic `release/google-play/feature_graphic.png` (1024x500), phone screenshots (`release/google-play/screenshots/`)
 - [ ] **(once)** Testing > Closed testing > create track *beta* with an email list of >= 12 testers; share the opt-in link; wait 14 days; then *Apply for production access* (Dashboard)
