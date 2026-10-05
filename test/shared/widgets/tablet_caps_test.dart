@@ -179,6 +179,17 @@ void main() {
       if (size.width < size.height) {
         expect(hud.left, closeTo(grid.left, 0.5));
       }
+      // The home button's leading edge lines up with the HUD / grid column.
+      final home = tester.getRect(
+        find
+            .ancestor(
+              of: find.byIcon(Icons.home_rounded),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      expect(home.size, const Size(44, 44));
+      expect(home.left, closeTo(hud.left, 0.5));
       await tester.pumpWidget(const SizedBox());
     });
   }

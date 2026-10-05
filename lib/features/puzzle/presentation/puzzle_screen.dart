@@ -319,6 +319,13 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
             return const _LoadingWithExit();
           }
 
+          // Side inset of the HUD column: phones keep 16dp; on tablets the
+          // column is capped and its content lines up with the grid's edges.
+          final columnInset =
+              MediaQuery.sizeOf(context).width >
+                  AppSizes.gridMaxWidth + AppSizes.gridPadding * 2
+              ? AppSizes.gridPadding
+              : AppSizes.md;
           final notifier = ref.read(gameNotifierProvider(source).notifier);
           final isReplay = notifier.isReplay;
           final completed = gameState.status == GameStatus.completed;
@@ -337,8 +344,10 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                   children: [
                     const SizedBox(height: AppSizes.sm),
                     Padding(
-                      padding: const EdgeInsetsDirectional.symmetric(
-                        horizontal: AppSizes.md,
+                      // Same inset as the HUD below, so the home button's
+                      // leading edge lines up with the HUD and the grid.
+                      padding: EdgeInsetsDirectional.symmetric(
+                        horizontal: columnInset,
                       ),
                       child: Row(
                         children: [
@@ -358,10 +367,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                     Padding(
                       // On tablets the bar lines up with the grid's edges.
                       padding: EdgeInsetsDirectional.symmetric(
-                        horizontal: MediaQuery.sizeOf(context).width >
-                                AppSizes.gridMaxWidth + AppSizes.gridPadding * 2
-                            ? AppSizes.gridPadding
-                            : AppSizes.md,
+                        horizontal: columnInset,
                       ),
                       child: _GlassInfoBar(
                         timer: AppDateUtils.formatTime(
