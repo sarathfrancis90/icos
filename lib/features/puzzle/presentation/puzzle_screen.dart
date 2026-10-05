@@ -55,7 +55,8 @@ class PuzzleScreen extends ConsumerStatefulWidget {
   ConsumerState<PuzzleScreen> createState() => _PuzzleScreenState();
 }
 
-class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
+class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
+    with WidgetsBindingObserver {
   bool _scoreSubmitted = false;
   bool _showCelebration = false;
 
@@ -83,6 +84,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _container = ProviderScope.containerOf(context, listen: false);
   }
 
@@ -111,8 +113,19 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     );
   }
 
+  /// A Dart timer does not advance while the device sleeps or the app is in
+  /// the background, so re-check the date (and re-time the wait) on resume.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    _unlockTimer?.cancel();
+    _unlockTimer = null;
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _unlockTimer?.cancel();
     // Timer stops while the screen is away; startGame resumes it. `ref` is
     // already unusable here (the element is unmounted), so go through the

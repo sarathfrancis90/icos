@@ -110,6 +110,26 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('also re-checks the date when the app resumes (a Dart timer '
+      'does not run while asleep)', (tester) async {
+    var now = DateTime.utc(2026, 10, 5, 22);
+    AppDateUtils.clock = () => now;
+    await open(tester, '2026-10-06');
+    expect(find.text('This puzzle is not available yet'), findsOneWidget);
+
+    // The device slept through midnight: no timer time elapsed in the app.
+    now = DateTime.utc(2026, 10, 6, 7);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('This puzzle is not available yet'), findsNothing);
+    expect(find.byType(PuzzleGrid), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('the timer is cancelled when the screen goes away first', (
     tester,
   ) async {
