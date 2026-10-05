@@ -596,7 +596,13 @@ class AuthNotifier extends _$AuthNotifier {
       unawaited(AnalyticsService.logEvent(AnalyticsEvents.signOut));
       unawaited(AnalyticsService.setUserId(null));
     } catch (e, st) {
+      // gotrue clears the local session (and emits signedOut) before it calls
+      // the server, so a network failure here only means the server-side
+      // session was not revoked. Make sure the local one is gone regardless.
       AppLogger.warn('Sign out failed', error: e, st: st);
+      try {
+        await SupabaseService.auth.signOut(scope: SignOutScope.local);
+      } catch (_) {}
     }
     state = const AsyncValue.data(null);
     // Start a fresh guest session so the app keeps working offline-first.

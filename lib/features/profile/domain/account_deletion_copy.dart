@@ -1,4 +1,5 @@
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/utils/app_error.dart';
 
 /// Wording for the delete-account flow. A guest has no login to come back
 /// with, so the "sign back in to cancel" promise only applies to members.
@@ -16,6 +17,14 @@ abstract final class AccountDeletionCopy {
       ? 'Guest profile deleted.'
       : 'Account scheduled for deletion. '
             'Sign in within ${AppSizes.accountDeletionGraceDays} days to cancel.';
+
+  static const offlineCancelFailed =
+      "You're offline. Try again when you're connected.";
+  static const cancelFailed = 'Could not cancel the deletion. Please try again.';
+
+  /// Message for a failed "Cancel deletion" request.
+  static String cancelFailureMessage(AppError error) =>
+      error is NetworkError ? offlineCancelFailed : cancelFailed;
 
   static const pendingBanner = 'This account is scheduled for deletion.';
   static const cancelDeletion = 'Cancel deletion';

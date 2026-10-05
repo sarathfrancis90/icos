@@ -58,8 +58,6 @@ abstract final class AppStrings {
 
   // Account deletion (blocking screen)
   static const deletionPendingTitle = 'Account scheduled for deletion';
-  static const deletionCancelFailed =
-      'Could not cancel the deletion. Please try again.';
   static const signOut = 'Sign out';
 
   // Stats

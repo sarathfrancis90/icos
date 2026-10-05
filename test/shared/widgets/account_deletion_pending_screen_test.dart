@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icos/core/router/deep_link.dart';
+import 'package:icos/core/utils/app_error.dart';
+import 'package:icos/features/profile/domain/account_deletion_copy.dart';
 import 'package:icos/shared/widgets/blocking_screens.dart';
 
 import '../../helpers/test_helpers.dart';
@@ -61,6 +63,44 @@ void main() {
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     expect(out, 1);
+  });
+
+  testWidgets('a failing sign-out leaves the screen usable', (tester) async {
+    await tester.pumpWidget(
+      screen(signOut: () async => throw Exception('network down')),
+    );
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final button = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, 'Sign out'),
+    );
+    expect(button.onPressed, isNotNull);
+  });
+
+  test('offline cancel failure shows the offline message', () {
+    expect(
+      AccountDeletionCopy.cancelFailureMessage(const AppError.network('x')),
+      "You're offline. Try again when you're connected.",
+    );
+    expect(
+      AccountDeletionCopy.cancelFailureMessage(const AppError.database('x')),
+      isNot(contains('offline')),
+    );
+  });
+
+  testWidgets('offline Cancel failure is shown inline', (tester) async {
+    await tester.pumpWidget(
+      screen(
+        cancel: () async => AccountDeletionCopy.cancelFailureMessage(
+          const AppError.network('x'),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Cancel deletion'));
+    await tester.pumpAndSettle();
+    expect(find.text("You're offline. Try again when you're connected."),
+        findsOneWidget);
   });
 
   testWidgets('does not overflow at 200% text on 320x568', (tester) async {

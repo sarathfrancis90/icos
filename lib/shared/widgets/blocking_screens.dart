@@ -170,7 +170,11 @@ class _AccountDeletionPendingScreenState
 
   Future<void> _signOut() async {
     setState(() => _busy = true);
-    await widget.onSignOut();
+    try {
+      await widget.onSignOut();
+    } catch (e) {
+      AppLogger.warn('Sign out from the deletion screen failed', error: e);
+    }
     if (mounted) setState(() => _busy = false);
   }
 

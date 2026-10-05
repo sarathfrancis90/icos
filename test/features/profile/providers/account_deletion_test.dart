@@ -145,4 +145,18 @@ void main() {
       DateTime.utc(2026, 10, 31),
     );
   });
+
+  test('refresh keeps the pending date during the reload (no gate flap)',
+      () async {
+    await load();
+    final seen = <DateTime?>[];
+    container.listen(
+      profileNotifierProvider,
+      (_, next) => seen.add(next.valueOrNull?.deletedAt),
+    );
+    await container.read(profileNotifierProvider.notifier).refresh();
+    await pumpEventQueue();
+    expect(seen.contains(null), isFalse);
+    expect(container.read(pendingDeletionDateProvider), isNotNull);
+  });
 }

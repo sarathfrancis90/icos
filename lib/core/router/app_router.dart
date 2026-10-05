@@ -15,6 +15,7 @@ import '../../features/groups/presentation/join_group_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/practice/presentation/practice_screen.dart';
 import '../../features/practice/providers/practice_provider.dart';
+import '../../features/profile/domain/account_deletion_copy.dart';
 import '../../features/profile/presentation/blocked_users_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/profile/providers/profile_provider.dart';
@@ -23,7 +24,6 @@ import '../../features/puzzle/presentation/puzzle_screen.dart';
 import '../../features/stats/presentation/stats_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 import '../../shared/widgets/blocking_screens.dart';
-import '../constants/app_strings.dart';
 import '../services/app_config_provider.dart';
 import '../services/app_config_service.dart';
 import '../services/storage_service.dart';
@@ -223,9 +223,11 @@ GoRouter appRouter(Ref ref) {
               final result = await ref
                   .read(profileNotifierProvider.notifier)
                   .cancelAccountDeletion();
-              return result is Failure
-                  ? AppStrings.deletionCancelFailed
-                  : null;
+              return switch (result) {
+                Failure(:final error) =>
+                  AccountDeletionCopy.cancelFailureMessage(error),
+                _ => null,
+              };
             },
             onSignOut: () => ref.read(authNotifierProvider.notifier).signOut(),
           );

@@ -143,7 +143,9 @@ class ProfileNotifier extends _$ProfileNotifier {
   }
 
   Future<void> refresh() async {
-    state = const AsyncValue.loading();
+    // Keep the previous profile visible while reloading so gates that read it
+    // (e.g. the pending-deletion screen) do not flap.
+    state = const AsyncLoading<UserProfile?>().copyWithPrevious(state);
     await _loadProfile();
   }
 
