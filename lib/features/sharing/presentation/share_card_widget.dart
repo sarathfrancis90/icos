@@ -252,7 +252,7 @@ class _ResultPill extends StatelessWidget {
             icon,
             size: 16,
             color: highlight
-                ? AppColors.electricBlueLight
+                ? AppColors.electricBlue
                 : AppColors.textSecondaryDark,
           ),
           const SizedBox(width: AppSizes.xs),

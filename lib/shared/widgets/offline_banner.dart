@@ -39,7 +39,9 @@ class OfflineBanner extends ConsumerWidget {
                     Icon(
                       Icons.cloud_off_rounded,
                       size: 18,
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.warning
+                          : AppColors.warningOnLight,
                     ),
                     const SizedBox(width: AppSizes.sm),
                     Expanded(

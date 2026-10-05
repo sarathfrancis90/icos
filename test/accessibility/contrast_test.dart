@@ -194,6 +194,17 @@ void main() {
           ),
           greaterThanOrEqualTo(4.5),
         );
+        // The icon is non-text: 3:1.
+        final icon = tester.widget<Icon>(find.byIcon(Icons.cloud_off_rounded));
+        final iconBg = backgroundBehind(
+          tester.element(find.byIcon(Icons.cloud_off_rounded)),
+          fallback: scaffoldBg,
+        );
+        expect(
+          contrastRatio(icon.color!, iconBg),
+          greaterThanOrEqualTo(3),
+          reason: 'offline banner icon',
+        );
       });
     });
   }

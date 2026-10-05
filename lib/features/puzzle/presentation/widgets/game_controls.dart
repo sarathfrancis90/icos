@@ -133,7 +133,7 @@ class _GradientPillButton extends StatelessWidget {
                     Text(
                       label,
                       style: TextStyle(
-                        color: isEnabled ? Colors.white : AppColors.textTertiaryDark,
+                        color: isEnabled ? Colors.white : AppColors.textDisabledOnElevated,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
@@ -141,7 +141,7 @@ class _GradientPillButton extends StatelessWidget {
                     const SizedBox(width: 8),
                     Icon(
                       icon,
-                      color: isEnabled ? Colors.white.withValues(alpha: 0.8) : AppColors.textTertiaryDark,
+                      color: isEnabled ? Colors.white.withValues(alpha: 0.8) : AppColors.textDisabledOnElevated,
                       size: 20,
                     ),
                   ],
@@ -203,7 +203,7 @@ class _OutlinedPillButton extends StatelessWidget {
                     Text(
                       label,
                       style: TextStyle(
-                        color: isEnabled ? AppColors.textPrimaryDark : AppColors.textTertiaryDark,
+                        color: isEnabled ? AppColors.textPrimaryDark : AppColors.textDisabledOnElevated,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -276,7 +276,7 @@ class _CircleIconButton extends StatelessWidget {
             ),
             child: Icon(
               icon,
-              color: isEnabled ? AppColors.textPrimaryDark : AppColors.textTertiaryDark,
+              color: isEnabled ? AppColors.textPrimaryDark : AppColors.textDisabledOnElevated,
               size: 24,
             ),
           ),

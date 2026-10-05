@@ -78,6 +78,8 @@ abstract final class AppColors {
   static const success = Color(0xFF22C55E);
   static const successDim = Color(0xFF16A34A);
   static const warning = Color(0xFFF59E0B);
+  /// Warning icons on pale tints in the light theme (3:1 needed; amber is 1.8:1).
+  static const warningOnLight = Color(0xFFB45309);
   static const error = Color(0xFFEF4444);
   static const streakGold = Color(0xFFFFD700);
   static const hintPurple = Color(0xFF8B5CF6);
@@ -105,8 +107,11 @@ abstract final class AppColors {
 
   // ─── Text ────────────────────────────────────────────────────────
   static const textPrimaryDark = Color(0xFFF1F5F9);
+  /// Disabled labels on the puzzle controls' raised surface (the tertiary
+  /// grey is 4.4:1 there).
+  static const textDisabledOnElevated = Color(0xFF8091A3);
   static const textSecondaryDark = Color(0xFF8899AA);
-  static const textTertiaryDark = Color(0xFF8091A3);
+  static const textTertiaryDark = Color(0xFF7A8B9D);
   static const textPrimaryLight = Color(0xFF0F172A);
   static const textSecondaryLight = Color(0xFF64748B);
 
