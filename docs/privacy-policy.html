@@ -40,7 +40,7 @@
 <div class="container">
 
 <h1>Privacy Policy</h1>
-<p class="effective">Effective Date: March 4, 2026 &middot; Last Updated: March 4, 2026</p>
+<p class="effective">Effective Date: March 4, 2026 &middot; Last Updated: October 5, 2026</p>
 
 <p>Icos ("we", "our", or "us") operates the Icos mobile application (the "App"), a daily puzzle game available on iOS and Android. This Privacy Policy explains how we collect, use, and protect your information when you use the App.</p>
 
@@ -80,6 +80,12 @@
 </ul>
 <p>This local data is not transmitted to our servers and is deleted when you uninstall the App.</p>
 
+<h3>1.5 Analytics and Crash Reporting</h3>
+<p>The App can use Firebase Analytics and Firebase Crashlytics (Google) to record which features are used (for example puzzle started or completed, group created or joined, sign-in method) and to report crashes and performance. These events are associated with your anonymous or account identifier but not with your name or email. This reporting is only active in builds where we have configured Firebase; in other builds the App sends no analytics or crash data to Firebase. Crash reporting is switched off in debug builds.</p>
+
+<h3>1.6 Notifications</h3>
+<p>If you allow notifications, the App schedules the daily puzzle reminder and streak reminder on your device itself; these local reminders do not use a push token or send anything to a server. In builds where Firebase is configured, the App also subscribes your device to a Firebase Cloud Messaging topic for the daily puzzle announcement, which uses a Firebase-generated device registration token. You can turn notifications off in the Profile screen or in your device settings.</p>
+
 <h2>2. How We Use Your Information</h2>
 <table>
     <tr><th>Purpose</th><th>Data Used</th></tr>
@@ -88,6 +94,8 @@
     <tr><td>Enable group leaderboards</td><td>Display name, solve times, group membership</td></tr>
     <tr><td>Account security and fraud prevention</td><td>IP address, authentication tokens</td></tr>
     <tr><td>Enable offline play</td><td>Cached puzzles (device-local only)</td></tr>
+    <tr><td>Understand feature use and fix crashes</td><td>Usage events, crash and performance data (where Firebase is configured)</td></tr>
+    <tr><td>Moderation of groups and names</td><td>Reports you send, display and group names</td></tr>
 </table>
 
 <h2>3. Data Sharing</h2>
@@ -97,6 +105,7 @@
 <p>We use the following service provider to operate the App:</p>
 <ul>
     <li><strong>Supabase</strong> (database, authentication, real-time features) &mdash; <a href="https://supabase.com/privacy" target="_blank">Supabase Privacy Policy</a></li>
+<li><strong>Google Firebase</strong> (analytics, crash reporting and, where configured, the daily notification topic) &mdash; <a href="https://firebase.google.com/support/privacy" target="_blank">Firebase Privacy Information</a></li>
 </ul>
 <p>If you sign in with Google or Apple, those providers process your authentication according to their own privacy policies:</p>
 <ul>
@@ -128,8 +137,8 @@
     <li><strong>Access</strong> your personal data via the Profile screen in the App</li>
     <li><strong>Correct</strong> your display name at any time</li>
     <li><strong>Delete</strong> your account and all associated data from the Profile screen (see <a href="delete-account.html">how to delete your account</a>)</li>
-    <li><strong>Export</strong> your data by contacting us</li>
-    <li><strong>Opt out</strong> of non-essential data collection</li>
+    <li><strong>Export</strong> a JSON copy of your data in the App (Profile &gt; Export my data), or by contacting us</li>
+    <li><strong>Opt out</strong> of notifications at any time in the Profile screen or your device settings, or ask us to stop non-essential processing by contacting us</li>
 </ul>
 <p>If you are in the European Economic Area (EEA), you have additional rights under GDPR, including the right to data portability and the right to lodge a complaint with your local data protection authority.</p>
 <p>If you are a California resident, you have rights under the CCPA, including the right to know what personal information is collected and the right to request deletion.</p>
