@@ -1,0 +1,23 @@
+# iPad portrait tour: onboarding, home, puzzle, auth, profile. Pass -e SHOTS.
+appId: com.icos.game
+---
+- launchApp:
+    clearState: true
+- takeScreenshot: ${SHOTS}/l1_ipad_onboarding
+- tapOn: "Next"
+- tapOn: "Next"
+- tapOn: "Get Started"
+- waitForAnimationToEnd:
+    timeout: 10000
+- takeScreenshot: ${SHOTS}/l2_ipad_home
+- tapOn: "Play"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/l3_ipad_puzzle
+- launchApp
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/l4_ipad_profile
+- tapOn: "(?s).*Create account.*"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/l5_ipad_auth

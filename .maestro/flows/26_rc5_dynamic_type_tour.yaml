@@ -1,0 +1,27 @@
+# Screenshot tour used with the largest Dynamic Type size. Pass -e SHOTS.
+appId: com.icos.game
+---
+- launchApp
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/k1_home
+- tapOn: "(?s).*Play.*"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/k2_puzzle
+- launchApp
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/k3_groups
+- tapOn:
+    text: "Stats\nTab 3 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/k4_stats
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/k5_profile_top
+- scroll
+- takeScreenshot: ${SHOTS}/k6_profile_mid
+- scroll
+- scroll
+- takeScreenshot: ${SHOTS}/k7_profile_bottom

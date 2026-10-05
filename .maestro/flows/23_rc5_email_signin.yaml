@@ -1,0 +1,22 @@
+# Sign in with an existing email account. Pass -e EMAIL -e PW -e SHOTS.
+appId: com.icos.game
+---
+- launchApp
+- runFlow: ../subflows/open_auth_from_profile.yaml
+- tapOn: "Sign up with Email"
+- tapOn: "Sign In"
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PW}
+- takeScreenshot: ${SHOTS}/d6a_signin_filled
+- tapOn:
+    text: "Sign In\nSign In"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: ${SHOTS}/d6_after_signin
+- tapOn:
+    text: "Home\nTab 1 of 4"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/d7_home_after_signin

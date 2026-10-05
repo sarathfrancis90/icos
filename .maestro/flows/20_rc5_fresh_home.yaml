@@ -1,0 +1,18 @@
+# Fresh install -> onboarding -> home shows a real server puzzle (not the offline practice notice).
+appId: com.icos.game
+---
+- launchApp:
+    clearState: true
+- takeScreenshot: /Users/sarathfrancis/work/git/Personal/icos/maestro-screenshots/rc5-ios/a1_onboarding
+- tapOn: "Next"
+- tapOn: "Next"
+- takeScreenshot: /Users/sarathfrancis/work/git/Personal/icos/maestro-screenshots/rc5-ios/a2_onboarding_last
+- tapOn:
+    text: "Get Started"
+    optional: true
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Play"
+    timeout: 20000
+- assertNotVisible: "(?s).*[Oo]ffline puzzle.*"
+- takeScreenshot: /Users/sarathfrancis/work/git/Personal/icos/maestro-screenshots/rc5-ios/a3_home

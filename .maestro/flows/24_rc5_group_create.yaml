@@ -1,0 +1,20 @@
+# Signed-in session: create a group, open it, show invite code + members. Pass -e SHOTS.
+appId: com.icos.game
+---
+- launchApp
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/g1_groups_signed_in
+- tapOn: "(?s).*Create Group.*"
+- waitForAnimationToEnd
+- tapOn:
+    text: "(?s).*roup.*ame.*"
+- inputText: "QA Squad"
+- takeScreenshot: ${SHOTS}/g2_create_dialog
+- pressKey: enter
+- waitForAnimationToEnd
+- tapOn: "Create"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: ${SHOTS}/g3_after_create

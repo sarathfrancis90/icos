@@ -1,0 +1,20 @@
+# Link the current guest to a new email account (pass -e EMAIL=... -e PW=...), then show home, stats, profile.
+# Also pass -e SHOTS=<dir> for screenshots.
+appId: com.icos.game
+---
+- launchApp
+- runFlow: ../subflows/open_auth_from_profile.yaml
+- tapOn: "Sign up with Email"
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PW}
+- tapOn: "Confirm Password"
+- inputText: ${PW}
+- hideKeyboard
+- takeScreenshot: ${SHOTS}/c2_form_filled
+- tapOn:
+    text: "Create Account\nCreate Account"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: ${SHOTS}/c3_after_signup

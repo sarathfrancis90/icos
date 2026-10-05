@@ -1,0 +1,17 @@
+# From the "Account Required" join screen (guest opened an invite link): create an account and see where we land.
+# Pass -e EMAIL -e PW -e SHOTS.
+appId: com.icos.game
+---
+- tapOn: "Create an account"
+- tapOn: "Sign up with Email"
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PW}
+- tapOn: "Confirm Password"
+- inputText: ${PW}
+- tapOn:
+    text: "Create Account\nCreate Account"
+- waitForAnimationToEnd:
+    timeout: 10000
+- takeScreenshot: ${SHOTS}/i7_after_signup_from_join

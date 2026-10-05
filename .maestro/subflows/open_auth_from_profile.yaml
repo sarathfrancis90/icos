@@ -1,0 +1,7 @@
+# Opens the "Save your progress" auth screen from the Profile tab (guest session).
+appId: com.icos.game
+---
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- tapOn: "Create account"
+- waitForAnimationToEnd
