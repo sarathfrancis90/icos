@@ -252,7 +252,7 @@ class _ResultPill extends StatelessWidget {
             icon,
             size: 16,
             color: highlight
-                ? AppColors.electricBlue
+                ? AppColors.electricBlueLight
                 : AppColors.textSecondaryDark,
           ),
           const SizedBox(width: AppSizes.xs),
@@ -260,7 +260,7 @@ class _ResultPill extends StatelessWidget {
             value,
             style: TextStyle(
               color: highlight
-                  ? AppColors.electricBlue
+                  ? AppColors.electricBlueLight
                   : AppColors.textSecondaryDark,
               fontSize: 14,
               fontWeight: FontWeight.w500,

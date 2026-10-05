@@ -69,6 +69,8 @@ abstract final class AppColors {
   // ─── Primary Accent ──────────────────────────────────────────────
   static const electricBlue = Color(0xFF3B82F6);
   static const electricBlueDim = Color(0xFF2563EB);
+  /// Blue for text/icons on the dark surfaces (4.5:1 on the share-card pill).
+  static const electricBlueLight = Color(0xFF60A5FA);
 
   // ─── UI Accent Colors ────────────────────────────────────────────
   static const success = Color(0xFF22C55E);
@@ -102,7 +104,7 @@ abstract final class AppColors {
   // ─── Text ────────────────────────────────────────────────────────
   static const textPrimaryDark = Color(0xFFF1F5F9);
   static const textSecondaryDark = Color(0xFF8899AA);
-  static const textTertiaryDark = Color(0xFF7A8B9D);
+  static const textTertiaryDark = Color(0xFF8091A3);
   static const textPrimaryLight = Color(0xFF0F172A);
   static const textSecondaryLight = Color(0xFF64748B);
 

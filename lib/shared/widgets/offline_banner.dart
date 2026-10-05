@@ -34,19 +34,21 @@ class OfflineBanner extends ConsumerWidget {
                   horizontal: AppSizes.md,
                   vertical: AppSizes.sm,
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(
                       Icons.cloud_off_rounded,
                       size: 18,
-                      color: AppColors.warning,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
-                    SizedBox(width: AppSizes.sm),
+                    const SizedBox(width: AppSizes.sm),
                     Expanded(
                       child: Text(
                         "You're offline — progress is saved on this device",
                         style: TextStyle(
-                          color: AppColors.textPrimaryDark,
+                          // The tint is pale in light theme: text follows the
+                          // theme's own on-surface colour.
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),

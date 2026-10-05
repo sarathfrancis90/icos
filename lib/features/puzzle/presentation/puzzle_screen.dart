@@ -482,7 +482,11 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
               const SizedBox(height: AppSizes.md),
               Text(
                 'Could not load puzzle',
-                style: Theme.of(context).textTheme.titleMedium,
+                // The puzzle screen is always dark: use its own on-dark
+                // colour, not the ambient (possibly light) theme's.
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.textPrimaryDark,
+                ),
               ),
               const SizedBox(height: AppSizes.md),
               SizedBox(
@@ -494,6 +498,9 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
               ),
               const SizedBox(height: AppSizes.sm),
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.purpleLight,
+                ),
                 onPressed: () => leaveScreen(context, '/'),
                 child: const Text('Back'),
               ),
@@ -561,7 +568,10 @@ class _NotYetAvailable extends StatelessWidget {
                   Text(
                     'This puzzle is not available yet',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    // Always-dark screen: on-dark text whatever the app theme.
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppColors.textPrimaryDark,
+                    ),
                   ),
                   const SizedBox(height: AppSizes.sm),
                   const Text(

@@ -13,7 +13,6 @@ import '../../../core/services/app_config_provider.dart';
 import '../../../core/services/app_logger.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_service.dart';
-import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../../../core/utils/share_utils.dart';
@@ -25,6 +24,7 @@ import 'widgets/colorblind_selector.dart';
 import 'widgets/contact_support_tile.dart';
 import 'widgets/edit_name_dialog.dart';
 import 'widgets/guest_account_card.dart';
+import 'widgets/theme_mode_dropdown.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -58,7 +58,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeMode = ref.watch(themeModeNotifierProvider);
     final profileState = ref.watch(profileNotifierProvider);
     ref.watch(authNotifierProvider);
     final user = SupabaseService.auth.currentUser;
@@ -106,7 +105,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: AppSizes.md),
-            _buildSettingsCard(context, themeMode, profile),
+            _buildSettingsCard(context, profile),
             const SizedBox(height: AppSizes.md),
             Text(
               'App',
@@ -267,7 +266,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildSettingsCard(
     BuildContext context,
-    ThemeMode themeMode,
     UserProfile? profile,
   ) {
     final reminder = ref.watch(reminderSettingsProvider).valueOrNull;
@@ -277,35 +275,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return _Card(
       child: Column(
         children: [
-          ListTile(
-            leading: const Icon(Icons.palette_rounded),
-            title: const Text('Theme'),
-            trailing: DropdownButton<ThemeMode>(
-              value: themeMode,
-              underline: const SizedBox.shrink(),
-              dropdownColor: AppColors.elevatedSurface,
-              onChanged: (mode) {
-                if (mode != null) {
-                  ref
-                      .read(themeModeNotifierProvider.notifier)
-                      .setThemeMode(mode);
-                }
-              },
-              items: const [
-                DropdownMenuItem(
-                  value: ThemeMode.system,
-                  child: Text('System'),
-                ),
-                DropdownMenuItem(
-                  value: ThemeMode.dark,
-                  child: Text('Dark'),
-                ),
-                DropdownMenuItem(
-                  value: ThemeMode.light,
-                  child: Text('Light'),
-                ),
-              ],
-            ),
+          const ListTile(
+            leading: Icon(Icons.palette_rounded),
+            title: Text('Theme'),
+            trailing: ThemeModeDropdown(),
           ),
           const Divider(height: 1),
           SwitchListTile(
