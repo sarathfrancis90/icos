@@ -20,6 +20,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../domain/models/profile.dart';
 import '../providers/profile_provider.dart';
 import 'widgets/colorblind_selector.dart';
+import 'widgets/contact_support_tile.dart';
 import 'widgets/edit_name_dialog.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -614,6 +615,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       applicationName: 'Icos',
       applicationVersion: version ?? '',
       applicationLegalese: 'Copyright 2026 Icos. All rights reserved.',
+      children: const [ContactSupportTile()],
       applicationIcon: Container(
         width: 48,
         height: 48,
