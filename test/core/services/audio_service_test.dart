@@ -179,36 +179,57 @@ void main() {
       );
     });
 
-    test('mix with other audio and never hold audio focus', () async {
-      final fake = _FakeEffectPlayer();
-      final engine = AudioplayersEngine(playerFactory: () => fake);
-      await engine.prepare('sounds/a.wav', 0.3);
+    test(
+      'are configured in order, and set no audio context themselves',
+      () async {
+        final fake = _FakeEffectPlayer();
+        final engine = AudioplayersEngine(playerFactory: () => fake);
+        await engine.prepare('sounds/a.wav', 0.3);
+        expect(fake.calls, [
+          'disablePositionUpdates',
+          'setPlayerMode PlayerMode.lowLatency',
+          'setReleaseMode ReleaseMode.stop',
+          'setVolume 0.3',
+          'setSource sounds/a.wav',
+        ]);
+      },
+    );
+  });
 
-      final context = fake.context!;
-      // Without this the default context requests (and abandons) AUDIOFOCUS_GAIN
-      // around every effect: other apps' music pauses on each move, and a
-      // refused request silently drops the sound.
-      expect(context.android.audioFocus, AndroidAudioFocus.none);
-      expect(context.android.usageType, AndroidUsageType.game);
-      expect(
-        context.iOS.options,
-        contains(AVAudioSessionOptions.mixWithOthers),
+  group('audio context', () {
+    test('is applied once, globally, for the service lifetime', () async {
+      final applied = <AudioContext>[];
+      final audio = AudioService.forTesting(
+        playerFactory: (asset) => _FakeSound(asset, calls),
+        soundEnabled: () => true,
+        applyAudioContext: (c) async => applied.add(c),
       );
-      expect(context.iOS.category, AVAudioSessionCategory.playback);
+      await audio.initialize();
+      await audio.ready;
+      for (var i = 0; i < 20; i++) {
+        await audio.play(SoundEffect.pathStep);
+      }
+      await audio.dispose();
+      await audio.initialize();
+      await audio.ready;
+      expect(applied, hasLength(1));
+      expect(calls.indexOf('load sounds/path_step.wav'), greaterThan(-1));
     });
 
-    test('is configured before its source is set', () async {
-      final fake = _FakeEffectPlayer();
-      final engine = AudioplayersEngine(playerFactory: () => fake);
-      await engine.prepare('sounds/a.wav', 0.3);
-      expect(fake.calls, [
-        'disablePositionUpdates',
-        'setAudioContext',
-        'setPlayerMode PlayerMode.lowLatency',
-        'setReleaseMode ReleaseMode.stop',
-        'setVolume 0.3',
-        'setSource sounds/a.wav',
-      ]);
+    test('Android: game / sonification, no audio focus, nothing forced', () {
+      final a = AudioService.effectContext().android;
+      expect(a.audioFocus, AndroidAudioFocus.none);
+      expect(a.usageType, AndroidUsageType.game);
+      expect(a.contentType, AndroidContentType.sonification);
+      expect(a.isSpeakerphoneOn, isFalse);
+      expect(a.audioMode, AndroidAudioMode.normal);
+      expect(a.stayAwake, isFalse);
+    });
+
+    test('iOS: ambient with no options (mixes, follows the silent switch)', () {
+      final i = AudioService.effectContext().iOS;
+      expect(i.category, AVAudioSessionCategory.ambient);
+      expect(i.options, isEmpty);
     });
   });
 
@@ -389,17 +410,11 @@ class _FlakySound implements SoundPlayer {
 
 class _FakeEffectPlayer implements EffectPlayer {
   final calls = <String>[];
-  AudioContext? context;
 
   @override
   void disablePositionUpdates() => calls.add('disablePositionUpdates');
 
   @override
-  Future<void> setAudioContext(AudioContext context) async {
-    this.context = context;
-    calls.add('setAudioContext');
-  }
-
   @override
   Future<void> setPlayerMode(PlayerMode mode) async =>
       calls.add('setPlayerMode $mode');

@@ -44,7 +44,6 @@ abstract interface class ShortSoundEngine {
 abstract interface class EffectPlayer {
   /// Stops the per-frame position polling audioplayers starts by default.
   void disablePositionUpdates();
-  Future<void> setAudioContext(AudioContext context);
   Future<void> setPlayerMode(PlayerMode mode);
   Future<void> setReleaseMode(ReleaseMode mode);
   Future<void> setVolume(double volume);
@@ -61,10 +60,6 @@ class _AudioPlayerEffect implements EffectPlayer {
 
   @override
   void disablePositionUpdates() => _player.positionUpdater = null;
-
-  @override
-  Future<void> setAudioContext(AudioContext context) =>
-      _player.setAudioContext(context);
 
   @override
   Future<void> setPlayerMode(PlayerMode mode) => _player.setPlayerMode(mode);
@@ -99,31 +94,8 @@ class AudioplayersEngine implements ShortSoundEngine {
 
   final EffectPlayer _player;
 
-  /// How effects take part in the device's audio: mixed with whatever else is
-  /// playing, never holding audio focus.
-  ///
-  /// audioplayers' default context requests AUDIOFOCUS_GAIN before each play
-  /// and abandons it after each stop on Android. That pauses other apps' music
-  /// on every move, and a refused request is ignored by the plugin
-  /// (WrappedPlayer / FocusManager.handleFocusResult has no branch for
-  /// AUDIOFOCUS_REQUEST_FAILED), so the sound is silently dropped. iOS gets
-  /// the playback category with `mixWithOthers` for the same reason.
-  static AudioContext effectContext() => AudioContext(
-    android: const AudioContextAndroid(
-      usageType: AndroidUsageType.game,
-      contentType: AndroidContentType.sonification,
-      audioFocus: AndroidAudioFocus.none,
-    ),
-    iOS: AudioContextIOS(
-      category: AVAudioSessionCategory.playback,
-      options: const {AVAudioSessionOptions.mixWithOthers},
-    ),
-  );
-
   @override
   Future<void> prepare(String asset, double volume) async {
-    // The context first: it is read when the platform player is created.
-    await _player.setAudioContext(effectContext());
     await _player.setPlayerMode(PlayerMode.lowLatency);
     await _player.setReleaseMode(ReleaseMode.stop);
     await _player.setVolume(volume);
@@ -174,7 +146,8 @@ class AudioService {
     : _playerFactory = ((_) => AudioplayersSound()),
       _soundEnabled = _storageSoundEnabled,
       _now = DateTime.now,
-      _prepareTimeout = const Duration(seconds: 15);
+      _prepareTimeout = const Duration(seconds: 15),
+      _applyContext = AudioPlayer.global.setAudioContext;
 
   /// A service with an injected player and settings, for tests.
   AudioService.forTesting({
@@ -182,7 +155,9 @@ class AudioService {
     required bool Function() soundEnabled,
     DateTime Function()? now,
     Duration prepareTimeout = const Duration(seconds: 15),
-  }) : _playerFactory = playerFactory,
+    Future<void> Function(AudioContext context)? applyAudioContext,
+  }) : _applyContext = applyAudioContext ?? ((_) async {}),
+       _playerFactory = playerFactory,
        _soundEnabled = soundEnabled,
        _now = now ?? DateTime.now,
        _prepareTimeout = prepareTimeout;
@@ -193,6 +168,35 @@ class AudioService {
   final bool Function() _soundEnabled;
   final DateTime Function() _now;
   final Duration _prepareTimeout;
+  final Future<void> Function(AudioContext context) _applyContext;
+  bool _contextApplied = false;
+
+  /// How effects take part in the device's audio, applied once, globally,
+  /// before any player exists (so players start with it; nothing is set per
+  /// player or per play).
+  ///
+  /// Android: usage game, content type sonification, no audio focus. The
+  /// plugin's default requests AUDIOFOCUS_GAIN before each play and abandons
+  /// it after each stop, which pauses other apps' music on every move, and a
+  /// refused request is ignored (FocusManager.handleFocusResult has no branch
+  /// for AUDIOFOCUS_REQUEST_FAILED) so the sound is silently dropped. The
+  /// speakerphone flag, audio mode and stay-awake keep their defaults (off,
+  /// normal, off), so the plugin has nothing to change on the AudioManager.
+  ///
+  /// iOS: the ambient category with no options mixes with the player's own
+  /// music and follows the silent switch. (Darwin applies a context to the
+  /// whole app's session, hence once and global.)
+  static AudioContext effectContext() => AudioContext(
+    android: const AudioContextAndroid(
+      usageType: AndroidUsageType.game,
+      contentType: AndroidContentType.sonification,
+      audioFocus: AndroidAudioFocus.none,
+    ),
+    iOS: AudioContextIOS(
+      category: AVAudioSessionCategory.ambient,
+      options: const {},
+    ),
+  );
 
   /// A sound that failed to prepare (a slow first start can outlast the
   /// timeout) is tried again on a later play: at most this many attempts, no
@@ -265,6 +269,14 @@ class AudioService {
   }
 
   Future<void> _prepareAll() async {
+    if (!_contextApplied) {
+      _contextApplied = true;
+      try {
+        await _applyContext(effectContext());
+      } catch (e) {
+        _logOnce('audio context could not be applied', e);
+      }
+    }
     await Future.wait([
       for (final effect in SoundEffect.values) _prepare(effect),
     ]);
