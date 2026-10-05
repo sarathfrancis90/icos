@@ -17,6 +17,7 @@ import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../shared/widgets/animated_background.dart';
 import '../../../shared/widgets/particle_field.dart';
+import '../../../shared/widgets/screen_exit.dart';
 import '../../practice/providers/practice_provider.dart';
 import '../data/puzzle_source.dart';
 import '../data/submission_result.dart';
@@ -333,7 +334,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                         children: [
                           _GlassCircleButton(
                             icon: Icons.home_rounded,
-                            onPressed: () => Navigator.of(context).pop(),
+                            onPressed: () => leaveScreen(context, '/'),
                           ),
                           const Spacer(),
                           if (source.isArchive)
@@ -447,7 +448,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                   onNewPuzzle: source.isPractice ? _onNewPracticePuzzle : null,
                   onDone: () {
                     if (source.isPractice) _discard();
-                    Navigator.of(context).pop();
+                    leaveScreen(context, '/');
                   },
                 ),
             ],
@@ -480,7 +481,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
               ),
               const SizedBox(height: AppSizes.sm),
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => leaveScreen(context, '/'),
                 child: const Text('Back'),
               ),
             ],

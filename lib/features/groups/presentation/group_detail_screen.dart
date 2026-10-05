@@ -7,6 +7,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/result.dart';
+import '../../../shared/widgets/screen_exit.dart';
 import '../domain/models/group.dart';
 import '../providers/blocked_users_provider.dart';
 import '../providers/groups_provider.dart';
@@ -52,11 +53,11 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
     return groupAsync.when(
       data: (group) => _buildContent(context, group, session),
       loading: () => Scaffold(
-        appBar: AppBar(),
+        appBar: _appBar(context),
         body: const Center(child: CircularProgressIndicator()),
       ),
       error: (error, _) => Scaffold(
-        appBar: AppBar(),
+        appBar: _appBar(context),
         body: GroupEmptyState(
           icon: Icons.group_off_rounded,
           message: error is AppError ? error.userMessage : AppStrings.groupNotFound,
@@ -69,12 +70,25 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
     );
   }
 
+  AppBar _appBar(BuildContext context) => AppBar(
+    leading: deepLinkLeading(
+      context,
+      fallback: '/groups',
+      label: 'Back to Groups',
+    ),
+  );
+
   Widget _buildContent(BuildContext context, Group group, GroupsSession session) {
     final theme = Theme.of(context);
     final isAdmin = session.userId != null && group.adminId == session.userId;
 
     return Scaffold(
       appBar: AppBar(
+        leading: deepLinkLeading(
+          context,
+          fallback: '/groups',
+          label: 'Back to Groups',
+        ),
         title: Text(group.name, overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(

@@ -7,6 +7,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
+import '../../../shared/widgets/screen_exit.dart';
 import '../domain/invite_code.dart';
 import '../providers/groups_provider.dart';
 import 'widgets/account_required_card.dart';
@@ -46,7 +47,14 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.joinGroup)),
+      appBar: AppBar(
+        leading: deepLinkLeading(
+          context,
+          fallback: '/groups',
+          label: 'Back to Groups',
+        ),
+        title: const Text(AppStrings.joinGroup),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -121,7 +129,13 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
       case Success(data: final group):
         setState(() => _phase = _JoinPhase.joined);
         await Future<void>.delayed(const Duration(milliseconds: 600));
-        if (mounted) context.go('/groups/${group.id}');
+        if (!mounted) return;
+        // Put the group on top of the Groups tab so back returns there (a
+        // deep link leaves nothing else on the stack).
+        final router = GoRouter.of(context);
+        router.go('/groups');
+        await WidgetsBinding.instance.endOfFrame;
+        router.push('/groups/${group.id}');
       case Failure(error: final error):
         setState(() {
           _phase = _JoinPhase.failed;
