@@ -20,13 +20,12 @@ abstract final class AccountDeletionCopy {
 
   static const offlineCancelFailed =
       "You're offline. Try again when you're connected.";
-  static const cancelFailed = 'Could not cancel the deletion. Please try again.';
+  static const cancelFailed =
+      'Could not cancel the deletion. Please try again.';
 
   /// Message for a failed "Cancel deletion" request.
   static String cancelFailureMessage(AppError error) =>
       error is NetworkError ? offlineCancelFailed : cancelFailed;
 
-  static const pendingBanner = 'This account is scheduled for deletion.';
   static const cancelDeletion = 'Cancel deletion';
-  static const deletionCancelled = 'Deletion cancelled.';
 }

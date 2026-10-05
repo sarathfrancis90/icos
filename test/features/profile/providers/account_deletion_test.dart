@@ -13,18 +13,21 @@ import 'package:supabase_flutter/supabase_flutter.dart' show User;
 class _FakeRepo extends ProfileRepository {
   _FakeRepo({this.pendingDeletion = true});
   bool pendingDeletion;
+  bool failGet = false;
   int cancelCalls = 0;
 
   @override
   Future<Result<UserProfile, AppError>> getProfile(String userId) async =>
-      Result.success(
-        UserProfile(
-          id: userId,
-          displayName: 'P',
-          isAnonymous: false,
-          deletedAt: pendingDeletion ? DateTime.utc(2026, 10, 1) : null,
-        ),
-      );
+      failGet
+      ? const Result.failure(AppError.network('offline'))
+      : Result.success(
+          UserProfile(
+            id: userId,
+            displayName: 'P',
+            isAnonymous: false,
+            deletedAt: pendingDeletion ? DateTime.utc(2026, 10, 1) : null,
+          ),
+        );
 
   @override
   Future<Result<void, AppError>> cancelAccountDeletion() async {
@@ -97,6 +100,22 @@ void main() {
     expect(repo.cancelCalls, 0);
   });
 
+  test(
+    'a failed refresh keeps a known pending deletion (gate stays)',
+    () async {
+      await load();
+      expect(container.read(pendingDeletionDateProvider), isNotNull);
+      repo.failGet = true;
+      await container.read(profileNotifierProvider.notifier).refresh();
+      expect(container.read(profileNotifierProvider).hasError, isTrue);
+      expect(
+        container.read(profileNotifierProvider).valueOrNull?.deletedAt,
+        isNotNull,
+      );
+      expect(container.read(pendingDeletionDateProvider), isNotNull);
+    },
+  );
+
   test('the explicit Cancel deletion action cancels it', () async {
     await load();
     final result = await container
@@ -146,17 +165,19 @@ void main() {
     );
   });
 
-  test('refresh keeps the pending date during the reload (no gate flap)',
-      () async {
-    await load();
-    final seen = <DateTime?>[];
-    container.listen(
-      profileNotifierProvider,
-      (_, next) => seen.add(next.valueOrNull?.deletedAt),
-    );
-    await container.read(profileNotifierProvider.notifier).refresh();
-    await pumpEventQueue();
-    expect(seen.contains(null), isFalse);
-    expect(container.read(pendingDeletionDateProvider), isNotNull);
-  });
+  test(
+    'refresh keeps the pending date during the reload (no gate flap)',
+    () async {
+      await load();
+      final seen = <DateTime?>[];
+      container.listen(
+        profileNotifierProvider,
+        (_, next) => seen.add(next.valueOrNull?.deletedAt),
+      );
+      await container.read(profileNotifierProvider.notifier).refresh();
+      await pumpEventQueue();
+      expect(seen.contains(null), isFalse);
+      expect(container.read(pendingDeletionDateProvider), isNotNull);
+    },
+  );
 }

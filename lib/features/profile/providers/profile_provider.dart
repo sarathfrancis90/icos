@@ -112,8 +112,17 @@ class ProfileNotifier extends _$ProfileNotifier {
         } else {
           state = AsyncValue.data(profile);
         }
-      case Failure():
-        state = const AsyncValue.data(null);
+      case Failure(error: final e):
+        // A failed refresh keeps the profile we already know (so a pending
+        // deletion's gate survives being offline) and surfaces the error.
+        // With nothing known yet, fall back to "no profile".
+        final previous = state.valueOrNull;
+        state = previous == null
+            ? const AsyncValue.data(null)
+            : AsyncValue<UserProfile?>.error(
+                e,
+                StackTrace.current,
+              ).copyWithPrevious(state);
     }
   }
 

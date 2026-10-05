@@ -91,7 +91,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                 value: _GroupMenuAction.share,
                 child: ListTile(
                   dense: true,
-                  contentPadding: EdgeInsets.zero,
+                  contentPadding: EdgeInsetsDirectional.zero,
                   leading: Icon(Icons.share_rounded),
                   title: Text('Share invite'),
                 ),
@@ -100,7 +100,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                 value: _GroupMenuAction.qr,
                 child: ListTile(
                   dense: true,
-                  contentPadding: EdgeInsets.zero,
+                  contentPadding: EdgeInsetsDirectional.zero,
                   leading: Icon(Icons.qr_code_2_rounded),
                   title: Text('Show QR code'),
                 ),
@@ -109,7 +109,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                 value: _GroupMenuAction.report,
                 child: ListTile(
                   dense: true,
-                  contentPadding: EdgeInsets.zero,
+                  contentPadding: EdgeInsetsDirectional.zero,
                   leading: Icon(Icons.flag_rounded),
                   title: Text('Report group'),
                 ),
@@ -119,7 +119,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                 value: _GroupMenuAction.leave,
                 child: ListTile(
                   dense: true,
-                  contentPadding: EdgeInsets.zero,
+                  contentPadding: EdgeInsetsDirectional.zero,
                   leading: Icon(Icons.logout_rounded, color: theme.colorScheme.error),
                   title: Text(
                     AppStrings.leaveGroup,
@@ -132,7 +132,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                   value: _GroupMenuAction.delete,
                   child: ListTile(
                     dense: true,
-                    contentPadding: EdgeInsets.zero,
+                    contentPadding: EdgeInsetsDirectional.zero,
                     leading: Icon(
                       Icons.delete_forever_rounded,
                       color: theme.colorScheme.error,

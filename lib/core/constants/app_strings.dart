@@ -149,4 +149,30 @@ abstract final class AppStrings {
   static String couldNotOpen(String url) => 'Could not open $url';
   static String couldNotOpenMail(String email) =>
       'Could not open your mail app. Email $email';
+
+  // Blocking screens
+  static const updateRequiredTitle = 'Update required';
+  static String updateAvailableVersion(String version) =>
+      'A new version ($version) of Icos is available. '
+      'Please update to keep playing.';
+  static const updateAvailable =
+      'A new version of Icos is available. Please update to keep playing.';
+  static const updateNow = 'Update now';
+  static const maintenanceTitle = 'Back soon';
+  static const maintenanceMessage =
+      'Icos is undergoing scheduled maintenance. '
+      'Please check back in a little while.';
+  static const tryAgain = 'Try again';
+  static const bannedTitle = 'Account suspended';
+  static String bannedMessage(String email) =>
+      'This account has been suspended for violating the Icos '
+      'community guidelines. If you believe this is a mistake, contact '
+      '$email.';
+  static const bannedAppealSubject = 'Icos account appeal';
+  static String deletionPendingMessage(String date) =>
+      'This account is scheduled for deletion on $date. Until you cancel '
+      'the deletion, your puzzles cannot be saved.';
+
+  // Groups
+  static const blockedPlayerPlaceholder = 'Player';
 }

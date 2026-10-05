@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../domain/models/blocked_user.dart';
@@ -52,7 +53,7 @@ class BlockedUsers extends _$BlockedUsers {
       if (blockedId != null && !current.any((u) => u.userId == blockedId))
         BlockedUser(
           userId: blockedId,
-          displayName: 'Player',
+          displayName: AppStrings.blockedPlayerPlaceholder,
           blockedAt: DateTime.now().toUtc(),
         ),
       for (final u in current)

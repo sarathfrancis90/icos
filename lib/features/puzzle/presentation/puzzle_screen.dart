@@ -109,6 +109,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   void _scheduleStart(Puzzle puzzle, SubmissionResult? result) {
     if (_startScheduled) return;
     _startScheduled = true;
+    _discarding = false;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final notifier = ref.read(gameNotifierProvider(source).notifier);
@@ -166,9 +167,10 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   Future<void> _showPostSolvePrompts() async {
     if (_postSolvePromptsShown) return;
     _postSolvePromptsShown = true;
+    final generation = _generation;
     // Let the celebration card settle first.
     await Future<void>.delayed(const Duration(milliseconds: 1800));
-    if (!mounted) return;
+    if (!mounted || generation != _generation) return;
 
     if (!StorageService.hasSeenNotificationPrompt &&
         StorageService.solveCount >= 1) {

@@ -46,7 +46,7 @@ class MemberTile extends StatelessWidget {
           value: MemberAction.makeAdmin,
           child: ListTile(
             dense: true,
-            contentPadding: EdgeInsets.zero,
+            contentPadding: EdgeInsetsDirectional.zero,
             leading: Icon(Icons.admin_panel_settings_rounded),
             title: Text('Make admin'),
           ),
@@ -56,7 +56,7 @@ class MemberTile extends StatelessWidget {
           value: MemberAction.remove,
           child: ListTile(
             dense: true,
-            contentPadding: EdgeInsets.zero,
+            contentPadding: EdgeInsetsDirectional.zero,
             leading: Icon(Icons.person_remove_rounded),
             title: Text('Remove member'),
           ),
@@ -65,7 +65,7 @@ class MemberTile extends StatelessWidget {
         value: MemberAction.report,
         child: ListTile(
           dense: true,
-          contentPadding: EdgeInsets.zero,
+          contentPadding: EdgeInsetsDirectional.zero,
           leading: Icon(Icons.flag_rounded),
           title: Text('Report user'),
         ),
@@ -75,7 +75,7 @@ class MemberTile extends StatelessWidget {
           value: MemberAction.unblock,
           child: ListTile(
             dense: true,
-            contentPadding: EdgeInsets.zero,
+            contentPadding: EdgeInsetsDirectional.zero,
             leading: Icon(Icons.lock_open_rounded),
             title: Text(AppStrings.unblockUser),
           ),
@@ -85,7 +85,7 @@ class MemberTile extends StatelessWidget {
           value: MemberAction.block,
           child: ListTile(
             dense: true,
-            contentPadding: EdgeInsets.zero,
+            contentPadding: EdgeInsetsDirectional.zero,
             leading: Icon(Icons.block_rounded),
             title: Text(AppStrings.blockUser),
           ),

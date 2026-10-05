@@ -94,7 +94,7 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: AppSizes.lg),
             Expanded(
               child: ListView(
-                padding: EdgeInsets.zero,
+                padding: EdgeInsetsDirectional.zero,
                 children: [
                   puzzleAsync.when(
                     data: (puzzle) => _PuzzleCard(

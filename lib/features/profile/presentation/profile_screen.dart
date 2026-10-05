@@ -91,10 +91,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               style: Theme.of(context).textTheme.displayMedium,
             ),
             const SizedBox(height: AppSizes.lg),
-            if (profile?.deletedAt != null) ...[
-              _buildPendingDeletionBanner(context),
-              const SizedBox(height: AppSizes.md),
-            ],
             _buildAvatarSection(context, profile, isAnonymous),
             const SizedBox(height: AppSizes.xl),
             if (isAnonymous) ...[
@@ -558,53 +554,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       AppLogger.warn('launchUrl failed', error: e, data: {'url': url});
       if (context.mounted) _snack(context, 'Could not open $url');
     }
-  }
-
-  Widget _buildPendingDeletionBanner(BuildContext context) {
-    return _Card(
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSizes.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.warning_amber_rounded, color: AppColors.error),
-                const SizedBox(width: AppSizes.sm),
-                Expanded(
-                  child: Text(
-                    AccountDeletionCopy.pendingBanner,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton(
-                style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
-                onPressed: _busy ? null : () => _cancelDeletion(context),
-                child: const Text(AccountDeletionCopy.cancelDeletion),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _cancelDeletion(BuildContext context) async {
-    setState(() => _busy = true);
-    final result =
-        await ref.read(profileNotifierProvider.notifier).cancelAccountDeletion();
-    if (!mounted) return;
-    setState(() => _busy = false);
-    _snack(
-      this.context,
-      result is Success
-          ? AccountDeletionCopy.deletionCancelled
-          : (result as Failure<void, AppError>).error.userMessage,
-    );
   }
 
   void _snack(BuildContext context, String message) {

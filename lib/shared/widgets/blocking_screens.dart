@@ -36,15 +36,14 @@ class ForceUpdateScreen extends StatelessWidget {
     return _BlockingScaffold(
       icon: Icons.system_update_rounded,
       iconColor: AppColors.purpleLight,
-      title: 'Update required',
+      title: AppStrings.updateRequiredTitle,
       message: latestVersion != null
-          ? 'A new version ($latestVersion) of Icos is available. '
-                'Please update to keep playing.'
-          : 'A new version of Icos is available. Please update to keep playing.',
+          ? AppStrings.updateAvailableVersion(latestVersion!)
+          : AppStrings.updateAvailable,
       action: FilledButton.icon(
         onPressed: _openStore,
         icon: const Icon(Icons.open_in_new_rounded),
-        label: const Text('Update now'),
+        label: const Text(AppStrings.updateNow),
       ),
     );
   }
@@ -62,16 +61,13 @@ class MaintenanceScreen extends StatelessWidget {
     return _BlockingScaffold(
       icon: Icons.construction_rounded,
       iconColor: AppColors.warning,
-      title: 'Back soon',
-      message:
-          message ??
-          'Icos is undergoing scheduled maintenance. '
-              'Please check back in a little while.',
+      title: AppStrings.maintenanceTitle,
+      message: message ?? AppStrings.maintenanceMessage,
       action: onRetry != null
           ? OutlinedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try again'),
+              label: const Text(AppStrings.tryAgain),
             )
           : null,
     );
@@ -90,7 +86,7 @@ class BannedScreen extends StatelessWidget {
     final uri = Uri(
       scheme: 'mailto',
       path: supportEmail,
-      queryParameters: {'subject': 'Icos account appeal'},
+      queryParameters: {'subject': AppStrings.bannedAppealSubject},
     );
     try {
       await launchUrl(uri);
@@ -104,22 +100,22 @@ class BannedScreen extends StatelessWidget {
     return _BlockingScaffold(
       icon: Icons.block_rounded,
       iconColor: AppColors.error,
-      title: 'Account suspended',
-      message:
-          'This account has been suspended for violating the Icos '
-          'community guidelines. If you believe this is a mistake, contact '
-          '$supportEmail.',
+      title: AppStrings.bannedTitle,
+      message: AppStrings.bannedMessage(supportEmail),
       action: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           OutlinedButton.icon(
             onPressed: _contactSupport,
             icon: const Icon(Icons.mail_outline_rounded),
-            label: const Text('Contact support'),
+            label: const Text(AppStrings.contactSupport),
           ),
           if (onSignOut != null) ...[
             const SizedBox(height: AppSizes.sm),
-            TextButton(onPressed: onSignOut, child: const Text('Sign out')),
+            TextButton(
+              onPressed: onSignOut,
+              child: const Text(AppStrings.signOut),
+            ),
           ],
         ],
       ),
@@ -185,9 +181,7 @@ class _AccountDeletionPendingScreenState
       icon: Icons.delete_forever_rounded,
       iconColor: AppColors.error,
       title: AppStrings.deletionPendingTitle,
-      message:
-          'This account is scheduled for deletion on $date. Until you cancel '
-          'the deletion, your puzzles cannot be saved.',
+      message: AppStrings.deletionPendingMessage(date),
       action: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
