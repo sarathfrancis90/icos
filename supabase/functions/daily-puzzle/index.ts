@@ -1,7 +1,7 @@
 // daily-puzzle: generate (or return) the deterministic puzzle for a date.
 //
 // POST { date?: "YYYY-MM-DD" }   (default: tomorrow UTC)
-// Auth: Authorization bearer == SUPABASE_SERVICE_ROLE_KEY (cron/backfill, any date)
+// Auth: service-role bearer (== env key, or a service_role JWT proven by a privileged call; cron/backfill, any date)
 //       OR a valid user JWT (today or tomorrow UTC only).
 // Idempotent: if the puzzle already exists it is returned with status "exists".
 //
@@ -27,7 +27,7 @@ import {
   json,
   Logger,
   readJson,
-  requireServiceRole,
+  isServiceRoleRequest,
   utcToday,
 } from "../_shared/http.ts";
 import { generatePuzzle, seedFor, weekdayDifficulty } from "../_shared/puzzle_core.ts";
@@ -74,7 +74,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const admin = adminClient();
 
     // ---- auth ---------------------------------------------------------------
-    const isService = requireServiceRole(req);
+    const isService = await isServiceRoleRequest(req);
     let userId: string | null = null;
     if (!isService) {
       const user = await getUser(req);

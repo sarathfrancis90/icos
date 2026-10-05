@@ -3,8 +3,9 @@
 // - CORS + JSON responses
 // - Structured JSON logger with a correlation id (from `x-correlation-id` or a
 //   fresh UUID) that is echoed back on every response.
-// - Auth helpers: getUser(req) (user JWT), requireServiceRole(req) (service key
-//   bearer), banCheck(admin, userId).
+// - Auth helpers: getUser(req) (user JWT), isServiceRoleRequest(req) (service
+//   role by key match or proven by a privileged call), requireServiceRole(req)
+//   (sync exact-match only), banCheck(admin, userId).
 // - Small date/crypto utilities shared by start-puzzle / submit-score.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -170,6 +171,52 @@ export function requireServiceRole(req: Request): boolean {
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!token || !key) return false;
   return timingSafeEqual(token, key);
+}
+
+function jwtRole(token: string): string | null {
+  const parts = token.split(".");
+  if (parts.length !== 3 || !parts.every((p) => /^[A-Za-z0-9_-]+$/.test(p))) {
+    return null;
+  }
+  try {
+    let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    const payload = JSON.parse(new TextDecoder().decode(
+      Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)),
+    ));
+    return typeof payload?.role === "string" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
+/** True only if `token` is a genuine service-role credential: auth.admin.listUsers succeeds. */
+export async function probeServiceRole(token: string): Promise<boolean> {
+  const client = createClient(env("SUPABASE_URL"), token, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error } = await client.auth.admin.listUsers({ page: 1, perPage: 1 });
+  return !error;
+}
+
+/**
+ * Service-role check: bearer equals the injected key, or is a service_role-looking
+ * JWT that `probe` proves genuine (the JWT decode is only a pre-filter, not trust).
+ */
+export async function isServiceRoleRequest(
+  req: Request,
+  probe: (token: string) => Promise<boolean> = probeServiceRole,
+): Promise<boolean> {
+  try {
+    const token = bearerToken(req);
+    if (!token) return false;
+    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (key && timingSafeEqual(token, key)) return true;
+    if (jwtRole(token) !== "service_role") return false;
+    return (await probe(token)) === true;
+  } catch {
+    return false;
+  }
 }
 
 export function timingSafeEqual(a: string, b: string): boolean {
