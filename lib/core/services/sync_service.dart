@@ -16,6 +16,7 @@ import 'auth_session_provider.dart';
 import 'connectivity_service.dart';
 import 'edge_function_client.dart';
 import 'notification_service.dart';
+import 'session_service.dart';
 import 'storage_service.dart';
 import 'submit_classifier.dart';
 
@@ -134,6 +135,8 @@ class SyncNotifier extends _$SyncNotifier {
     _retryTimer?.cancel();
     state = true;
     try {
+      // Nothing can be submitted without a session; (re)create the guest one.
+      await ref.read(sessionEnsurerProvider).ensureSession();
       final sessionUserId = ref.read(authSessionProvider).userId;
       // Records are scoped to the storage's active user: it must be the
       // session's before anything is read or submitted.

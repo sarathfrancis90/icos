@@ -6,6 +6,7 @@ import 'package:icos/core/services/analytics_service.dart';
 import 'package:icos/core/services/auth_session_provider.dart';
 import 'package:icos/core/services/connectivity_service.dart';
 import 'package:icos/core/services/edge_function_client.dart';
+import 'package:icos/core/services/session_service.dart';
 import 'package:icos/core/services/storage_service.dart';
 import 'package:icos/core/services/sync_service.dart';
 import 'package:icos/features/puzzle/data/score_signature.dart';
@@ -17,6 +18,30 @@ class _Online extends ConnectivityNotifier {
   @override
   bool build() => true;
 }
+
+class _SignedInGateway implements SessionGateway {
+  @override
+  bool get hasSession => true;
+
+  @override
+  Future<void> signInAnonymously() async {}
+}
+
+class _CountingGateway implements SessionGateway {
+  int signInCalls = 0;
+  bool _has = false;
+
+  @override
+  bool get hasSession => _has;
+
+  @override
+  Future<void> signInAnonymously() async {
+    signInCalls++;
+    _has = true;
+  }
+}
+
+final _ensurer = SessionEnsurer(gateway: _SignedInGateway());
 
 typedef _Handler = Future<EdgeResponse> Function(Map<String, dynamic> body);
 
@@ -65,6 +90,7 @@ void main() {
         edgeInvokerProvider.overrideWithValue(edge.call),
         connectivityNotifierProvider.overrideWith(_Online.new),
         authSessionProvider.overrideWithValue(const FakeAuthSessionInfo()),
+        sessionEnsurerProvider.overrideWithValue(_ensurer),
       ],
     );
   });
@@ -278,6 +304,7 @@ void main() {
           authSessionProvider.overrideWithValue(
             const FakeAuthSessionInfo(hasSession: false, userId: null),
           ),
+          sessionEnsurerProvider.overrideWithValue(_ensurer),
         ],
       );
       addTearDown(noSession.dispose);
@@ -286,6 +313,26 @@ void main() {
       expect(edge.calls, isEmpty);
       expect(StorageService.syncQueueLength, 1);
     });
+  });
+
+  test('makes sure a session exists before the queue runs', () async {
+    final gateway = _CountingGateway();
+    final c = ProviderContainer(
+      overrides: [
+        edgeInvokerProvider.overrideWithValue(edge.call),
+        connectivityNotifierProvider.overrideWith(_Online.new),
+        authSessionProvider.overrideWithValue(const FakeAuthSessionInfo()),
+        sessionEnsurerProvider.overrideWithValue(
+          SessionEnsurer(gateway: gateway),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await StorageService.addToSyncQueue(_submitItem());
+
+    await c.read(syncNotifierProvider.notifier).flush();
+
+    expect(gateway.signInCalls, 1);
   });
 
   group('per-user queue', () {
@@ -331,6 +378,7 @@ void main() {
           authSessionProvider.overrideWithValue(
             const FakeAuthSessionInfo(userId: 'guest-user'),
           ),
+          sessionEnsurerProvider.overrideWithValue(_ensurer),
         ],
       );
       addTearDown(asGuest.dispose);

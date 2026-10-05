@@ -10,6 +10,7 @@ import 'app.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/audio_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/session_service.dart';
 import 'core/services/storage_service.dart';
 import 'core/services/supabase_service.dart';
 
@@ -44,17 +45,14 @@ Future<void> main() async {
     onError: (Object _) {},
   );
 
-  // Auto sign in anonymously if no session exists
-  if (SupabaseService.auth.currentSession == null) {
-    try {
-      await SupabaseService.auth
-          .signInAnonymously()
-          .timeout(const Duration(seconds: 5));
-    } catch (_) {
-      // Offline or timeout — continue without auth
-    }
-    await StorageService.setActiveUser(SupabaseService.auth.currentUser?.id);
-  }
+  // Guest session if there is none. Startup waits at most 5 s; the attempt
+  // keeps going in the background and is retried on reconnect, on resume and
+  // before the sync queue runs (see SessionKeeper).
+  await SessionEnsurer.instance.ensureSession().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => false,
+      );
+  await StorageService.setActiveUser(SupabaseService.auth.currentUser?.id);
 
   // Notifications (local reminders + optional FCM); never throws.
   await NotificationService.initialize();

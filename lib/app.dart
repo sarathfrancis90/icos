@@ -10,6 +10,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/utils/date_utils.dart';
 import 'features/auth/providers/auth_provider.dart';
+import 'features/auth/providers/session_keeper.dart';
 import 'features/puzzle/domain/models/puzzle.dart';
 import 'features/puzzle/providers/daily_puzzle_provider.dart';
 import 'features/puzzle/providers/puzzle_result_provider.dart';
@@ -43,6 +44,8 @@ class _IcosAppState extends ConsumerState<IcosApp>
   void _onAppStart() {
     // Instantiate the sync queue so queued results flush on launch.
     ref.read(syncNotifierProvider);
+    // Re-creates the guest session on reconnect / when it is lost.
+    ref.read(sessionKeeperProvider);
     ref.read(puzzleRepositoryProvider).preCacheTomorrowPuzzle();
 
     // Local records are per user: when the signed-in user changes, everything
@@ -64,6 +67,7 @@ class _IcosAppState extends ConsumerState<IcosApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
     ref.invalidate(appConfigProvider);
+    ref.read(sessionKeeperProvider.notifier).ensure();
     ref.read(puzzleRepositoryProvider).preCacheTomorrowPuzzle();
     ref.read(syncNotifierProvider.notifier).flush();
 

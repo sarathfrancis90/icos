@@ -14,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/app_logger.dart';
+import '../../../core/services/session_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../domain/auth_outcome.dart';
 import '../domain/auth_strategy.dart';
@@ -179,29 +180,42 @@ class AuthNotifier extends _$AuthNotifier {
   Future<AuthOutcome> signInWithApple() =>
       _oauth(OAuthKind.apple, hasClientIds: true);
 
-  /// Forces the web OAuth flow for an *existing* account (used after an
-  /// "identity already exists" response, which abandons the guest data).
+  /// Signs in to an *existing* account (used after an "identity already
+  /// exists" response; the guest's local data stays under the guest's id).
+  ///
+  /// The guest session is not signed out first: the SDK replaces it once the
+  /// provider returns a session, so cancelling or failing leaves the guest
+  /// usable. [switchToExistingAccount] re-creates one if anything lost it.
   Future<AuthOutcome> signInToExistingWithOAuth(OAuthKind provider) async {
-    state = const AsyncValue.loading();
-    try {
-      await SupabaseService.auth.signOut();
-      _setUser();
-      return _oauth(provider,
-          hasClientIds:
-              provider == OAuthKind.google ? googleNativeConfigured : true);
-    } catch (e, st) {
-      AppLogger.warn('Sign out before OAuth failed', error: e, st: st);
-      _setUser();
-      return AuthFailure(AuthStrategy.friendlyMessage(e.toString()), raw: e);
-    }
+    final outcome = await switchToExistingAccount(
+      ensurer: ref.read(sessionEnsurerProvider),
+      providerFlow: () => _oauth(
+        provider,
+        hasClientIds:
+            provider == OAuthKind.google ? googleNativeConfigured : true,
+        existingAccount: true,
+      ),
+    );
+    _setUser();
+    return outcome;
+  }
+
+  /// Signs in anonymously if there is no session; see [SessionEnsurer].
+  /// Never throws; returns whether a session exists.
+  Future<bool> ensureSession() async {
+    final has = await ref.read(sessionEnsurerProvider).ensureSession();
+    _setUser();
+    return has;
   }
 
   Future<AuthOutcome> _oauth(
     OAuthKind provider, {
     required bool hasClientIds,
+    bool existingAccount = false,
   }) async {
     final method = AuthStrategy.forOAuth(
-      isAnonymous: isAnonymous,
+      // Switching to an existing account must not link the guest identity.
+      isAnonymous: isAnonymous && !existingAccount,
       platform: platform,
       provider: provider,
       hasClientIds: hasClientIds,
@@ -457,7 +471,7 @@ class AuthNotifier extends _$AuthNotifier {
     }
     state = const AsyncValue.data(null);
     // Start a fresh guest session so the app keeps working offline-first.
-    await signInAnonymously();
+    await ensureSession();
   }
 }
 
