@@ -26,7 +26,10 @@ appId: com.icos.game
 - assertVisible: "Sound Effects"
 - assertVisible:
     text: "(?s)Colorblind Mode.*"
+- scrollUntilVisible:
+    element: "(?s).*Daily reminder.*"
 - assertVisible: "(?s).*Daily reminder.*"
+- assertVisible: "(?s)Blocked users.*"
 - takeScreenshot: 08_profile/settings_section
 
 # -- Scroll to App section --

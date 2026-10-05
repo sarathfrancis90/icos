@@ -36,6 +36,8 @@ appId: com.icos.game
 - takeScreenshot: 18_settings/sound_toggled_on
 
 # ====== Toggle the daily reminder ======
+- scrollUntilVisible:
+    element: "(?s).*Daily reminder.*"
 - tapOn: "(?s).*Daily reminder.*"
 - waitForAnimationToEnd
 - takeScreenshot: 18_settings/notifications_toggled
