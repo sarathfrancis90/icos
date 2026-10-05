@@ -69,9 +69,10 @@ Answer exactly this (it matches `ios/Runner/PrivacyInfo.xcprivacy` and the priva
 | Contact Info > Name (display name) | Yes | Yes | No | App Functionality |
 | User Content > Other User Content (group names) | Yes | Yes | No | App Functionality |
 | Identifiers > User ID | Yes | Yes | No | App Functionality |
-| Usage Data > Product Interaction | Yes | No | No | Analytics |
-| Diagnostics > Crash Data | Yes | No | No | App Functionality |
-| Diagnostics > Performance Data | Yes | No | No | App Functionality |
+| User Content > Gameplay Content (solve records) | Yes | Yes | No | App Functionality |
+| Usage Data > Product Interaction | Yes | Yes | No | Analytics, App Functionality |
+| Diagnostics > Crash Data | Yes | Yes | No | App Functionality |
+| Diagnostics > Performance Data | Yes | Yes | No | App Functionality |
 | Identifiers > Device ID (Firebase Cloud Messaging registration, only when Firebase is configured) | Yes | No | No | App Functionality |
 
 Everything else: **not collected**. "Do you or your third-party partners use data for
@@ -205,8 +206,9 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
   Use the HTTPS form of the repo URL in `MATCH_GIT_URL` when using basic auth.
 - [ ] **(once)** Google Sign-In on iOS: set the `GOOGLE_IOS_CLIENT_ID` secret. `deploy-ios.yml` appends the reversed client ID as a URL scheme in `ios/Runner/Info.plist` at build time. Info.plist must NOT contain a placeholder scheme: App Store validation rejects it with error 90158
 - [ ] **(once)** App Store Connect > App > **App Privacy**: answers must match `ios/Runner/PrivacyInfo.xcprivacy` and `docs/privacy-policy.html`:
-  - Email Address, User ID, Gameplay Content: linked to identity, app functionality, no tracking
-  - Crash Data, Performance Data, Product Interaction: not linked, analytics/app functionality, no tracking
+  - Email Address, Name, Other User Content (group names), User ID, Gameplay Content: linked to identity, app functionality, no tracking
+  - Product Interaction (analytics + app functionality), Crash Data, Performance Data: linked to identity (tied to the user id), no tracking
+  - Device ID (FCM, only when Firebase is configured): not linked, app functionality, no tracking
   - Tracking: **No**
 - [ ] **(once)** App Information: Privacy Policy URL `https://icos.sarathfrancis.work/privacy-policy.html`, category *Games > Puzzle*, age rating questionnaire (expect 4+), content rights
 - [ ] **(once)** Sign in with Apple review requirement: because the app offers Google sign-in it **must** also offer Sign in with Apple (it does); keep both visible on the sign-in screen
