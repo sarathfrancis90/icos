@@ -90,3 +90,7 @@ maestro-out/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Maestro screenshot output from flows that use relative paths
+/08_profile/
+/14_colorblind/
