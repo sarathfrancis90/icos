@@ -44,7 +44,6 @@ abstract final class AppSizes {
   static const int invalidFlashStaticMs = 400;
   static const int springSettleMs = 600;
   static const int buttonPressMs = 100;
-  static const int scoreCountUpMs = 1200;
   static const int statRevealStaggerMs = 200;
 
   // Limits

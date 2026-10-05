@@ -83,8 +83,6 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
   // Phase 8: Staggered stat reveals
   late final AnimationController _statsController;
 
-  // Phase 8: Score count-up
-  late final AnimationController _countUpController;
 
   final GlobalKey _shareCardKey = GlobalKey();
   bool _sharing = false;
@@ -186,12 +184,6 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
       vsync: this,
     );
 
-    // Phase 8: Score count-up
-    _countUpController = AnimationController(
-      duration: const Duration(milliseconds: AppSizes.scoreCountUpMs),
-      vsync: this,
-    );
-
     // Start animations
     _fadeController.forward();
     Future.delayed(const Duration(milliseconds: 200), () {
@@ -204,7 +196,6 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
         _statsController.forward();
-        _countUpController.forward();
       }
     });
     Future.delayed(const Duration(milliseconds: 500), () {
@@ -220,7 +211,6 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
     _confettiBottomController.dispose();
     _trophyController.dispose();
     _statsController.dispose();
-    _countUpController.dispose();
     super.dispose();
   }
 
@@ -365,7 +355,6 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                   onDone: widget.onDone ?? () => Navigator.of(context).pop(),
                   onNewPuzzle: widget.onNewPuzzle,
                   trophyScale: reduceMotion ? 1.0 : _trophyScale.value,
-                  countUpValue: reduceMotion ? 1.0 : _countUpController.value,
                   staggeredValue: reduceMotion ? (_) => 1.0 : _staggeredValue,
                   statsAnimation: _statsController,
                 ),
@@ -387,7 +376,6 @@ class _CelebrationCard extends StatelessWidget {
     required this.gridSize,
     required this.difficulty,
     required this.trophyScale,
-    required this.countUpValue,
     required this.staggeredValue,
     required this.statsAnimation,
     required this.onShare,
@@ -413,7 +401,6 @@ class _CelebrationCard extends StatelessWidget {
   final bool isArchive;
   final bool isPractice;
   final double trophyScale;
-  final double countUpValue;
   final double Function(int delayMs) staggeredValue;
   final Animation<double> statsAnimation;
 
@@ -432,8 +419,9 @@ class _CelebrationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Phase 8: Count-up display time
-    final displayTime = (timeSeconds * countUpValue).round();
+    // The submitted time, shown as is: it was once a count-up animation,
+    // which could be caught (or left) part-way and read as a different time.
+    final displayTime = timeSeconds;
 
     return Container(
       decoration: BoxDecoration(
