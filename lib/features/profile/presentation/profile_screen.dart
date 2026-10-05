@@ -18,6 +18,7 @@ import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../domain/account_deletion_copy.dart';
 import '../domain/models/profile.dart';
 import '../providers/profile_provider.dart';
 import 'widgets/colorblind_selector.dart';
@@ -90,6 +91,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               style: Theme.of(context).textTheme.displayMedium,
             ),
             const SizedBox(height: AppSizes.lg),
+            if (profile?.deletedAt != null) ...[
+              _buildPendingDeletionBanner(context),
+              const SizedBox(height: AppSizes.md),
+            ],
             _buildAvatarSection(context, profile, isAnonymous),
             const SizedBox(height: AppSizes.xl),
             if (isAnonymous) ...[
@@ -555,6 +560,53 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  Widget _buildPendingDeletionBanner(BuildContext context) {
+    return _Card(
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(AppSizes.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                const SizedBox(width: AppSizes.sm),
+                Expanded(
+                  child: Text(
+                    AccountDeletionCopy.pendingBanner,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
+                onPressed: _busy ? null : () => _cancelDeletion(context),
+                child: const Text(AccountDeletionCopy.cancelDeletion),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cancelDeletion(BuildContext context) async {
+    setState(() => _busy = true);
+    final result =
+        await ref.read(profileNotifierProvider.notifier).cancelAccountDeletion();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    _snack(
+      this.context,
+      result is Success
+          ? AccountDeletionCopy.deletionCancelled
+          : (result as Failure<void, AppError>).error.userMessage,
+    );
+  }
+
   void _snack(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
@@ -676,16 +728,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _showDeleteAccountDialog(BuildContext context) async {
+    final isGuest = SupabaseService.auth.currentUser?.isAnonymous ?? true;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Account'),
-        content: const Text(
-          'Are you sure you want to delete your account? '
-          'Your account will be scheduled for deletion and permanently '
-          'removed after ${AppSizes.accountDeletionGraceDays} days. '
-          'Sign back in within this period to cancel the deletion.',
-        ),
+        content: Text(AccountDeletionCopy.dialogBody(isGuest: isGuest)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -712,11 +760,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     switch (result) {
       case Success():
-        _snack(
-          this.context,
-          'Account scheduled for deletion. '
-          'Sign in within ${AppSizes.accountDeletionGraceDays} days to cancel.',
-        );
+        _snack(this.context, AccountDeletionCopy.doneMessage(isGuest: isGuest));
         this.context.go('/');
       case Failure(error: final error):
         _snack(this.context, error.userMessage);

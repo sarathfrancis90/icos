@@ -8,6 +8,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/app_logger.dart';
+import '../../../core/services/auth_session_provider.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_service.dart';
@@ -61,24 +62,37 @@ class ProfileNotifier extends _$ProfileNotifier {
   @override
   AsyncValue<UserProfile?> build() {
     // Reload whenever the signed-in user changes (guest → account, sign out).
-    ref.watch(authNotifierProvider.select((s) => s.valueOrNull?.id));
+    // Only such a change is a deliberate sign-in; the first load and refreshes
+    // never cancel a pending account deletion.
+    ref.listen<String?>(
+      authNotifierProvider.select((s) => s.valueOrNull?.id),
+      (previous, next) {
+        if (previous == next) return;
+        state = const AsyncValue.loading();
+        _loadProfile(signedIn: next != null);
+      },
+    );
     _loadProfile();
     return const AsyncValue.loading();
   }
 
-  Future<void> _loadProfile() async {
-    final user = SupabaseService.auth.currentUser;
-    if (user == null) {
+  int _loadGeneration = 0;
+
+  Future<void> _loadProfile({bool signedIn = false}) async {
+    final generation = ++_loadGeneration;
+    final userId = ref.read(authSessionProvider).userId;
+    if (userId == null) {
       state = const AsyncValue.data(null);
       return;
     }
 
     final repo = ref.read(profileRepositoryProvider);
-    final result = await repo.getProfile(user.id);
+    final result = await repo.getProfile(userId);
+    if (generation != _loadGeneration) return; // a newer load superseded this
     switch (result) {
       case Success(data: final profile):
-        if (profile.deletedAt != null) {
-          await _autoCancelDeletion(repo, user.id, profile);
+        if (profile.deletedAt != null && signedIn) {
+          await _autoCancelDeletion(repo, userId, profile);
         } else {
           state = AsyncValue.data(profile);
         }
@@ -87,7 +101,9 @@ class ProfileNotifier extends _$ProfileNotifier {
     }
   }
 
-  /// A user who signs in during the grace period wants to keep the account.
+  /// Signing back in during the grace period is the deliberate act the
+  /// deletion dialog promises will cancel the deletion ('Sign back in within
+  /// 30 days to cancel'). Loads that are not a sign-in leave it pending.
   Future<void> _autoCancelDeletion(
     ProfileRepository repo,
     String userId,
@@ -271,8 +287,7 @@ class ProfileNotifier extends _$ProfileNotifier {
     return result;
   }
 
-  /// Explicit cancel (e.g. from a banner) — normally handled automatically
-  /// on sign-in.
+  /// Explicit cancel from the 'scheduled for deletion' banner on Profile.
   Future<Result<void, AppError>> cancelAccountDeletion() async {
     final repo = ref.read(profileRepositoryProvider);
     final result = await repo.cancelAccountDeletion();
