@@ -256,7 +256,9 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                   // Submit button
                   Semantics(
                     button: true,
+                    excludeSemantics: true,
                     label: _isSignUp ? 'Create Account' : 'Sign In',
+                    onTap: _isLoading ? null : _submit,
                     child: GestureDetector(
                       onTap: _isLoading ? null : _submit,
                       child: Container(

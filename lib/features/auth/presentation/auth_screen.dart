@@ -28,6 +28,15 @@ class AuthScreen extends ConsumerWidget {
     final platform = AuthNotifier.platform;
     final showApple = AuthStrategy.showAppleButton(platform);
     final next = sanitizeDeepLink(nextLocation);
+    Future<void> googleSignIn() async {
+      final outcome = await ref
+          .read(authNotifierProvider.notifier)
+          .signInWithGoogle();
+      if (context.mounted) {
+        await handleAuthOutcome(context, ref, outcome, nextLocation: next);
+      }
+    }
+
     String emailRoute({bool signIn = false}) => Uri(
       path: '/auth/email',
       queryParameters: {
@@ -131,23 +140,15 @@ class AuthScreen extends ConsumerWidget {
                         )
                       else ...[
                         // Google sign in
+                        // excludeSemantics: the label here replaces the child's
+                        // own text, which would otherwise be read a second time.
                         Semantics(
                           button: true,
+                          excludeSemantics: true,
                           label: AppStrings.signInWithGoogle,
+                          onTap: googleSignIn,
                           child: GestureDetector(
-                            onTap: () async {
-                              final outcome = await ref
-                                  .read(authNotifierProvider.notifier)
-                                  .signInWithGoogle();
-                              if (context.mounted) {
-                                await handleAuthOutcome(
-                                  context,
-                                  ref,
-                                  outcome,
-                                  nextLocation: next,
-                                );
-                              }
-                            },
+                            onTap: googleSignIn,
                             child: Container(
                               width: double.infinity,
                               constraints: const BoxConstraints(minHeight: 52),
@@ -238,7 +239,9 @@ class AuthScreen extends ConsumerWidget {
                         // sign-up mode.
                         Semantics(
                           button: true,
+                          excludeSemantics: true,
                           label: AppStrings.alreadyHaveAccount,
+                          onTap: () => context.push(emailRoute(signIn: true)),
                           child: TextButton(
                             onPressed: () =>
                                 context.push(emailRoute(signIn: true)),
