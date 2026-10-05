@@ -76,6 +76,10 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
 
   late final ProviderContainer _container;
 
+  /// Fires once at the next UTC midnight while a not-yet-released date is
+  /// showing, so a screen left open across the rollover becomes playable.
+  Timer? _unlockTimer;
+
   @override
   void initState() {
     super.initState();
@@ -93,8 +97,23 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     ArchivePuzzleSource(:final date) => puzzleForDateProvider(date),
   };
 
+  /// Re-checks the date a second after the next midnight UTC. Only one timer
+  /// is ever pending; a date further ahead schedules the next one when this
+  /// fires and the screen still is not released.
+  void _scheduleUnlockCheck() {
+    if (_unlockTimer?.isActive ?? false) return;
+    _unlockTimer = Timer(
+      AppDateUtils.untilNextUtcMidnight() + const Duration(seconds: 1),
+      () {
+        _unlockTimer = null;
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
   @override
   void dispose() {
+    _unlockTimer?.cancel();
     // Timer stops while the screen is away; startGame resumes it. `ref` is
     // already unusable here (the element is unmounted), so go through the
     // container captured in initState.
@@ -244,6 +263,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     // released (tomorrow's puzzle is pre-cached, so it must not be shown).
     final requested = source.date;
     if (requested != null && requested.compareTo(AppDateUtils.todayUtc()) > 0) {
+      _scheduleUnlockCheck();
       return const _NotYetAvailable();
     }
     final puzzleAsync = ref.watch(_puzzleProvider);

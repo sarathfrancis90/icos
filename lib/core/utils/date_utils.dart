@@ -1,7 +1,21 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 abstract final class AppDateUtils {
+  /// The current time. Replaceable so tests can move across midnight UTC.
+  @visibleForTesting
+  static DateTime Function() clock = DateTime.now;
+
   static String todayUtc() {
-    final now = DateTime.now().toUtc();
+    final now = clock().toUtc();
     return formatDate(now);
+  }
+
+  /// Time left until the next 00:00 UTC (the daily rollover). A full day at
+  /// exactly midnight.
+  static Duration untilNextUtcMidnight() {
+    final now = clock().toUtc();
+    final next = DateTime.utc(now.year, now.month, now.day + 1);
+    return next.difference(now);
   }
 
   static String formatDate(DateTime date) {
@@ -22,7 +36,7 @@ abstract final class AppDateUtils {
   }
 
   static String tomorrowUtc() {
-    final tomorrow = DateTime.now().toUtc().add(const Duration(days: 1));
+    final tomorrow = clock().toUtc().add(const Duration(days: 1));
     return formatDate(tomorrow);
   }
 
