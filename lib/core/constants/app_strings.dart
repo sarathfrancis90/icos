@@ -73,4 +73,15 @@ abstract final class AppStrings {
   static const a11yWallCell = 'wall';
   static const a11yRow = 'Row';
   static const a11yColumn = 'Column';
+
+  // Legal / support
+  static const consentPrefix = 'By continuing, you agree to our ';
+  static const consentAnd = ' and ';
+  static const termsOfService = 'Terms of Service';
+  static const privacyPolicy = 'Privacy Policy';
+  static const contactSupport = 'Contact support';
+  static const contactSupportSemantics = 'Contact support by email';
+  static String couldNotOpen(String url) => 'Could not open $url';
+  static String couldNotOpenMail(String email) =>
+      'Could not open your mail app. Email $email';
 }

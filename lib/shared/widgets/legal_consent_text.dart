@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_sizes.dart';
+import '../../core/constants/app_strings.dart';
 import '../../core/constants/app_urls.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/external_links.dart';
@@ -15,14 +16,12 @@ class LegalConsentText extends StatelessWidget {
   /// tests do not reach for the platform.
   final Future<bool> Function(String url) onOpen;
 
-  static const String prefix = 'By continuing, you agree to our ';
-
   Future<void> _open(BuildContext context, String url) async {
     final ok = await onOpen(url);
     if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open $url')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppStrings.couldNotOpen(url))));
     }
   }
 
@@ -48,10 +47,7 @@ class LegalConsentText extends StatelessWidget {
               padding: const EdgeInsetsDirectional.symmetric(
                 horizontal: AppSizes.xs,
               ),
-              child: Align(
-                widthFactor: 1,
-                child: Text(label, style: style),
-              ),
+              child: Align(widthFactor: 1, child: Text(label, style: style)),
             ),
           ),
         ),
@@ -68,10 +64,10 @@ class LegalConsentText extends StatelessWidget {
       TextSpan(
         style: base,
         children: [
-          const TextSpan(text: prefix),
-          _link(context, 'Terms of Service', kTermsUrl),
-          const TextSpan(text: ' and '),
-          _link(context, 'Privacy Policy', kPrivacyPolicyUrl),
+          const TextSpan(text: AppStrings.consentPrefix),
+          _link(context, AppStrings.termsOfService, kTermsUrl),
+          const TextSpan(text: AppStrings.consentAnd),
+          _link(context, AppStrings.privacyPolicy, kPrivacyPolicyUrl),
           const TextSpan(text: '.'),
         ],
       ),

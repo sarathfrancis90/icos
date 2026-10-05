@@ -24,10 +24,7 @@ void main() {
       final router = GoRouter(
         initialLocation: '/auth',
         routes: [
-          GoRoute(
-            path: '/auth',
-            builder: (_, _) => const AuthScreen(),
-          ),
+          GoRoute(path: '/auth', builder: (_, _) => const AuthScreen()),
           GoRoute(
             path: '/auth/email',
             builder: (context, state) {
@@ -47,8 +44,9 @@ void main() {
       );
     }
 
-    testWidgets('offers a way in for someone who already has an account',
-        (tester) async {
+    testWidgets('offers a way in for someone who already has an account', (
+      tester,
+    ) async {
       await tester.pumpWidget(build());
       await tester.pump();
 
@@ -59,8 +57,9 @@ void main() {
       );
     });
 
-    testWidgets('the sign-in link opens the form in sign-in mode',
-        (tester) async {
+    testWidgets('the sign-in link opens the form in sign-in mode', (
+      tester,
+    ) async {
       final visited = <String>[];
       await tester.pumpWidget(build(visited: visited));
       await tester.pump();
@@ -76,22 +75,26 @@ void main() {
       );
     });
 
-    testWidgets('the email button is labelled as sign-up, not ambiguous',
-        (tester) async {
+    testWidgets('the email button is labelled as sign-up, not ambiguous', (
+      tester,
+    ) async {
       await tester.pumpWidget(build());
       await tester.pump();
 
       expect(find.text(AppStrings.signUpWithEmail), findsOneWidget);
     });
 
-    testWidgets('shows the Terms/Privacy consent line with both links',
-        (tester) async {
+    testWidgets('shows the Terms/Privacy consent line with both links', (
+      tester,
+    ) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(build());
       await tester.pump();
 
-      expect(find.textContaining('By continuing, you agree to our'),
-          findsOneWidget);
+      expect(
+        find.textContaining('By continuing, you agree to our'),
+        findsOneWidget,
+      );
       expect(find.bySemanticsLabel('Terms of Service'), findsOneWidget);
       expect(find.bySemanticsLabel('Privacy Policy'), findsOneWidget);
       handle.dispose();
@@ -111,6 +114,13 @@ void main() {
         ),
       );
       await tester.pump();
+      expect(
+        MediaQuery.textScalerOf(
+          tester.element(find.byType(AuthScreen)),
+        ).scale(10),
+        20,
+        reason: 'the 2.0 text scale must reach the widget under test',
+      );
       expect(tester.takeException(), isNull);
     });
 

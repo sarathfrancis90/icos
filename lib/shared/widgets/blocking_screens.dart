@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_sizes.dart';
+import '../../core/constants/app_urls.dart';
 import '../../core/services/app_logger.dart';
 
 /// Full-screen block shown when the installed version is below
@@ -35,7 +36,7 @@ class ForceUpdateScreen extends StatelessWidget {
       title: 'Update required',
       message: latestVersion != null
           ? 'A new version ($latestVersion) of Icos is available. '
-              'Please update to keep playing.'
+                'Please update to keep playing.'
           : 'A new version of Icos is available. Please update to keep playing.',
       action: FilledButton.icon(
         onPressed: _openStore,
@@ -59,7 +60,8 @@ class MaintenanceScreen extends StatelessWidget {
       icon: Icons.construction_rounded,
       iconColor: AppColors.warning,
       title: 'Back soon',
-      message: message ??
+      message:
+          message ??
           'Icos is undergoing scheduled maintenance. '
               'Please check back in a little while.',
       action: onRetry != null
@@ -79,7 +81,7 @@ class BannedScreen extends StatelessWidget {
 
   final VoidCallback? onSignOut;
 
-  static const supportEmail = 'sarathfrancis90@gmail.com';
+  static const supportEmail = kSupportEmail;
 
   Future<void> _contactSupport() async {
     final uri = Uri(
@@ -100,7 +102,8 @@ class BannedScreen extends StatelessWidget {
       icon: Icons.block_rounded,
       iconColor: AppColors.error,
       title: 'Account suspended',
-      message: 'This account has been suspended for violating the Icos '
+      message:
+          'This account has been suspended for violating the Icos '
           'community guidelines. If you believe this is a mistake, contact '
           '$supportEmail.',
       action: Column(
@@ -113,10 +116,7 @@ class BannedScreen extends StatelessWidget {
           ),
           if (onSignOut != null) ...[
             const SizedBox(height: AppSizes.sm),
-            TextButton(
-              onPressed: onSignOut,
-              child: const Text('Sign out'),
-            ),
+            TextButton(onPressed: onSignOut, child: const Text('Sign out')),
           ],
         ],
       ),
@@ -143,15 +143,17 @@ class _BlockingScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final secondary =
-        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final secondary = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
 
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints:
-                const BoxConstraints(maxWidth: AppSizes.contentMaxWidth),
+            constraints: const BoxConstraints(
+              maxWidth: AppSizes.contentMaxWidth,
+            ),
             child: Padding(
               padding: const EdgeInsetsDirectional.all(AppSizes.xl),
               child: Column(

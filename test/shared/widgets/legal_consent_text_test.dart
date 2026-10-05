@@ -24,8 +24,10 @@ void main() {
 
   testWidgets('renders the consent sentence with two links', (tester) async {
     await tester.pumpWidget(host([]));
-    expect(find.textContaining('By continuing, you agree to our'),
-        findsOneWidget);
+    expect(
+      find.textContaining('By continuing, you agree to our'),
+      findsOneWidget,
+    );
     expect(find.text('Terms of Service'), findsOneWidget);
     expect(find.text('Privacy Policy'), findsOneWidget);
   });
@@ -38,8 +40,9 @@ void main() {
     expect(opened, [kTermsUrl, kPrivacyPolicyUrl]);
   });
 
-  testWidgets('links are exposed as semantic links with labels',
-      (tester) async {
+  testWidgets('links are exposed as semantic links with labels', (
+    tester,
+  ) async {
     final handle = tester.ensureSemantics();
     await tester.pumpWidget(host([]));
     for (final label in ['Terms of Service', 'Privacy Policy']) {
@@ -53,17 +56,15 @@ void main() {
     await tester.pumpWidget(host([]));
     for (final label in ['Terms of Service', 'Privacy Policy']) {
       final box = tester.getSize(
-        find.ancestor(
-          of: find.text(label),
-          matching: find.byType(InkWell),
-        ),
+        find.ancestor(of: find.text(label), matching: find.byType(InkWell)),
       );
       expect(box.height, greaterThanOrEqualTo(44), reason: label);
     }
   });
 
-  testWidgets('does not overflow at 200% text on a 320x568 screen',
-      (tester) async {
+  testWidgets('does not overflow at 200% text on a 320x568 screen', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -75,6 +76,13 @@ void main() {
         ),
         child: host([]),
       ),
+    );
+    expect(
+      MediaQuery.textScalerOf(
+        tester.element(find.byType(LegalConsentText)),
+      ).scale(10),
+      20,
+      reason: 'the 2.0 text scale must reach the widget under test',
     );
     expect(tester.takeException(), isNull);
   });

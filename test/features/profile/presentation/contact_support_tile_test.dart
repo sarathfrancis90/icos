@@ -8,8 +8,9 @@ import '../../../helpers/test_helpers.dart';
 void main() {
   setUpTestEnvironment();
 
-  testWidgets('renders a Contact support row that opens a mailto',
-      (tester) async {
+  testWidgets('renders a Contact support row that opens a mailto', (
+    tester,
+  ) async {
     final opened = <String>[];
     await tester.pumpWidget(
       buildTestWidget(
@@ -24,8 +25,11 @@ void main() {
       ),
     );
 
+    final handle = tester.ensureSemantics();
     expect(find.text('Contact support'), findsOneWidget);
     expect(find.text(kSupportEmail), findsOneWidget);
+    expect(find.bySemanticsLabel('Contact support by email'), findsOneWidget);
+    handle.dispose();
     await tester.tap(find.text('Contact support'));
     expect(opened.single, startsWith('mailto:$kSupportEmail'));
   });

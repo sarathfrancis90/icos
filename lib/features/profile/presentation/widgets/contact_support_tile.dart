@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_urls.dart';
 import '../../../../core/utils/external_links.dart';
 
@@ -14,13 +15,13 @@ class ContactSupportTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Contact support by email',
+      label: AppStrings.contactSupportSemantics,
       excludeSemantics: true,
       child: ListTile(
-        contentPadding: EdgeInsets.zero,
+        contentPadding: EdgeInsetsDirectional.zero,
         minVerticalPadding: 12,
         leading: const Icon(Icons.mail_outline_rounded),
-        title: const Text('Contact support'),
+        title: const Text(AppStrings.contactSupport),
         subtitle: const Text(kSupportEmail),
         trailing: const Icon(
           Icons.open_in_new_rounded,
@@ -30,8 +31,8 @@ class ContactSupportTile extends StatelessWidget {
           final ok = await onOpen(kSupportMailtoUrl);
           if (!ok && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Could not open your mail app. Email $kSupportEmail'),
+              SnackBar(
+                content: Text(AppStrings.couldNotOpenMail(kSupportEmail)),
               ),
             );
           }
