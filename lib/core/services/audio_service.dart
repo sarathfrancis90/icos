@@ -39,18 +39,95 @@ abstract interface class ShortSoundEngine {
   Future<void> dispose();
 }
 
-/// [ShortSoundEngine] backed by audioplayers in low-latency mode.
-class AudioplayersEngine implements ShortSoundEngine {
-  AudioplayersEngine() : _player = AudioPlayer();
+/// The slice of audioplayers' `AudioPlayer` that [AudioplayersEngine] uses,
+/// so the configuration it applies can be tested without a platform engine.
+abstract interface class EffectPlayer {
+  /// Stops the per-frame position polling audioplayers starts by default.
+  void disablePositionUpdates();
+  Future<void> setAudioContext(AudioContext context);
+  Future<void> setPlayerMode(PlayerMode mode);
+  Future<void> setReleaseMode(ReleaseMode mode);
+  Future<void> setVolume(double volume);
+  Future<void> setSource(String asset);
+  Future<void> stop();
+  Future<void> resume();
+  Future<void> dispose();
+}
+
+class _AudioPlayerEffect implements EffectPlayer {
+  _AudioPlayerEffect() : _player = AudioPlayer();
 
   final AudioPlayer _player;
 
   @override
+  void disablePositionUpdates() => _player.positionUpdater = null;
+
+  @override
+  Future<void> setAudioContext(AudioContext context) =>
+      _player.setAudioContext(context);
+
+  @override
+  Future<void> setPlayerMode(PlayerMode mode) => _player.setPlayerMode(mode);
+
+  @override
+  Future<void> setReleaseMode(ReleaseMode mode) => _player.setReleaseMode(mode);
+
+  @override
+  Future<void> setVolume(double volume) => _player.setVolume(volume);
+
+  @override
+  Future<void> setSource(String asset) => _player.setSource(AssetSource(asset));
+
+  @override
+  Future<void> stop() => _player.stop();
+
+  @override
+  Future<void> resume() => _player.resume();
+
+  @override
+  Future<void> dispose() => _player.dispose();
+}
+
+/// [ShortSoundEngine] backed by audioplayers in low-latency mode.
+class AudioplayersEngine implements ShortSoundEngine {
+  AudioplayersEngine({EffectPlayer Function()? playerFactory})
+    : _player = (playerFactory ?? _AudioPlayerEffect.new)()
+        // Effects never need position updates, and on Android a SoundPool
+        // player never reports completion, so the default updater would keep
+        // scheduling a frame callback and a platform call after every sound.
+        ..disablePositionUpdates();
+
+  final EffectPlayer _player;
+
+  /// How effects take part in the device's audio: mixed with whatever else is
+  /// playing, never holding audio focus.
+  ///
+  /// audioplayers' default context requests AUDIOFOCUS_GAIN before each play
+  /// and abandons it after each stop on Android. That pauses other apps' music
+  /// on every move, and a refused request is ignored by the plugin
+  /// (WrappedPlayer / FocusManager.handleFocusResult has no branch for
+  /// AUDIOFOCUS_REQUEST_FAILED), so the sound is silently dropped. iOS gets
+  /// the playback category with `mixWithOthers` for the same reason.
+  static AudioContext effectContext() => AudioContext(
+    android: const AudioContextAndroid(
+      usageType: AndroidUsageType.game,
+      contentType: AndroidContentType.sonification,
+      audioFocus: AndroidAudioFocus.none,
+    ),
+    iOS: AudioContextIOS(
+      category: AVAudioSessionCategory.playback,
+      options: const {AVAudioSessionOptions.mixWithOthers},
+    ),
+  );
+
+  @override
   Future<void> prepare(String asset, double volume) async {
+    // The context first: it is read when the platform player is created.
+    await _player.setAudioContext(effectContext());
     await _player.setPlayerMode(PlayerMode.lowLatency);
     await _player.setReleaseMode(ReleaseMode.stop);
     await _player.setVolume(volume);
-    await _player.setSource(AssetSource(asset));
+    await _player.setSource(asset);
   }
 
   @override
@@ -95,19 +172,36 @@ class AudioplayersSound implements SoundPlayer {
 class AudioService {
   AudioService._()
     : _playerFactory = ((_) => AudioplayersSound()),
-      _soundEnabled = _storageSoundEnabled;
+      _soundEnabled = _storageSoundEnabled,
+      _now = DateTime.now,
+      _prepareTimeout = const Duration(seconds: 15);
 
   /// A service with an injected player and settings, for tests.
   AudioService.forTesting({
     required SoundPlayer Function(String asset) playerFactory,
     required bool Function() soundEnabled,
+    DateTime Function()? now,
+    Duration prepareTimeout = const Duration(seconds: 15),
   }) : _playerFactory = playerFactory,
-       _soundEnabled = soundEnabled;
+       _soundEnabled = soundEnabled,
+       _now = now ?? DateTime.now,
+       _prepareTimeout = prepareTimeout;
 
   static final instance = AudioService._();
 
   final SoundPlayer Function(String asset) _playerFactory;
   final bool Function() _soundEnabled;
+  final DateTime Function() _now;
+  final Duration _prepareTimeout;
+
+  /// A sound that failed to prepare (a slow first start can outlast the
+  /// timeout) is tried again on a later play: at most this many attempts, no
+  /// closer together than [_retryAfter].
+  static const _maxPrepareAttempts = 3;
+  static const _retryAfter = Duration(seconds: 10);
+  final Map<SoundEffect, int> _attempts = {};
+  final Map<SoundEffect, DateTime> _lastAttempt = {};
+  final Set<SoundEffect> _inFlight = {};
 
   /// Effects that loaded and can be played.
   final Map<SoundEffect, SoundPlayer> _players = {};
@@ -147,17 +241,27 @@ class AudioService {
 
   /// Starts preparing the sound effects in the background and returns
   /// immediately; never throws and never blocks startup. Does nothing while
-  /// the sound setting is off (preparation then happens on the first play
-  /// after it is switched on).
+  /// the sound setting is off (preparation then starts when it is switched on).
   Future<void> initialize() async {
     if (_started) return;
     if (!_soundEnabled()) {
-      // Prepared on the first play after the setting is switched on.
+      // Prepared when the setting is switched on (see [soundSettingChanged]),
+      // or at the latest on the first play after that.
       _deferred = true;
       return;
     }
     _started = true;
     _preparing = _prepareAll();
+  }
+
+  /// Call after the sound setting changed: switching it on starts preparing
+  /// right away, so the first sound after the switch is not the one that is
+  /// dropped while the effects load.
+  void soundSettingChanged() {
+    if (_soundEnabled() && !_started) {
+      _deferred = false;
+      unawaited(initialize());
+    }
   }
 
   Future<void> _prepareAll() async {
@@ -167,20 +271,34 @@ class AudioService {
   }
 
   Future<void> _prepare(SoundEffect effect) async {
+    if (!_inFlight.add(effect)) return;
+    _attempts[effect] = (_attempts[effect] ?? 0) + 1;
+    _lastAttempt[effect] = _now();
     final asset = _assets[effect]!;
     SoundPlayer? player;
     try {
       player = _playerFactory(asset);
       await player
           .load(asset, _volumes[effect] ?? 0.3)
-          .timeout(const Duration(seconds: 5));
+          .timeout(_prepareTimeout);
       _players[effect] = player;
     } catch (e) {
       _logOnce('sound could not be loaded', e);
       try {
         await player?.dispose();
       } catch (_) {}
+    } finally {
+      _inFlight.remove(effect);
     }
+  }
+
+  /// Tries a failed effect again, when it is due.
+  void _retryIfDue(SoundEffect effect) {
+    if (_inFlight.contains(effect)) return;
+    if ((_attempts[effect] ?? 0) >= _maxPrepareAttempts) return;
+    final last = _lastAttempt[effect];
+    if (last != null && _now().difference(last) < _retryAfter) return;
+    _preparing = _prepare(effect);
   }
 
   /// Play a sound effect if sound is enabled and it is ready. A request that
@@ -196,7 +314,10 @@ class AudioService {
       return;
     }
     final player = _players[effect];
-    if (player == null) return;
+    if (player == null) {
+      _retryIfDue(effect);
+      return;
+    }
     try {
       await player.replay();
     } catch (e) {
@@ -227,6 +348,8 @@ class AudioService {
       await player.dispose();
     }
     _players.clear();
+    _attempts.clear();
+    _lastAttempt.clear();
     _started = false;
     _preparing = null;
   }

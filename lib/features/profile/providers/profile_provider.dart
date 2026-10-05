@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart' show XFile;
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/app_logger.dart';
+import '../../../core/services/audio_service.dart';
 import '../../../core/services/auth_session_provider.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/storage_service.dart';
@@ -245,6 +246,8 @@ class ProfileNotifier extends _$ProfileNotifier {
     }
 
     await StorageService.setSoundEnabled(enabled);
+    // Start preparing the effects now, not on the first (then dropped) sound.
+    AudioService.instance.soundSettingChanged();
 
     final repo = ref.read(profileRepositoryProvider);
     final result = await repo.updateSettings(
