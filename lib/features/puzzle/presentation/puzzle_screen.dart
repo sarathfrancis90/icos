@@ -31,6 +31,7 @@ import 'widgets/celebration_overlay.dart';
 import 'widgets/game_controls.dart';
 import 'widgets/grid_palette.dart';
 import 'widgets/notification_prompt.dart';
+import 'widgets/offline_puzzle_notice.dart';
 import 'widgets/puzzle_grid.dart';
 
 /// Solve count at which the store rating prompt is requested (once).
@@ -57,6 +58,11 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   bool _showCelebration = false;
   bool _startScheduled = false;
   bool _postSolvePromptsShown = false;
+
+  /// The puzzle this screen started with. A refresh that swaps the offline
+  /// stand-in for the real puzzle (connectivity returned) must not replace
+  /// the grid under the player's finger; the next visit picks it up.
+  Puzzle? _pinnedPuzzle;
 
   PuzzleSource get source => widget.source;
 
@@ -91,6 +97,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
       final current = ref.read(gameNotifierProvider(source));
       if (result != null &&
           !result.isRejected &&
+          puzzle.origin == PuzzleOrigin.server &&
           current?.status != GameStatus.completed) {
         _adoptResult(puzzle, result);
         return;
@@ -216,10 +223,11 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
       ref.listen(puzzleResultProvider(date), (prev, next) {
         final result = next.valueOrNull;
         final current = ref.read(gameNotifierProvider(source));
-        final puzzle = ref.read(_puzzleProvider).valueOrNull;
+        final puzzle = _pinnedPuzzle ?? ref.read(_puzzleProvider).valueOrNull;
         if (result == null ||
             result.isRejected ||
             puzzle == null ||
+            puzzle.origin == PuzzleOrigin.bundled ||
             current == null ||
             current.status == GameStatus.completed) {
           return;
@@ -247,7 +255,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     return Scaffold(
       backgroundColor: AppColors.deepBlack,
       body: puzzleAsync.when(
-        data: (puzzle) {
+        data: (loaded) {
+          final puzzle = _pinnedPuzzle ??= loaded;
           final result = resultAsync.valueOrNull;
           if (gameState == null || gameState.puzzle != puzzle) {
             _scheduleStart(puzzle, result);
@@ -300,6 +309,15 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                         parTimeSeconds: puzzle.parTimeSeconds,
                       ),
                     ),
+                    if (puzzle.origin == PuzzleOrigin.bundled)
+                      const Padding(
+                        padding: EdgeInsetsDirectional.only(
+                          start: AppSizes.md,
+                          end: AppSizes.md,
+                          top: AppSizes.sm,
+                        ),
+                        child: OfflinePuzzleNotice(),
+                      ),
                     if (isReplay)
                       Padding(
                         padding: const EdgeInsetsDirectional.only(
@@ -368,7 +386,10 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                   streak: result?.streak?.currentStreak,
                   status: result?.status,
                   isArchive: source.isArchive,
-                  isPractice: source.isPractice,
+                  // An offline stand-in is practice too: it stays on the device.
+                  isPractice:
+                      source.isPractice ||
+                      puzzle.origin == PuzzleOrigin.bundled,
                   path: [
                     for (final p in gameState.path) [p.row, p.col],
                   ],

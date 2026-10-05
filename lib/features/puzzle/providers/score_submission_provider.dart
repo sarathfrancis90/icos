@@ -9,6 +9,7 @@ import '../data/puzzle_source.dart';
 import '../data/score_signature.dart';
 import '../data/submission_result.dart';
 import '../domain/models/game_state.dart';
+import '../domain/models/puzzle.dart';
 import 'puzzle_result_provider.dart';
 
 part 'score_submission_provider.g.dart';
@@ -25,6 +26,11 @@ class ScoreSubmitter extends _$ScoreSubmitter {
   AsyncValue<bool> build() => const AsyncValue.data(false);
 
   Future<void> submitScore(GameState gameState, PuzzleSource source) async {
+    if (gameState.puzzle.origin == PuzzleOrigin.bundled) {
+      await _recordBundledSolve(gameState, source);
+      return;
+    }
+
     // Already recorded (screen rebuilt, keepAlive state re-attached, …).
     if (StorageService.getSubmissionResult(source.storageKey) != null) {
       state = const AsyncValue.data(true);
@@ -107,6 +113,37 @@ class ScoreSubmitter extends _$ScoreSubmitter {
       state = const AsyncValue.data(true);
     } catch (e, st) {
       AppLogger.error('score submission failed', error: e, st: st);
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  /// An offline puzzle shown in place of the real one: remembered for the
+  /// screen, but never submitted or queued, never stored as the date's result
+  /// and not counted (solve count, streak, stats).
+  Future<void> _recordBundledSolve(
+    GameState gameState,
+    PuzzleSource source,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      final date = source.date ?? source.storageKey;
+      await StorageService.saveBundledResult(
+        date,
+        SubmissionResult(
+          date: date,
+          status: SubmissionStatus.localOnly,
+          timeSeconds: gameState.elapsedSeconds,
+          hintsUsed: gameState.hintsUsed,
+          undosUsed: gameState.undosUsed,
+          path: gameState.path.map((p) => [p.row, p.col]).toList(),
+          completedAt: DateTime.now().toUtc(),
+          isArchive: source.isArchive,
+        ).toJson(),
+      );
+      await StorageService.clearGameState('bundled_${source.storageKey}');
+      state = const AsyncValue.data(true);
+    } catch (e, st) {
+      AppLogger.error('bundled solve record failed', error: e, st: st);
       state = AsyncValue.error(e, st);
     }
   }

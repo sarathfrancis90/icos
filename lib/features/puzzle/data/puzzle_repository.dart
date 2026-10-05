@@ -30,7 +30,8 @@ class PuzzleRepository {
   final EdgeInvoker _invoke;
 
   /// Puzzle for [date]: cache → `puzzles` table → (today/tomorrow only)
-  /// `daily-puzzle` edge function → bundled fallback.
+  /// `daily-puzzle` edge function → bundled fallback. Only the fallback is
+  /// marked [PuzzleOrigin.bundled]; see [Puzzle.origin].
   Future<Result<Puzzle, AppError>> getPuzzle(String date) async {
     final cached = StorageService.getCachedPuzzle(date);
     if (cached != null) {
@@ -124,7 +125,9 @@ class PuzzleRepository {
       }
       final puzzleJson = Map<String, dynamic>.from(puzzles[index])
         ..['puzzle_date'] = date;
-      return Result.success(Puzzle.fromJson(puzzleJson));
+      return Result.success(
+        Puzzle.fromJson(puzzleJson).copyWith(origin: PuzzleOrigin.bundled),
+      );
     } catch (e, st) {
       AppLogger.error('Fallback puzzle load failed', error: e, st: st);
       return const Result.failure(

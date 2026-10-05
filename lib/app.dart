@@ -10,6 +10,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/utils/date_utils.dart';
 import 'features/auth/providers/auth_provider.dart';
+import 'features/puzzle/domain/models/puzzle.dart';
 import 'features/puzzle/providers/daily_puzzle_provider.dart';
 import 'features/puzzle/providers/puzzle_result_provider.dart';
 import 'features/stats/providers/stats_provider.dart';
@@ -65,6 +66,14 @@ class _IcosAppState extends ConsumerState<IcosApp>
     ref.invalidate(appConfigProvider);
     ref.read(puzzleRepositoryProvider).preCacheTomorrowPuzzle();
     ref.read(syncNotifierProvider.notifier).flush();
+
+    // Today's puzzle is still the offline stand-in (server was unreachable
+    // earlier): try for the real one again.
+    final todayDate = AppDateUtils.todayUtc();
+    if (ref.read(dailyPuzzleProvider).valueOrNull?.origin ==
+        PuzzleOrigin.bundled) {
+      ref.invalidate(puzzleForDateProvider(todayDate));
+    }
 
     // Crossed midnight UTC while backgrounded: today's puzzle changed.
     final today = AppDateUtils.todayUtc();

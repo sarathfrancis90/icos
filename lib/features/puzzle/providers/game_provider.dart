@@ -310,6 +310,8 @@ class GameNotifier extends _$GameNotifier {
     _sessionRequested = true;
     final date = source.date;
     if (!source.submitsToServer || date == null) return;
+    // A bundled puzzle has no server session: nothing will be submitted.
+    if (state?.puzzle.origin == PuzzleOrigin.bundled) return;
     unawaited(
       AnalyticsService.logEvent(AnalyticsEvents.puzzleStart, {
         'puzzle_date': date,
@@ -341,12 +343,19 @@ class GameNotifier extends _$GameNotifier {
       'undos_used': state!.undosUsed,
       'status': state!.status.name,
     };
-    StorageService.saveGameState(source.storageKey, data);
+    StorageService.saveGameState(_stateKey(state!.puzzle), data);
   }
 
+  /// Bundled puzzles keep their in-progress state under their own key so it
+  /// is never restored onto the real puzzle of the same date.
+  String _stateKey(Puzzle puzzle) => puzzle.origin == PuzzleOrigin.bundled
+      ? 'bundled_${source.storageKey}'
+      : source.storageKey;
+
   void _restoreGameState() {
-    final saved = StorageService.getGameState(source.storageKey);
-    if (saved == null || state == null || _engine == null) return;
+    if (state == null || _engine == null) return;
+    final saved = StorageService.getGameState(_stateKey(state!.puzzle));
+    if (saved == null) return;
 
     final pathData = (saved['path'] as List<dynamic>?) ?? [];
     var restoredState = _engine!.createInitialState();

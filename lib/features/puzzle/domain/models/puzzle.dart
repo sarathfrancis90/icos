@@ -1,7 +1,17 @@
+// ignore_for_file: invalid_annotation_target
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'puzzle.freezed.dart';
 part 'puzzle.g.dart';
+
+/// Where a [Puzzle] came from.
+///
+/// A [bundled] puzzle is one of the offline fallbacks shipped in the app. It
+/// is shown under today's date when the real puzzle cannot be loaded, but it
+/// is not the real puzzle: solving it must never be submitted, queued or
+/// stored as the result for that date.
+enum PuzzleOrigin { server, bundled }
 
 @freezed
 abstract class Puzzle with _$Puzzle {
@@ -14,6 +24,12 @@ abstract class Puzzle with _$Puzzle {
     required String difficulty,
     required int parTimeSeconds,
     int? difficultyScore,
+
+    /// Set by the repository, never serialised: anything parsed from JSON is
+    /// a server puzzle.
+    @JsonKey(includeFromJson: false, includeToJson: false)
+    @Default(PuzzleOrigin.server)
+    PuzzleOrigin origin,
   }) = _Puzzle;
 
   factory Puzzle.fromJson(Map<String, dynamic> json) => _$PuzzleFromJson(json);
