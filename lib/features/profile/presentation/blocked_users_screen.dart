@@ -5,6 +5,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
+import '../../../shared/widgets/content_width.dart';
 import '../../groups/domain/models/blocked_user.dart';
 import '../../groups/presentation/widgets/group_ui.dart';
 import '../../groups/providers/blocked_users_provider.dart';
@@ -19,7 +20,7 @@ class BlockedUsersScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text(AppStrings.blockedUsers)),
-      body: blocked.when(
+      body: ContentWidth(child: blocked.when(
         data: (users) => users.isEmpty
             ? const GroupEmptyState(
                 icon: Icons.block_rounded,
@@ -40,7 +41,7 @@ class BlockedUsersScreen extends ConsumerWidget {
             child: const Text(AppStrings.retry),
           ),
         ),
-      ),
+      )),
     );
   }
 }

@@ -8,6 +8,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/router/deep_link.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/content_width.dart';
 import '../../../shared/widgets/legal_consent_text.dart';
 import '../domain/auth_strategy.dart';
 import '../providers/auth_provider.dart';
@@ -71,7 +72,7 @@ class AuthScreen extends ConsumerWidget {
         body: SafeArea(
           // Scrolls when the content outgrows the screen (small phones, large
           // text); otherwise the Spacers keep the original centred layout.
-          child: LayoutBuilder(
+          child: ContentWidth(child: LayoutBuilder(
             builder: (context, constraints) => SingleChildScrollView(
               padding: const EdgeInsetsDirectional.all(AppSizes.lg),
               child: ConstrainedBox(
@@ -297,7 +298,7 @@ class AuthScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          ),
+          )),
         ),
       ),
     );

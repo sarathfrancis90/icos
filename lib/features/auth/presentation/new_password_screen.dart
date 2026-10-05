@@ -8,6 +8,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
+import '../../../shared/widgets/content_width.dart';
 import '../domain/auth_strategy.dart';
 import '../domain/password_rules.dart';
 import '../providers/auth_provider.dart';
@@ -83,7 +84,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
       child: Scaffold(
         backgroundColor: AppColors.deepBlack,
         body: SafeArea(
-          child: SingleChildScrollView(
+          child: ContentWidth(child: SingleChildScrollView(
             padding: const EdgeInsetsDirectional.all(AppSizes.lg),
             child: Form(
               key: _formKey,
@@ -210,7 +211,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
                 ],
               ),
             ),
-          ),
+          )),
         ),
       ),
     );

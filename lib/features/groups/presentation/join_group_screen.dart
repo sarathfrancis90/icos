@@ -7,6 +7,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
+import '../../../shared/widgets/content_width.dart';
 import '../../../shared/widgets/screen_exit.dart';
 import '../domain/invite_code.dart';
 import '../providers/groups_provider.dart';
@@ -56,7 +57,7 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
         title: const Text(AppStrings.joinGroup),
       ),
       body: SafeArea(
-        child: Center(
+        child: ContentWidth(child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsetsDirectional.all(AppSizes.lg),
             child: !session.canUseGroups
@@ -118,7 +119,7 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
                       ),
                   },
           ),
-        ),
+        )),
       ),
     );
   }

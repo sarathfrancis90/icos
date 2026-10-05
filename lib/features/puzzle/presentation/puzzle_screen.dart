@@ -16,6 +16,7 @@ import '../../../core/services/storage_service.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../shared/widgets/animated_background.dart';
+import '../../../shared/widgets/content_width.dart';
 import '../../../shared/widgets/particle_field.dart';
 import '../../../shared/widgets/screen_exit.dart';
 import '../../practice/providers/practice_provider.dart';
@@ -323,7 +324,12 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
               const Positioned.fill(child: AnimatedBackground()),
               const Positioned.fill(child: ParticleField()),
               SafeArea(
-                child: Column(
+                // The background above stays full-bleed; the HUD, grid and
+                // controls form one column no wider than the grid plus its
+                // padding (phones are narrower, so nothing changes there).
+                child: ContentWidth(
+                  maxWidth: AppSizes.gridMaxWidth + AppSizes.gridPadding * 2,
+                  child: Column(
                   children: [
                     const SizedBox(height: AppSizes.sm),
                     Padding(
@@ -346,8 +352,12 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                     ),
                     const SizedBox(height: AppSizes.sm),
                     Padding(
-                      padding: const EdgeInsetsDirectional.symmetric(
-                        horizontal: AppSizes.md,
+                      // On tablets the bar lines up with the grid's edges.
+                      padding: EdgeInsetsDirectional.symmetric(
+                        horizontal: MediaQuery.sizeOf(context).width >
+                                AppSizes.gridMaxWidth + AppSizes.gridPadding * 2
+                            ? AppSizes.gridPadding
+                            : AppSizes.md,
                       ),
                       child: _GlassInfoBar(
                         timer: AppDateUtils.formatTime(
@@ -422,6 +432,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                     ),
                     const SizedBox(height: AppSizes.md),
                   ],
+                ),
                 ),
               ),
               if (_showCelebration)
@@ -543,6 +554,9 @@ class _GlassInfoBar extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
+          key: const Key('puzzle_hud'),
+          // Full width of the bar's slot: a Wrap shrink-wraps otherwise.
+          width: double.infinity,
           padding: const EdgeInsetsDirectional.symmetric(
             horizontal: AppSizes.md,
             vertical: AppSizes.sm + 4,
@@ -557,7 +571,7 @@ class _GlassInfoBar extends StatelessWidget {
           child: Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: AppSizes.md,
+            spacing: AppSizes.sm,
             runSpacing: AppSizes.xs,
             children: [
               Text(

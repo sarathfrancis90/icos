@@ -7,6 +7,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../shared/widgets/animated_background.dart';
+import '../../../shared/widgets/content_width.dart';
 import '../../../shared/widgets/spring_button.dart';
 import '../providers/practice_provider.dart';
 
@@ -48,7 +49,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
           children: [
             const Positioned.fill(child: AnimatedBackground()),
             SafeArea(
-              child: ListView(
+              child: ContentWidth(child: ListView(
                 padding: const EdgeInsetsDirectional.all(AppSizes.lg),
                 children: [
                   Text(
@@ -123,7 +124,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                   _PracticeStatsCard(stats: stats),
                 ],
               ),
-            ),
+            )),
           ],
         ),
       ),

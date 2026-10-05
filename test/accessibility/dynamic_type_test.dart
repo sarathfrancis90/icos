@@ -36,10 +36,15 @@ import '../helpers/test_helpers.dart';
 const _sizes = [Size(320, 568), Size(393, 852)];
 const _scale = 2.0;
 
-Future<void> _pump(WidgetTester tester, Size size, Widget app) async {
+Future<void> _pump(
+  WidgetTester tester,
+  Size size,
+  Widget app, {
+  double scale = _scale,
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
-  tester.platformDispatcher.textScaleFactorTestValue = _scale;
+  tester.platformDispatcher.textScaleFactorTestValue = scale;
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   await tester.pumpWidget(app);
@@ -166,6 +171,167 @@ void main() {
     testWidgets('leaves sizes up to 200% alone', (tester) async {
       expect(await scaleSeenAt(tester, 1.5), 1.5);
       expect(await scaleSeenAt(tester, 2.0), 2.0);
+    });
+  });
+
+  group('normal text size keeps the original layout (393x852 at 100%)', () {
+    const size = Size(393, 852);
+
+    Future<void> pumpHud(WidgetTester tester, double scale) async {
+      final today = AppDateUtils.todayUtc();
+      final puzzle = smallTestPuzzle.copyWith(puzzleDate: today);
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (_, _) => PuzzleScreen(source: PuzzleSource.daily(today)),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await _pump(
+        tester,
+        size,
+        buildTestWidgetWithRouter(
+          router,
+          overrides: [
+            puzzleForDateProvider(today).overrideWith((ref) async => puzzle),
+            puzzleRepositoryProvider.overrideWithValue(_NoAttempts()),
+            authSessionProvider.overrideWithValue(const FakeAuthSessionInfo()),
+            connectivityNotifierProvider.overrideWith(_Online.new),
+            edgeInvokerProvider.overrideWithValue(
+              (fn, body) async => const EdgeResponse(200, {'nonce': 'n'}),
+            ),
+            sessionEnsurerProvider.overrideWithValue(
+              SessionEnsurer(gateway: _SignedIn()),
+            ),
+          ],
+        ),
+        scale: scale,
+      );
+    }
+
+    testWidgets('puzzle HUD is a full-width bar, items in order', (
+      tester,
+    ) async {
+      await pumpHud(tester, 1.0);
+      final bar = tester.getRect(find.byKey(const Key('puzzle_hud')));
+      expect(bar.left, 16);
+      expect(bar.right, size.width - 16);
+      final timer = tester.getRect(find.text('00:00'));
+      expect(timer.left, closeTo(bar.left + 16, 1));
+      expect(timer.top, greaterThanOrEqualTo(bar.top));
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    // The test font (Ahem) is about 1.5x wider than the app's real font, so
+    // "fits on one line" is asserted at the scale that matches real widths.
+    testWidgets('puzzle HUD items share one line when they fit', (
+      tester,
+    ) async {
+      await pumpHud(tester, 0.7);
+      final bar = tester.getRect(find.byKey(const Key('puzzle_hud')));
+      final timer = tester.getRect(find.text('00:00'));
+      final mode = tester.getRect(find.textContaining('3x3'));
+      final par = tester.getRect(find.textContaining('Par'));
+      expect(bar.width, size.width - 32);
+      expect(timer.center.dy, closeTo(mode.center.dy, 1));
+      expect(par.center.dy, closeTo(mode.center.dy, 1));
+      expect(timer.left, closeTo(bar.left + 16, 1));
+      expect(par.right, closeTo(bar.right - 16, 1));
+      expect(mode.center.dx, inInclusiveRange(timer.right, par.left));
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('groups header: title left, buttons right, one row', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        size,
+        buildTestWidget(
+          const Scaffold(body: GroupsScreen()),
+          overrides: [
+            groupsSessionProvider.overrideWith(
+              (ref) => const GroupsSession(userId: 'u-1', isAnonymous: false),
+            ),
+            myGroupsProvider.overrideWith(_FakeMyGroups.new),
+          ],
+        ),
+        scale: 1.0,
+      );
+
+      final title = tester.getRect(find.text('Groups').first);
+      final join = tester.getRect(find.bySemanticsLabel('Join Group').first);
+      expect(title.left, 24);
+      expect(join.right, size.width - 24);
+      expect(join.center.dy, closeTo(title.center.dy, 6));
+    });
+
+    testWidgets('stats cards sit side by side; streaks side by side', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        size,
+        buildTestWidget(
+          const Scaffold(body: StatsScreen()),
+          overrides: [
+            statsOverviewProvider.overrideWith(
+              (ref) async => const StatsOverview(
+                currentStreak: 12,
+                longestStreak: 34,
+                totalSolved: 56,
+                averageTimeSeconds: 139,
+                freezeCount: 1,
+                lastFreezeUsedAt: null,
+              ),
+            ),
+            solveHistoryProvider.overrideWith((ref) async => const []),
+          ],
+        ),
+        scale: 1.0,
+      );
+
+      final current = tester.getRect(find.text('Current Streak'));
+      final longest = tester.getRect(find.text('Longest Streak'));
+      // Side by side: the two streak columns overlap vertically.
+      final n1 = tester.getRect(find.text('12').first);
+      final n2 = tester.getRect(find.text('34').first);
+      expect(n1.top, lessThan(n2.bottom));
+      expect(n2.top, lessThan(n1.bottom));
+      expect(n1.center.dx, lessThan(n2.center.dx));
+      expect(current.center.dx, lessThan(longest.center.dx));
+      final solved = tester.getRect(find.text('Puzzles Solved'));
+      final average = tester.getRect(find.text('Average Time'));
+      expect(solved.top, lessThan(average.bottom));
+      expect(average.top, lessThan(solved.bottom));
+      expect(solved.center.dx, lessThan(average.center.dx));
+    });
+
+    testWidgets('guest card: icon and title share a row, full width', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        size,
+        buildTestWidget(
+          const Scaffold(
+            body: Padding(
+              padding: EdgeInsetsDirectional.all(24),
+              child: GuestAccountCard(),
+            ),
+          ),
+        ),
+        scale: 1.0,
+      );
+
+      final card = tester.getRect(find.byType(GuestAccountCard));
+      expect(card.width, size.width - 48);
+      final icon = tester.getRect(find.byIcon(Icons.person_outline_rounded));
+      final title = tester.getRect(find.text('Guest account'));
+      expect(icon.center.dy, closeTo(title.center.dy, 2));
+      expect(title.left, greaterThan(icon.right));
     });
   });
 

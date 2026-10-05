@@ -7,6 +7,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../shared/widgets/animated_background.dart';
+import '../../../shared/widgets/content_width.dart';
 import '../../puzzle/domain/solver/puzzle_core.dart';
 import '../providers/archive_provider.dart';
 
@@ -33,7 +34,7 @@ class ArchiveScreen extends ConsumerWidget {
           children: [
             const Positioned.fill(child: AnimatedBackground()),
             SafeArea(
-              child: RefreshIndicator(
+              child: ContentWidth(child: RefreshIndicator(
                 color: AppColors.purpleLight,
                 backgroundColor: AppColors.cardSurface,
                 onRefresh: () async {
@@ -96,7 +97,7 @@ class ArchiveScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-            ),
+            )),
           ],
         ),
       ),

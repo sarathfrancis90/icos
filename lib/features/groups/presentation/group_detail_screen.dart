@@ -7,6 +7,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/result.dart';
+import '../../../shared/widgets/content_width.dart';
 import '../../../shared/widgets/screen_exit.dart';
 import '../domain/models/group.dart';
 import '../providers/blocked_users_provider.dart';
@@ -161,7 +162,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
           ),
         ],
       ),
-      body: Column(
+      body: ContentWidth(child: Column(
         children: [
           _GroupHeader(group: group),
           TabBar(
@@ -188,7 +189,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 

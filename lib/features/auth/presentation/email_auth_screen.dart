@@ -7,6 +7,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/router/deep_link.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/content_width.dart';
 import '../../../shared/widgets/legal_consent_text.dart';
 import '../domain/password_rules.dart';
 import '../providers/auth_provider.dart';
@@ -72,7 +73,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
           ),
         ),
         body: SafeArea(
-          child: SingleChildScrollView(
+          child: ContentWidth(child: SingleChildScrollView(
             padding: const EdgeInsetsDirectional.all(AppSizes.lg),
             child: Form(
               key: _formKey,
@@ -339,7 +340,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                 ],
               ),
             ),
-          ),
+          )),
         ),
       ),
     );

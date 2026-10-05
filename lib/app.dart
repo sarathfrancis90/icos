@@ -16,7 +16,6 @@ import 'features/auth/providers/user_scope_keeper.dart';
 import 'features/puzzle/domain/models/puzzle.dart';
 import 'features/puzzle/providers/daily_puzzle_provider.dart';
 import 'features/puzzle/providers/puzzle_result_provider.dart';
-import 'shared/widgets/content_width_limit.dart';
 import 'shared/widgets/text_scale_limit.dart';
 
 class IcosApp extends ConsumerStatefulWidget {
@@ -98,10 +97,8 @@ class _IcosAppState extends ConsumerState<IcosApp>
       routerConfig: router,
       // Layouts are verified to 200% text scale; larger system sizes (iOS
       // accessibility sizes reach ~310%) are clamped rather than broken.
-      // Tablets: content max 600dp wide, centred (phones are unaffected).
-      builder: (context, child) => TextScaleLimit(
-        child: ContentWidthLimit(child: child ?? const SizedBox()),
-      ),
+      builder: (context, child) =>
+          TextScaleLimit(child: child ?? const SizedBox()),
     );
   }
 }

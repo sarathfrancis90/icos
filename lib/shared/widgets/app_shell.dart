@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import 'animated_background.dart';
+import 'content_width.dart';
 import 'offline_banner.dart';
 import 'particle_field.dart';
 
@@ -48,7 +49,7 @@ class AppShell extends StatelessWidget {
           Column(
             children: [
               const OfflineBanner(),
-              Expanded(child: child),
+              Expanded(child: ContentWidth(child: child)),
             ],
           ),
         ],
