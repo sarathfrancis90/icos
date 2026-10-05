@@ -94,16 +94,16 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _send(),
                       decoration: const InputDecoration(
-                        labelText: 'Email',
+                        labelText: AppStrings.emailLabel,
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Email is required';
+                          return AppStrings.emailRequired;
                         }
                         if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
                             .hasMatch(value.trim())) {
-                          return 'Enter a valid email address';
+                          return AppStrings.emailInvalid;
                         }
                         return null;
                       },
@@ -126,7 +126,7 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
         TextButton(
           style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
           onPressed: _sending ? null : () => Navigator.of(context).pop(),
-          child: Text(_sent ? AppStrings.close : 'Cancel'),
+          child: Text(_sent ? AppStrings.close : AppStrings.cancel),
         ),
         if (!_sent)
           TextButton(

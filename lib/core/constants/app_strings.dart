@@ -32,6 +32,20 @@ abstract final class AppStrings {
   static const resetRateLimited =
       'Too many reset requests. Please try again in a little while.';
   static const close = 'Close';
+  static const cancel = 'Cancel';
+  static const emailLabel = 'Email';
+  static const emailRequired = 'Email is required';
+  static const emailInvalid = 'Enter a valid email address';
+  static const passwordHint = 'At least 6 characters';
+  static const showPassword = 'Show password';
+  static const hidePassword = 'Hide password';
+  static const notNow = 'Not now';
+  static const recoveryExpired =
+      'This reset link has expired. Request a new one to set a new password.';
+  static const requestNewLink = 'Send a new link';
+  static const recoveryGuestWarning =
+      "You're signing in to an existing account. Progress from the guest "
+      "profile on this device won't carry over.";
   static const newPasswordTitle = 'Set a new password';
   static const newPasswordSubtitle = 'Choose a new password for your account.';
   static const newPasswordLabel = 'New password';
@@ -41,6 +55,12 @@ abstract final class AppStrings {
   static const passwordRequired = 'Password is required';
   static const passwordTooShort = 'Password must be at least 6 characters';
   static const passwordsDoNotMatch = 'Passwords do not match';
+
+  // Account deletion (blocking screen)
+  static const deletionPendingTitle = 'Account scheduled for deletion';
+  static const deletionCancelFailed =
+      'Could not cancel the deletion. Please try again.';
+  static const signOut = 'Sign out';
 
   // Stats
   static const statsShowingSaved = 'Showing saved stats';

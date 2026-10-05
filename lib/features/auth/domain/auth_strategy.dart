@@ -191,6 +191,34 @@ abstract final class AuthStrategy {
     return PasswordResetFailure.other;
   }
 
+  /// Message carried by the failure when the recovery session behind the
+  /// "set a new password" screen is no longer valid.
+  static const String recoverySessionExpiredMessage = 'recovery_session_expired';
+
+  /// True when `updateUser` failed because the session from the recovery link
+  /// has expired or is gone (so only a new link can help).
+  static bool isRecoverySessionExpired({
+    String? code,
+    String? statusCode,
+    String? message,
+  }) {
+    final c = (code ?? '').toLowerCase();
+    if (c == 'session_not_found' ||
+        c == 'session_expired' ||
+        c == 'bad_jwt' ||
+        c == 'refresh_token_not_found' ||
+        c == 'refresh_token_already_used') {
+      return true;
+    }
+    final m = (message ?? '').toLowerCase();
+    return statusCode == '401' ||
+        m.contains('session missing') ||
+        m.contains('session not found') ||
+        m.contains('jwt expired') ||
+        m.contains('token has expired') ||
+        m.contains('invalid jwt');
+  }
+
   /// Maps raw provider/Supabase errors to friendly copy.
   static String friendlyMessage(String raw) {
     final e = raw.toLowerCase();

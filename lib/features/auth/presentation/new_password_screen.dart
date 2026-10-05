@@ -8,8 +8,10 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
+import '../domain/auth_strategy.dart';
 import '../domain/password_rules.dart';
 import '../providers/auth_provider.dart';
+import 'widgets/forgot_password_dialog.dart';
 
 /// Shown after a password-recovery link signs the player in: choose a new
 /// password, then continue to Home.
@@ -27,6 +29,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
   bool _obscure = true;
   bool _saving = false;
   String? _error;
+  bool _expired = false;
 
   @override
   void dispose() {
@@ -57,13 +60,23 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
       case Failure(:final error):
         setState(() {
           _saving = false;
-          _error = error.userMessage;
+          _expired = error is AuthError &&
+              error.message == AuthStrategy.recoverySessionExpiredMessage;
+          _error = _expired ? AppStrings.recoveryExpired : error.userMessage;
         });
     }
   }
 
+  /// Leave without changing the password: the player stays signed in to the
+  /// recovered account and goes home.
+  void _notNow() {
+    ref.read(passwordRecoveryPendingProvider.notifier).clear();
+    context.go('/');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final replacesGuest = ref.watch(recoveryReplacesGuestProvider);
     final theme = AppTheme.darkTheme;
     return Theme(
       data: theme,
@@ -91,6 +104,18 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
                       color: AppColors.textSecondaryDark,
                     ),
                   ),
+                  if (replacesGuest) ...[
+                    const SizedBox(height: AppSizes.md),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        AppStrings.recoveryGuestWarning,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: AppSizes.xl),
                   TextFormField(
                     controller: _password,
@@ -99,7 +124,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
                       labelText: AppStrings.newPasswordLabel,
-                      hintText: 'At least 6 characters',
+                      hintText: AppStrings.passwordHint,
                       prefixIcon: const Icon(Icons.lock_outlined),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -107,7 +132,9 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
                               ? Icons.visibility_off_rounded
                               : Icons.visibility_rounded,
                         ),
-                        tooltip: _obscure ? 'Show password' : 'Hide password',
+                        tooltip: _obscure
+                            ? AppStrings.showPassword
+                            : AppStrings.hidePassword,
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
@@ -138,6 +165,22 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
                       ),
                     ),
                   ],
+                  if (_expired)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                        ),
+                        onPressed: () => showForgotPasswordDialog(
+                          context,
+                          initialEmail:
+                              ref.read(authNotifierProvider).valueOrNull?.email ??
+                                  '',
+                        ),
+                        child: const Text(AppStrings.requestNewLink),
+                      ),
+                    ),
                   const SizedBox(height: AppSizes.lg),
                   FilledButton(
                     style: FilledButton.styleFrom(
@@ -151,6 +194,18 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2.5),
                           )
                         : const Text(AppStrings.savePassword),
+                  ),
+                  const SizedBox(height: AppSizes.sm),
+                  Semantics(
+                    button: true,
+                    label: AppStrings.notNow,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      onPressed: _saving ? null : _notNow,
+                      child: const Text(AppStrings.notNow),
+                    ),
                   ),
                 ],
               ),

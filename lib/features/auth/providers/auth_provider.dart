@@ -15,6 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/app_logger.dart';
 import '../../../core/services/session_service.dart';
+import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
@@ -62,16 +63,46 @@ abstract final class PasswordRecoveryLatch {
   static bool arrivedBeforeStart = false;
 }
 
+/// True when the recovery link replaced a guest profile that has progress on
+/// this device, so the "set a new password" screen can warn that it will not
+/// carry over.
+@Riverpod(keepAlive: true)
+class RecoveryReplacesGuest extends _$RecoveryReplacesGuest {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
+}
+
 /// True from the moment a password-recovery link signs the player in until
 /// they set a new password (or dismiss the screen). The router sends the
 /// player to the "set a new password" screen while this is true.
 @Riverpod(keepAlive: true)
 class PasswordRecoveryPending extends _$PasswordRecoveryPending {
+  /// The guest session active before the event, if any.
+  String? _guestId;
+
   @override
   bool build() {
+    final current = ref.read(authNotifierProvider).valueOrNull;
+    if (current != null && current.isAnonymous) _guestId = current.id;
+
     ref.listen<AsyncValue<AuthState>>(authStateChangesProvider, (_, next) {
-      if (next.valueOrNull?.event == AuthChangeEvent.passwordRecovery) {
+      final data = next.valueOrNull;
+      if (data == null) return;
+      final user = data.session?.user;
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        final guest = _guestId;
+        ref.read(recoveryReplacesGuestProvider.notifier).set(
+              guest != null &&
+                  guest != user?.id &&
+                  StorageService.hasLocalProgress(guest),
+            );
         state = true;
+      } else if (user != null && user.isAnonymous) {
+        _guestId = user.id;
+      } else if (data.event == AuthChangeEvent.signedOut) {
+        _guestId = null;
       }
     });
     final early = PasswordRecoveryLatch.arrivedBeforeStart;
@@ -79,7 +110,12 @@ class PasswordRecoveryPending extends _$PasswordRecoveryPending {
     return early;
   }
 
-  void clear() => state = false;
+  /// Recovery finished (password set) or was dismissed.
+  void clear() {
+    PasswordRecoveryLatch.arrivedBeforeStart = false;
+    ref.read(recoveryReplacesGuestProvider.notifier).set(false);
+    state = false;
+  }
 }
 
 @riverpod
@@ -532,6 +568,15 @@ class AuthNotifier extends _$AuthNotifier {
     } on AuthException catch (e, st) {
       AppLogger.warn('Password update failed',
           error: e, st: st, data: {'code': e.code});
+      if (AuthStrategy.isRecoverySessionExpired(
+        code: e.code,
+        statusCode: e.statusCode,
+        message: e.message,
+      )) {
+        return const Result.failure(
+          AppError.auth(AuthStrategy.recoverySessionExpiredMessage),
+        );
+      }
       return Result.failure(
         AppError.auth(AuthStrategy.friendlyMessage(e.message)),
       );

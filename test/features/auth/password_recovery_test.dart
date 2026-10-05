@@ -12,9 +12,11 @@ import 'package:icos/features/auth/presentation/email_auth_screen.dart';
 import 'package:icos/features/auth/presentation/new_password_screen.dart';
 import 'package:icos/features/auth/presentation/widgets/forgot_password_dialog.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
+import 'package:icos/core/services/storage_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
-    show AuthChangeEvent, AuthState, User;
+    show AuthChangeEvent, AuthState, Session, User;
 
+import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
 
 class _FakeAuth extends AuthNotifier {
@@ -41,6 +43,7 @@ class _FakeAuth extends AuthNotifier {
 
 void main() {
   setUpTestEnvironment();
+  _recoveryTests();
 
   setUp(() {
     _FakeAuth.resetResult = const Result.success(null);
@@ -83,7 +86,9 @@ void main() {
         PasswordResetFailure.rateLimited,
       );
       expect(
-        AuthStrategy.classifyPasswordReset(message: 'Request rate limit reached'),
+        AuthStrategy.classifyPasswordReset(
+          message: 'Request rate limit reached',
+        ),
         PasswordResetFailure.rateLimited,
       );
       expect(
@@ -299,6 +304,183 @@ void main() {
       expect(
         find.text('Choose a password you have not used before.'),
         findsOneWidget,
+      );
+    });
+  });
+}
+
+class _Harness {
+  _Harness(this.container, this.router);
+  final ProviderContainer container;
+  final GoRouter router;
+}
+
+_Harness _recoveryHarness(
+  List<Override> overrides, {
+  Stream<AuthState>? events,
+}) {
+  final container = ProviderContainer(
+    overrides: [
+      ...overrides,
+      if (events != null)
+        authStateChangesProvider.overrideWith((ref) => events),
+    ],
+  );
+  addTearDown(container.dispose);
+  final refresh = ValueNotifier(0);
+  container.listen<bool>(
+    passwordRecoveryPendingProvider,
+    (_, _) => refresh.value++,
+  );
+  final router = GoRouter(
+    refreshListenable: refresh,
+    redirect: (context, state) => recoveryRedirect(
+      path: state.uri.path,
+      pending: container.read(passwordRecoveryPendingProvider),
+    ),
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, _) => const Scaffold(body: Text('HOME')),
+      ),
+      GoRoute(
+        path: kNewPasswordPath,
+        builder: (_, _) => const NewPasswordScreen(),
+      ),
+    ],
+  );
+  return _Harness(container, router);
+}
+
+void _recoveryTests() {
+  group('recovery escape hatches', () {
+    final overrides = [
+      authNotifierProvider.overrideWith(_FakeAuth.new),
+      isGuestProvider.overrideWithValue(true),
+    ];
+
+    Future<_Harness> pump(
+      WidgetTester tester, {
+      Stream<AuthState>? events,
+    }) async {
+      final h = _recoveryHarness(overrides, events: events);
+      h.container.read(passwordRecoveryPendingProvider.notifier);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: h.container,
+          child: MaterialApp.router(routerConfig: h.router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return h;
+    }
+
+    testWidgets('Not now leaves the password unchanged and goes home', (
+      tester,
+    ) async {
+      final events = StreamController<AuthState>.broadcast();
+      addTearDown(events.close);
+      final h = await pump(tester, events: events.stream);
+      events.add(const AuthState(AuthChangeEvent.passwordRecovery, null));
+      await tester.pumpAndSettle();
+      expect(find.text('Not now'), findsOneWidget);
+      expect(
+        tester.getSize(find.widgetWithText(TextButton, 'Not now')).height,
+        greaterThanOrEqualTo(44),
+      );
+      await tester.tap(find.text('Not now'));
+      await tester.pumpAndSettle();
+      expect(find.text('HOME'), findsOneWidget);
+      expect(h.container.read(passwordRecoveryPendingProvider), isFalse);
+      expect(_FakeAuth.updateCalls, isEmpty);
+    });
+
+    testWidgets('expired recovery session offers a new link', (tester) async {
+      _FakeAuth.updateResult = const Result.failure(
+        AppError.auth(AuthStrategy.recoverySessionExpiredMessage),
+      );
+      await tester.pumpWidget(
+        buildTestWidget(const NewPasswordScreen(), overrides: overrides),
+      );
+      await tester.enterText(find.byType(TextFormField).at(0), 'hunter22');
+      await tester.enterText(find.byType(TextFormField).at(1), 'hunter22');
+      await tester.tap(find.text('Save password'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'This reset link has expired. Request a new one to set a new password.',
+        ),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.text('Send a new link'));
+      await tester.tap(find.text('Send a new link'));
+      await tester.pumpAndSettle();
+      expect(find.text('Reset your password'), findsOneWidget);
+    });
+
+    testWidgets('warns when the link replaced a guest with progress', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        final dir = await initTestStorage(userId: 'g1');
+        addTearDown(() => dir.delete(recursive: true));
+        await StorageService.saveSubmissionResult('2026-10-01', {
+          'x': 1,
+        }, userId: 'g1');
+      });
+      final events = StreamController<AuthState>.broadcast();
+      addTearDown(events.close);
+      final h = await pump(tester, events: events.stream);
+      User user(String id, {bool anon = false}) => User(
+        id: id,
+        appMetadata: const {},
+        userMetadata: const {},
+        aud: 'authenticated',
+        createdAt: '2026-01-01T00:00:00Z',
+        isAnonymous: anon,
+      );
+      events.add(
+        AuthState(
+          AuthChangeEvent.signedIn,
+          Session(
+            accessToken: 'a',
+            tokenType: 'bearer',
+            user: user('g1', anon: true),
+          ),
+        ),
+      );
+      await tester.pump();
+      events.add(
+        AuthState(
+          AuthChangeEvent.passwordRecovery,
+          Session(accessToken: 'b', tokenType: 'bearer', user: user('u1')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(h.container.read(recoveryReplacesGuestProvider), isTrue);
+      expect(find.textContaining("won't carry over"), findsOneWidget);
+    });
+
+    test('clearing recovery also clears the early-arrival latch', () {
+      final h = _recoveryHarness(overrides);
+      PasswordRecoveryLatch.arrivedBeforeStart = true;
+      h.container.read(passwordRecoveryPendingProvider.notifier).clear();
+      expect(PasswordRecoveryLatch.arrivedBeforeStart, isFalse);
+    });
+
+    test('recovery-session-expired classification', () {
+      expect(
+        AuthStrategy.isRecoverySessionExpired(code: 'session_not_found'),
+        isTrue,
+      );
+      expect(AuthStrategy.isRecoverySessionExpired(statusCode: '401'), isTrue);
+      expect(
+        AuthStrategy.isRecoverySessionExpired(message: 'Auth session missing!'),
+        isTrue,
+      );
+      expect(
+        AuthStrategy.isRecoverySessionExpired(message: 'weak password'),
+        isFalse,
       );
     });
   });

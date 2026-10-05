@@ -85,6 +85,18 @@ abstract final class StorageService {
 
   static Future<void> _adoption = Future.value();
 
+  /// Whether [userId] has any solved/in-progress puzzle data on this device.
+  static bool hasLocalProgress(String userId) {
+    final prefix = 'u.$userId.';
+    return _prefs.getKeys().any(
+          (k) =>
+              k.startsWith(prefix) &&
+              (k.contains('submit_result_') ||
+                  k.contains('game_state_') ||
+                  k.endsWith('solve_count')),
+        );
+  }
+
   static String _prefixFor(String? userId) =>
       userId == null ? _prefix : 'u.$userId.';
 
