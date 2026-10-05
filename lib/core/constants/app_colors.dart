@@ -60,6 +60,8 @@ abstract final class AppColors {
 
   // ─── Purple Accent (Buttons) ─────────────────────────────────────
   static const purpleLight = Color(0xFFB388FF);
+  /// Text/icons on [purpleLight] (filled buttons in the dark theme).
+  static const onPurpleLight = Color(0xFF1A0B33);
   static const purplePrimary = Color(0xFF9C27B0);
   static const purpleDeep = Color(0xFF7B1FA2);
   static const purpleDark = Color(0xFF6A1B9A);

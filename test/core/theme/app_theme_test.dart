@@ -312,7 +312,7 @@ void main() {
       expect(capturedTheme.colorScheme.error, AppColors.error);
     });
 
-    testWidgets('onPrimary is white', (tester) async {
+    testWidgets('onPrimary is dark on the light purple (white was 2.7:1)', (tester) async {
       late ThemeData capturedTheme;
       await tester.pumpWidget(
         MaterialApp(
@@ -326,7 +326,7 @@ void main() {
         ),
       );
 
-      expect(capturedTheme.colorScheme.onPrimary, Colors.white);
+      expect(capturedTheme.colorScheme.onPrimary, AppColors.onPurpleLight);
     });
 
     testWidgets('onSecondary is white', (tester) async {

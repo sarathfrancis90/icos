@@ -12,7 +12,8 @@ abstract final class AppTheme {
           secondary: AppColors.pathOrange,
           surface: AppColors.darkSurface,
           error: AppColors.error,
-          onPrimary: Colors.white,
+          // White on purpleLight is 2.7:1; dark text is about 8:1.
+          onPrimary: AppColors.onPurpleLight,
           onSecondary: Colors.white,
           onSurface: AppColors.textPrimaryDark,
           onError: Colors.white,

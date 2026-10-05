@@ -13,6 +13,14 @@ import 'package:icos/core/services/storage_service.dart';
 import 'package:icos/core/services/sync_service.dart';
 import 'package:icos/core/theme/app_theme.dart';
 import 'package:icos/core/utils/date_utils.dart';
+import 'package:icos/features/archive/presentation/archive_screen.dart';
+import 'package:icos/features/archive/providers/archive_provider.dart';
+import 'package:icos/features/auth/presentation/auth_screen.dart';
+import 'package:icos/features/auth/presentation/email_auth_screen.dart';
+import 'package:icos/features/auth/presentation/new_password_screen.dart';
+import 'package:icos/features/auth/presentation/onboarding_screen.dart';
+import 'package:icos/features/auth/providers/auth_provider.dart';
+import 'package:icos/features/practice/presentation/practice_screen.dart';
 import 'package:icos/features/profile/presentation/widgets/theme_mode_dropdown.dart';
 import 'package:icos/features/puzzle/data/puzzle_repository.dart';
 import 'package:icos/features/puzzle/data/submission_result.dart';
@@ -22,6 +30,7 @@ import 'package:icos/features/puzzle/presentation/widgets/celebration_overlay.da
 import 'package:icos/features/puzzle/presentation/widgets/offline_puzzle_notice.dart';
 import 'package:icos/features/puzzle/providers/daily_puzzle_provider.dart';
 import 'package:icos/shared/widgets/offline_banner.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show User;
 
 import '../helpers/contrast.dart';
 import '../helpers/storage_test_helpers.dart';
@@ -30,6 +39,11 @@ import '../helpers/test_helpers.dart';
 class _Online extends ConnectivityNotifier {
   @override
   bool build() => true;
+}
+
+class _FakeAuth extends AuthNotifier {
+  @override
+  AsyncValue<User?> build() => const AsyncValue.data(null);
 }
 
 class _Offline extends ConnectivityNotifier {
@@ -260,6 +274,88 @@ void main() {
         contrastFailures(tester, fallbackBackground: AppColors.deepBlack),
         isEmpty,
       );
+    });
+  });
+
+  group('contrast sweep: other always-dark screens in light theme', () {
+    Future<void> pumpScreen(
+      WidgetTester tester,
+      Widget screen, {
+      List<Override> overrides = const [],
+    }) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: overrides,
+          child: MaterialApp(theme: AppTheme.lightTheme, home: screen),
+        ),
+      );
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    void expectClean(WidgetTester tester) {
+      expect(
+        contrastFailures(tester, fallbackBackground: AppColors.deepBlack),
+        isEmpty,
+      );
+    }
+
+    final authOverrides = [
+      authNotifierProvider.overrideWith(_FakeAuth.new),
+      isGuestProvider.overrideWithValue(true),
+    ];
+
+    testWidgets('auth', (tester) async {
+      await pumpScreen(tester, const AuthScreen(), overrides: authOverrides);
+      expectClean(tester);
+    });
+
+    testWidgets('email auth (sign up)', (tester) async {
+      await pumpScreen(
+        tester,
+        const EmailAuthScreen(),
+        overrides: authOverrides,
+      );
+      expectClean(tester);
+    });
+
+    testWidgets('new password', (tester) async {
+      await pumpScreen(
+        tester,
+        const NewPasswordScreen(),
+        overrides: authOverrides,
+      );
+      expectClean(tester);
+    });
+
+    testWidgets('onboarding', (tester) async {
+      await pumpScreen(tester, const OnboardingScreen());
+      expectClean(tester);
+    });
+
+    testWidgets('archive', (tester) async {
+      await pumpScreen(
+        tester,
+        const ArchiveScreen(),
+        overrides: [
+          archiveEntriesProvider.overrideWith(
+            (ref) async => [
+              const ArchiveEntry(date: '2026-10-04'),
+              const ArchiveEntry(date: '2026-10-03'),
+            ],
+          ),
+        ],
+      );
+      expectClean(tester);
+    });
+
+    testWidgets('practice', (tester) async {
+      await pumpScreen(tester, const PracticeScreen());
+      expectClean(tester);
     });
   });
 }
