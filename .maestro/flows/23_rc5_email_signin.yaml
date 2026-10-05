@@ -10,8 +10,18 @@ appId: com.icos.game
 - tapOn: "Password"
 - inputText: ${PW}
 - takeScreenshot: ${SHOTS}/d6a_signin_filled
-- tapOn:
-    text: "Sign In\nSign In"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "Sign In\nSign In"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      # Android exposes the button as plain "Sign In" (the title is "Welcome Back").
+      - tapOn: "Sign In"
 - waitForAnimationToEnd:
     timeout: 8000
 - takeScreenshot: ${SHOTS}/d6_after_signin

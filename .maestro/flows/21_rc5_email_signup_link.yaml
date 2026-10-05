@@ -13,8 +13,20 @@ appId: com.icos.game
 - inputText: ${PW}
 - hideKeyboard
 - takeScreenshot: ${SHOTS}/c2_form_filled
-- tapOn:
-    text: "Create Account\nCreate Account"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "Create Account\nCreate Account"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      # Android exposes the button as plain "Create Account"; index 0 is the screen title.
+      - tapOn:
+          text: "Create Account"
+          index: 1
 - waitForAnimationToEnd:
     timeout: 8000
 - takeScreenshot: ${SHOTS}/c3_after_signup
