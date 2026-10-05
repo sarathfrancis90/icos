@@ -23,9 +23,11 @@ import '../../features/puzzle/presentation/puzzle_screen.dart';
 import '../../features/stats/presentation/stats_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 import '../../shared/widgets/blocking_screens.dart';
+import '../constants/app_strings.dart';
 import '../services/app_config_provider.dart';
 import '../services/app_config_service.dart';
 import '../services/storage_service.dart';
+import '../utils/result.dart';
 import 'deep_link.dart';
 
 part 'app_router.g.dart';
@@ -59,6 +61,11 @@ GoRouter appRouter(Ref ref) {
         return '/';
       }
       // Onboarding only applies once no blocking gate is active.
+      final deletion = deletionRedirect(
+        path: path,
+        pending: ref.read(pendingDeletionDateProvider) != null,
+      );
+      if (deletion != null) return deletion;
       final recovery = recoveryRedirect(
         path: path,
         pending: ref.read(passwordRecoveryPendingProvider),
@@ -206,6 +213,25 @@ GoRouter appRouter(Ref ref) {
         },
       ),
       GoRoute(
+        path: kDeletionPendingPath,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final date = ref.read(pendingDeletionDateProvider) ?? DateTime.now();
+          return AccountDeletionPendingScreen(
+            deletionDate: date,
+            onCancelDeletion: () async {
+              final result = await ref
+                  .read(profileNotifierProvider.notifier)
+                  .cancelAccountDeletion();
+              return result is Failure
+                  ? AppStrings.deletionCancelFailed
+                  : null;
+            },
+            onSignOut: () => ref.read(authNotifierProvider.notifier).signOut(),
+          );
+        },
+      ),
+      GoRoute(
         path: '/banned',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => BannedScreen(
@@ -221,6 +247,10 @@ class _RouterRefresh extends ChangeNotifier {
   _RouterRefresh(Ref ref) {
     ref.listen<AppGate>(appGateProvider, (_, _) => notifyListeners());
     ref.listen<bool>(isBannedProvider, (_, _) => notifyListeners());
+    ref.listen<DateTime?>(
+      pendingDeletionDateProvider,
+      (_, _) => notifyListeners(),
+    );
     ref.listen<bool>(
       passwordRecoveryPendingProvider,
       (_, _) => notifyListeners(),

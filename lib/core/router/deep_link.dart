@@ -37,3 +37,13 @@ String? recoveryRedirect({required String path, required bool pending}) {
   if (!pending && path == kNewPasswordPath) return '/';
   return null;
 }
+
+/// Where a signed-in player whose account has a pending deletion is held.
+const String kDeletionPendingPath = '/account-deletion';
+
+/// Blocks the app while a deletion is pending and releases it once it is not.
+String? deletionRedirect({required String path, required bool pending}) {
+  if (pending && path != kDeletionPendingPath) return kDeletionPendingPath;
+  if (!pending && path == kDeletionPendingPath) return '/';
+  return null;
+}

@@ -34,6 +34,14 @@ class _FakeRepo extends ProfileRepository {
   }
 }
 
+class _MutableSession extends AuthSessionInfo {
+  _MutableSession(this.userId);
+  @override
+  String? userId;
+  @override
+  bool get hasSession => userId != null;
+}
+
 class _FakeAuth extends AuthNotifier {
   @override
   AsyncValue<User?> build() => const AsyncValue.data(null);
@@ -52,15 +60,15 @@ class _FakeAuth extends AuthNotifier {
 void main() {
   late _FakeRepo repo;
   late ProviderContainer container;
+  late _MutableSession session;
 
   setUp(() {
     repo = _FakeRepo();
+    session = _MutableSession('u1');
     container = ProviderContainer(
       overrides: [
         profileRepositoryProvider.overrideWithValue(repo),
-        authSessionProvider.overrideWithValue(
-          const FakeAuthSessionInfo(userId: 'u1'),
-        ),
+        authSessionProvider.overrideWithValue(session),
         authNotifierProvider.overrideWith(_FakeAuth.new),
       ],
     );
@@ -103,17 +111,38 @@ void main() {
     );
   });
 
-  test(
-    'a deliberate sign-in to the account cancels it, as the dialog says',
-    () async {
-      await load();
-      expect(repo.cancelCalls, 0);
-      (container.read(authNotifierProvider.notifier) as _FakeAuth).signInAs(
-        'u1',
-      );
-      await pumpEventQueue();
-      expect(repo.cancelCalls, 1);
-      expect(container.read(deletionCancelledFlagProvider), isTrue);
-    },
-  );
+  test('auth state passing through loading and back to the same user does '
+      'not cancel', () async {
+    await load();
+    final auth = container.read(authNotifierProvider.notifier) as _FakeAuth;
+    auth.signInAs('u1'); // null -> u1 with u1 already the active user
+    await pumpEventQueue();
+    auth.state = const AsyncValue.loading();
+    await pumpEventQueue();
+    auth.signInAs('u1');
+    await pumpEventQueue();
+    expect(repo.cancelCalls, 0);
+    expect(container.read(deletionCancelledFlagProvider), isFalse);
+  });
+
+  test('a deliberate sign-in to a different account cancels it, as the '
+      'dialog says', () async {
+    session.userId = 'guest-1';
+    repo.pendingDeletion = false;
+    await load();
+    repo.pendingDeletion = true;
+    session.userId = 'u1';
+    (container.read(authNotifierProvider.notifier) as _FakeAuth).signInAs('u1');
+    await pumpEventQueue();
+    expect(repo.cancelCalls, 1);
+    expect(container.read(deletionCancelledFlagProvider), isTrue);
+  });
+
+  test('pending deletion exposes the date 30 days after deleted_at', () async {
+    await load();
+    expect(
+      container.read(pendingDeletionDateProvider),
+      DateTime.utc(2026, 10, 31),
+    );
+  });
 }

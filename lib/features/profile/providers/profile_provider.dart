@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/constants/app_sizes.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/app_logger.dart';
 import '../../../core/services/auth_session_provider.dart';
@@ -57,6 +58,14 @@ class DeletionCancelledFlag extends _$DeletionCancelledFlag {
 bool isBanned(Ref ref) =>
     ref.watch(profileNotifierProvider).valueOrNull?.isBanned ?? false;
 
+/// The date the signed-in account will be permanently deleted, when a
+/// deletion is pending (`deleted_at` set); otherwise `null`.
+@riverpod
+DateTime? pendingDeletionDate(Ref ref) {
+  final deletedAt = ref.watch(profileNotifierProvider).valueOrNull?.deletedAt;
+  return deletedAt?.add(const Duration(days: AppSizes.accountDeletionGraceDays));
+}
+
 @riverpod
 class ProfileNotifier extends _$ProfileNotifier {
   @override
@@ -68,15 +77,22 @@ class ProfileNotifier extends _$ProfileNotifier {
       authNotifierProvider.select((s) => s.valueOrNull?.id),
       (previous, next) {
         if (previous == next) return;
+        // A sign-in is a different account becoming active. The auth state
+        // briefly passing through loading/null and back to the same user is
+        // not one.
+        final signedIn = next != null && next != _lastUserId;
+        if (next != null) _lastUserId = next;
         state = const AsyncValue.loading();
-        _loadProfile(signedIn: next != null);
+        _loadProfile(signedIn: signedIn);
       },
     );
+    _lastUserId = ref.read(authSessionProvider).userId;
     _loadProfile();
     return const AsyncValue.loading();
   }
 
   int _loadGeneration = 0;
+  String? _lastUserId;
 
   Future<void> _loadProfile({bool signedIn = false}) async {
     final generation = ++_loadGeneration;

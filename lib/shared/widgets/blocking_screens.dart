@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_sizes.dart';
+import '../../core/constants/app_strings.dart';
 import '../../core/constants/app_urls.dart';
 import '../../core/services/app_logger.dart';
+import '../../features/profile/domain/account_deletion_copy.dart';
 
 /// Full-screen block shown when the installed version is below
 /// `min_supported_version`.
@@ -124,6 +127,94 @@ class BannedScreen extends StatelessWidget {
   }
 }
 
+/// Full-screen block shown when the signed-in account has a pending deletion
+/// (for example requested on another device). Playing would silently fail
+/// server-side, so the player must cancel the deletion or sign out.
+class AccountDeletionPendingScreen extends StatefulWidget {
+  const AccountDeletionPendingScreen({
+    super.key,
+    required this.deletionDate,
+    required this.onCancelDeletion,
+    required this.onSignOut,
+  });
+
+  /// When the account will be permanently deleted.
+  final DateTime deletionDate;
+
+  /// Cancels the deletion; returns `null` on success or an error message.
+  final Future<String?> Function() onCancelDeletion;
+  final Future<void> Function() onSignOut;
+
+  @override
+  State<AccountDeletionPendingScreen> createState() =>
+      _AccountDeletionPendingScreenState();
+}
+
+class _AccountDeletionPendingScreenState
+    extends State<AccountDeletionPendingScreen> {
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _cancel() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final error = await widget.onCancelDeletion();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = error;
+    });
+  }
+
+  Future<void> _signOut() async {
+    setState(() => _busy = true);
+    await widget.onSignOut();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final date = DateFormat.yMMMd().format(widget.deletionDate.toLocal());
+    return _BlockingScaffold(
+      icon: Icons.delete_forever_rounded,
+      iconColor: AppColors.error,
+      title: AppStrings.deletionPendingTitle,
+      message:
+          'This account is scheduled for deletion on $date. Until you cancel '
+          'the deletion, your puzzles cannot be saved.',
+      action: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_error != null) ...[
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: AppSizes.sm),
+          ],
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(44, 48)),
+            onPressed: _busy ? null : _cancel,
+            child: const Text(AccountDeletionCopy.cancelDeletion),
+          ),
+          const SizedBox(height: AppSizes.sm),
+          TextButton(
+            style: TextButton.styleFrom(minimumSize: const Size(44, 48)),
+            onPressed: _busy ? null : _signOut,
+            child: const Text(AppStrings.signOut),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BlockingScaffold extends StatelessWidget {
   const _BlockingScaffold({
     required this.icon,
@@ -149,49 +240,57 @@ class _BlockingScaffold extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppSizes.contentMaxWidth,
-            ),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.all(AppSizes.xl),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: iconColor.withValues(alpha: 0.12),
-                      border: Border.all(
-                        color: iconColor.withValues(alpha: 0.4),
-                        width: 1.5,
-                      ),
+        // Scrolls when large text or a small screen needs more room.
+        child: LayoutBuilder(
+          builder: (context, viewport) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: viewport.maxHeight),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppSizes.contentMaxWidth,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.all(AppSizes.xl),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 96,
+                          height: 96,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: iconColor.withValues(alpha: 0.12),
+                            border: Border.all(
+                              color: iconColor.withValues(alpha: 0.4),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Icon(icon, size: 48, color: iconColor),
+                        ),
+                        const SizedBox(height: AppSizes.lg),
+                        Text(
+                          title,
+                          style: theme.textTheme.headlineLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSizes.md),
+                        Text(
+                          message,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: secondary,
+                            height: 1.5,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (action != null) ...[
+                          const SizedBox(height: AppSizes.xl),
+                          action!,
+                        ],
+                      ],
                     ),
-                    child: Icon(icon, size: 48, color: iconColor),
                   ),
-                  const SizedBox(height: AppSizes.lg),
-                  Text(
-                    title,
-                    style: theme.textTheme.headlineLarge,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSizes.md),
-                  Text(
-                    message,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: secondary,
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (action != null) ...[
-                    const SizedBox(height: AppSizes.xl),
-                    action!,
-                  ],
-                ],
+                ),
               ),
             ),
           ),
