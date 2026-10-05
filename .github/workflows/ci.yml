@@ -58,5 +58,10 @@ jobs:
         with:
           deno-version: v2.x
 
-      - name: Deno tests (shared puzzle core)
-        run: deno test -A supabase/functions/_shared/
+      # Run from supabase/functions so its deno.json import map resolves
+      # @supabase/supabase-js for the helpers that talk to the API.
+      - name: Deno tests and type-check (edge functions)
+        working-directory: supabase/functions
+        run: |
+          deno test -A
+          deno check */index.ts
