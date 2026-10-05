@@ -166,8 +166,15 @@ abstract final class AuthStrategy {
     // so reporting it differently would reveal that the account exists. It
     // gets the same neutral confirmation. Only request/IP-wide limits are
     // shown as "try again later".
+    //
+    // `email_address_invalid` is the mailer rejecting the address (e.g. an
+    // undeliverable domain). Format validation already passed on the client,
+    // and the server only answers this for an address that has an account,
+    // so it is neutral too.
     if (c == 'user_not_found' ||
         c == 'over_email_send_rate_limit' ||
+        c == 'email_address_invalid' ||
+        (m.contains('email address') && m.contains('is invalid')) ||
         m.contains('user not found') ||
         m.contains('unable to validate email') ||
         m.contains('security purposes')) {

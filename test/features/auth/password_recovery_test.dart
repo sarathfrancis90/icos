@@ -58,6 +58,26 @@ void main() {
   ];
 
   group('classifyPasswordReset', () {
+    test('a server-side "email invalid" answer is neutral, not an error', () {
+      // The mailer rejects an undeliverable domain only for a registered
+      // account (unknown ones get a 200), so surfacing it would both scare
+      // the user and reveal that the account exists.
+      expect(
+        AuthStrategy.classifyPasswordReset(
+          code: 'email_address_invalid',
+          statusCode: '400',
+          message: 'Email address "qa@example.com" is invalid',
+        ),
+        PasswordResetFailure.unknownEmail,
+      );
+      expect(
+        AuthStrategy.classifyPasswordReset(
+          message: 'Email address "qa@example.com" is invalid',
+        ),
+        PasswordResetFailure.unknownEmail,
+      );
+    });
+
     test('unknown email is neutral; rate limit and network are reported', () {
       expect(
         AuthStrategy.classifyPasswordReset(code: 'user_not_found'),
