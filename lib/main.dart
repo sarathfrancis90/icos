@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthChangeEvent;
 
 import 'app.dart';
@@ -25,6 +26,14 @@ Future<void> main() async {
   // ignore: unused_local_variable
   final semanticsHandle = SemanticsBinding.instance.ensureSemantics();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  // Inter ships in assets/google_fonts/: never fetch fonts from the network
+  // (an undeclared third-party call that also fails offline on first launch).
+  GoogleFonts.config.allowRuntimeFetching = false;
+  LicenseRegistry.addLicense(() async* {
+    final license = await rootBundle.loadString('assets/google_fonts/OFL.txt');
+    yield LicenseEntryWithLineBreaks(<String>['Inter'], license);
+  });
 
   // Lock orientation to portrait on phones
   await SystemChrome.setPreferredOrientations([

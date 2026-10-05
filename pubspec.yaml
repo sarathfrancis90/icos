@@ -105,5 +105,6 @@ flutter:
     - assets/puzzles/
     - assets/icons/
     - assets/sounds/
+    - assets/google_fonts/
     - .env.development
     - .env.production
