@@ -34,8 +34,10 @@ void main() {
       find.textContaining('By continuing, you agree to our'),
       findsOneWidget,
     );
-    expect(find.bySemanticsLabel('Terms of Service'), findsOneWidget);
-    expect(find.bySemanticsLabel('Privacy Policy'), findsOneWidget);
+    for (final label in ['Terms of Service', 'Privacy Policy']) {
+      final node = find.semantics.byLabel(label).evaluate().single;
+      expect(node.flagsCollection.isLink, isTrue, reason: label);
+    }
     handle.dispose();
   });
 

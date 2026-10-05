@@ -46,6 +46,50 @@ void main() {
       );
     }
 
+    testWidgets(
+      'at 200% text on 320x568 the dismiss button and the consent line scroll '
+      'into view above the system navigation area',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.devicePixelRatio = 1;
+        // An 80dp gesture/navigation bar at the bottom.
+        tester.view.padding = const FakeViewPadding(bottom: 80);
+        tester.view.viewPadding = const FakeViewPadding(bottom: 80);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearAllTestValues);
+
+        await tester.pumpWidget(build());
+        await tester.pump();
+
+        // A guest without a session sees "Continue as guest" here; once signed
+        // in as a guest it reads "Not now". Same button, same place.
+        final notNow = find.text(AppStrings.continueAsGuest);
+        final consent = find.byWidgetPredicate(
+          (w) =>
+              w is RichText && w.text.toPlainText().startsWith('By continuing'),
+        );
+        expect(notNow, findsOneWidget);
+        expect(consent, findsOneWidget);
+
+        // Reachable by scrolling...
+        await tester.drag(
+          find.byType(SingleChildScrollView),
+          const Offset(0, -2000),
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(notNow);
+        await tester.pumpAndSettle();
+
+        // ...and when scrolled to the end, neither sits behind the system bar.
+        const usable = 568.0 - 80;
+        expect(tester.getRect(consent).bottom, lessThanOrEqualTo(usable));
+        expect(tester.getRect(notNow).bottom, lessThanOrEqualTo(usable));
+        expect(tester.getRect(notNow).top, greaterThanOrEqualTo(0));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets('offers a way in for someone who already has an account', (
       tester,
     ) async {
@@ -97,8 +141,10 @@ void main() {
         find.textContaining('By continuing, you agree to our'),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('Terms of Service'), findsOneWidget);
-      expect(find.bySemanticsLabel('Privacy Policy'), findsOneWidget);
+      for (final label in ['Terms of Service', 'Privacy Policy']) {
+        final node = find.semantics.byLabel(label).evaluate().single;
+        expect(node.flagsCollection.isLink, isTrue, reason: label);
+      }
       handle.dispose();
     });
 
