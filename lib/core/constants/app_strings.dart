@@ -20,6 +20,28 @@ abstract final class AppStrings {
       "Offline puzzle. This one is just for practice and won't count toward "
       'your streak.';
 
+  // Password recovery
+  static const forgotPassword = 'Forgot password?';
+  static const resetPasswordTitle = 'Reset your password';
+  static const resetPasswordPrompt =
+      "Enter your email and we'll send you a link to reset your password.";
+  static const resetLinkSent =
+      "If an account exists for that email, we've sent a link to reset your "
+      'password.';
+  static const resetSendLink = 'Send link';
+  static const resetRateLimited =
+      'Too many reset requests. Please try again in a little while.';
+  static const close = 'Close';
+  static const newPasswordTitle = 'Set a new password';
+  static const newPasswordSubtitle = 'Choose a new password for your account.';
+  static const newPasswordLabel = 'New password';
+  static const confirmPasswordLabel = 'Confirm password';
+  static const savePassword = 'Save password';
+  static const passwordUpdated = 'Password updated.';
+  static const passwordRequired = 'Password is required';
+  static const passwordTooShort = 'Password must be at least 6 characters';
+  static const passwordsDoNotMatch = 'Passwords do not match';
+
   // Stats
   static const statsShowingSaved = 'Showing saved stats';
   static const statsLoadFailed = 'Failed to load stats. Pull down to retry.';

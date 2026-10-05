@@ -25,3 +25,15 @@ String? onboardingRedirect({
   if (from == null) return '/onboarding';
   return Uri(path: '/onboarding', queryParameters: {'from': from}).toString();
 }
+
+/// Where a player whose password-recovery link just signed them in sets a
+/// new password.
+const String kNewPasswordPath = '/auth/new-password';
+
+/// Sends the player to the "set a new password" screen while a recovery is
+/// pending, and away from it once it is not. `null` = no redirect.
+String? recoveryRedirect({required String path, required bool pending}) {
+  if (pending && path != kNewPasswordPath) return kNewPasswordPath;
+  if (!pending && path == kNewPasswordPath) return '/';
+  return null;
+}

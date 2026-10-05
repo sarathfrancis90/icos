@@ -6,6 +6,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../features/archive/presentation/archive_screen.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/auth/presentation/email_auth_screen.dart';
+import '../../features/auth/presentation/new_password_screen.dart';
 import '../../features/auth/presentation/onboarding_screen.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/groups/presentation/group_detail_screen.dart';
@@ -58,6 +59,11 @@ GoRouter appRouter(Ref ref) {
         return '/';
       }
       // Onboarding only applies once no blocking gate is active.
+      final recovery = recoveryRedirect(
+        path: path,
+        pending: ref.read(passwordRecoveryPendingProvider),
+      );
+      if (recovery != null) return recovery;
       return onboardingRedirect(
         uri: state.uri,
         hasSeenOnboarding: StorageService.hasSeenOnboarding,
@@ -164,6 +170,11 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) => const AuthScreen(),
       ),
       GoRoute(
+        path: kNewPasswordPath,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const NewPasswordScreen(),
+      ),
+      GoRoute(
         path: '/auth/email',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => EmailAuthScreen(
@@ -210,5 +221,9 @@ class _RouterRefresh extends ChangeNotifier {
   _RouterRefresh(Ref ref) {
     ref.listen<AppGate>(appGateProvider, (_, _) => notifyListeners());
     ref.listen<bool>(isBannedProvider, (_, _) => notifyListeners());
+    ref.listen<bool>(
+      passwordRecoveryPendingProvider,
+      (_, _) => notifyListeners(),
+    );
   }
 }

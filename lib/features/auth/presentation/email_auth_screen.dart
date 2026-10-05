@@ -4,10 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/legal_consent_text.dart';
+import '../domain/password_rules.dart';
 import '../providers/auth_provider.dart';
 import 'widgets/auth_outcome_handler.dart';
+import 'widgets/forgot_password_dialog.dart';
 
 class EmailAuthScreen extends ConsumerStatefulWidget {
   const EmailAuthScreen({super.key, this.initialSignUp = true});
@@ -144,16 +147,36 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                       ),
                     ),
                     validator: (value) {
+                      if (_isSignUp) return validateNewPassword(value);
                       if (value == null || value.isEmpty) {
-                        return 'Password is required';
-                      }
-                      if (_isSignUp && value.length < 6) {
-                        return 'Password must be at least 6 characters';
+                        return AppStrings.passwordRequired;
                       }
                       return null;
                     },
                     onFieldSubmitted: _isSignUp ? null : (_) => _submit(),
                   ),
+
+                  // Password recovery (sign-in only)
+                  if (!_isSignUp)
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                        ),
+                        onPressed: _isLoading
+                            ? null
+                            : () => showForgotPasswordDialog(
+                                context,
+                                initialEmail: _emailController.text.trim(),
+                              ),
+                        child: Text(
+                          AppStrings.forgotPassword,
+                          style: AppTheme.darkTheme.textTheme.labelLarge
+                              ?.copyWith(color: AppColors.purpleLight),
+                        ),
+                      ),
+                    ),
 
                   // Confirm password (sign-up only)
                   if (_isSignUp) ...[
@@ -179,12 +202,10 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                           ),
                         ),
                       ),
-                      validator: (value) {
-                        if (value != _passwordController.text) {
-                          return 'Passwords do not match';
-                        }
-                        return null;
-                      },
+                      validator: (value) => validatePasswordConfirmation(
+                        value,
+                        _passwordController.text,
+                      ),
                       onFieldSubmitted: (_) => _submit(),
                     ),
                   ],

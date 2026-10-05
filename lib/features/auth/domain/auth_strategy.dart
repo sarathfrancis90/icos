@@ -7,6 +7,16 @@ enum AuthPlatform { ios, android, other }
 
 enum OAuthKind { google, apple }
 
+/// How a failed "send password reset email" request should be reported.
+enum PasswordResetFailure {
+  /// The address has no account. Reported exactly like success so the form
+  /// cannot be used to find out who has an account.
+  unknownEmail,
+  rateLimited,
+  network,
+  other,
+}
+
 /// Which Supabase call to make for an OAuth button press.
 enum OAuthMethod {
   /// Anonymous user → `auth.linkIdentity(provider)` (web/PKCE flow). This is
@@ -146,6 +156,35 @@ abstract final class AuthStrategy {
     return emailConfirmedAt == null || emailConfirmedAt.isEmpty;
   }
 
+  /// Classifies an error from `resetPasswordForEmail`.
+  static PasswordResetFailure classifyPasswordReset({
+    String? code,
+    String? statusCode,
+    String? message,
+  }) {
+    final c = (code ?? '').toLowerCase();
+    final m = (message ?? '').toLowerCase();
+    if (c == 'user_not_found' ||
+        m.contains('user not found') ||
+        m.contains('unable to validate email')) {
+      return PasswordResetFailure.unknownEmail;
+    }
+    if (c.contains('rate_limit') ||
+        statusCode == '429' ||
+        m.contains('rate limit') ||
+        m.contains('too many') ||
+        m.contains('security purposes')) {
+      return PasswordResetFailure.rateLimited;
+    }
+    if (m.contains('network') ||
+        m.contains('socket') ||
+        m.contains('failed host lookup') ||
+        m.contains('clientexception')) {
+      return PasswordResetFailure.network;
+    }
+    return PasswordResetFailure.other;
+  }
+
   /// Maps raw provider/Supabase errors to friendly copy.
   static String friendlyMessage(String raw) {
     final e = raw.toLowerCase();
@@ -161,6 +200,10 @@ abstract final class AuthStrategy {
     }
     if (e.contains('rate limit') || e.contains('too many')) {
       return 'Too many attempts. Please wait a moment.';
+    }
+    if (e.contains('different from the old password') ||
+        e.contains('same_password')) {
+      return 'Choose a password you have not used before.';
     }
     if (e.contains('password should be') || e.contains('weak password')) {
       return 'Please choose a stronger password (at least 6 characters).';

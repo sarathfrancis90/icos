@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -5,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthChangeEvent;
 
 import 'app.dart';
 import 'core/services/analytics_service.dart';
@@ -13,6 +16,7 @@ import 'core/services/notification_service.dart';
 import 'core/services/session_service.dart';
 import 'core/services/storage_service.dart';
 import 'core/services/supabase_service.dart';
+import 'features/auth/providers/auth_provider.dart' show PasswordRecoveryLatch;
 
 Future<void> main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -41,7 +45,12 @@ Future<void> main() async {
   // else listens so the scope is already switched when providers react.
   await StorageService.setActiveUser(SupabaseService.auth.currentUser?.id);
   SupabaseService.auth.onAuthStateChange.listen(
-    (state) => StorageService.setActiveUser(state.session?.user.id),
+    (state) {
+      if (state.event == AuthChangeEvent.passwordRecovery) {
+        PasswordRecoveryLatch.arrivedBeforeStart = true;
+      }
+      unawaited(StorageService.setActiveUser(state.session?.user.id));
+    },
     onError: (Object _) {},
   );
 

@@ -16,6 +16,8 @@ import '../../../core/services/analytics_service.dart';
 import '../../../core/services/app_logger.dart';
 import '../../../core/services/session_service.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/app_error.dart';
+import '../../../core/utils/result.dart';
 import '../domain/auth_outcome.dart';
 import '../domain/auth_strategy.dart';
 
@@ -52,6 +54,32 @@ class AuthIdentityConflict extends _$AuthIdentityConflict {
   void show(OAuthKind? provider) => state = provider;
 
   void clear() => state = null;
+}
+
+/// Set by `main()` when a password-recovery link was opened before the app's
+/// providers existed, so the recovery screen is still shown.
+abstract final class PasswordRecoveryLatch {
+  static bool arrivedBeforeStart = false;
+}
+
+/// True from the moment a password-recovery link signs the player in until
+/// they set a new password (or dismiss the screen). The router sends the
+/// player to the "set a new password" screen while this is true.
+@Riverpod(keepAlive: true)
+class PasswordRecoveryPending extends _$PasswordRecoveryPending {
+  @override
+  bool build() {
+    ref.listen<AsyncValue<AuthState>>(authStateChangesProvider, (_, next) {
+      if (next.valueOrNull?.event == AuthChangeEvent.passwordRecovery) {
+        state = true;
+      }
+    });
+    final early = PasswordRecoveryLatch.arrivedBeforeStart;
+    PasswordRecoveryLatch.arrivedBeforeStart = false;
+    return early;
+  }
+
+  void clear() => state = false;
 }
 
 @riverpod
@@ -456,6 +484,62 @@ class AuthNotifier extends _$AuthNotifier {
       );
     } catch (e) {
       AppLogger.debug('Resend confirmation failed', error: e);
+    }
+  }
+
+  // ─── Password recovery ──────────────────────────────────────────────
+
+  /// Emails a password-reset link. An address with no account counts as
+  /// success so the caller can show one neutral confirmation either way.
+  Future<Result<void, AppError>> sendPasswordReset(String email) async {
+    try {
+      await SupabaseService.auth.resetPasswordForEmail(
+        email,
+        redirectTo: kAuthRedirectUri,
+      );
+      return const Result.success(null);
+    } on AuthException catch (e, st) {
+      AppLogger.warn('Password reset request failed',
+          error: e, st: st, data: {'code': e.code});
+      return switch (AuthStrategy.classifyPasswordReset(
+        code: e.code,
+        statusCode: e.statusCode,
+        message: e.message,
+      )) {
+        PasswordResetFailure.unknownEmail => const Result.success(null),
+        PasswordResetFailure.rateLimited =>
+          const Result.failure(AppError.rateLimit('Too many requests')),
+        PasswordResetFailure.network =>
+          const Result.failure(AppError.network('No connection')),
+        PasswordResetFailure.other =>
+          Result.failure(AppError.auth(AuthStrategy.friendlyMessage(e.message))),
+      };
+    } catch (e, st) {
+      AppLogger.warn('Password reset request failed', error: e, st: st);
+      return Result.failure(
+        AppError.network(AuthStrategy.friendlyMessage(e.toString())),
+      );
+    }
+  }
+
+  /// Sets a new password for the signed-in (recovery) session.
+  Future<Result<void, AppError>> updatePassword(String newPassword) async {
+    try {
+      await SupabaseService.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+      return const Result.success(null);
+    } on AuthException catch (e, st) {
+      AppLogger.warn('Password update failed',
+          error: e, st: st, data: {'code': e.code});
+      return Result.failure(
+        AppError.auth(AuthStrategy.friendlyMessage(e.message)),
+      );
+    } catch (e, st) {
+      AppLogger.warn('Password update failed', error: e, st: st);
+      return Result.failure(
+        AppError.network(AuthStrategy.friendlyMessage(e.toString())),
+      );
     }
   }
 
