@@ -112,16 +112,13 @@ abstract final class AuthStrategy {
     };
   }
 
-  /// Whether to render the Sign in with Apple button. Apple requires the
-  /// button on iOS whenever third-party login is offered; on Android the
-  /// web flow works but is hidden unless [allowWebOnAndroid].
-  static bool showAppleButton(
-    AuthPlatform platform, {
-    bool allowWebOnAndroid = false,
-  }) {
+  /// Whether to render the Sign in with Apple button: on iOS (required by
+  /// Apple whenever third-party login is offered) and on Android, where it
+  /// always runs the web flow ([nativeAvailable] is false there) so it can
+  /// sit beside Google at equal prominence.
+  static bool showAppleButton(AuthPlatform platform) {
     return switch (platform) {
-      AuthPlatform.ios => true,
-      AuthPlatform.android => allowWebOnAndroid,
+      AuthPlatform.ios || AuthPlatform.android => true,
       AuthPlatform.other => false,
     };
   }
@@ -193,7 +190,8 @@ abstract final class AuthStrategy {
 
   /// Message carried by the failure when the recovery session behind the
   /// "set a new password" screen is no longer valid.
-  static const String recoverySessionExpiredMessage = 'recovery_session_expired';
+  static const String recoverySessionExpiredMessage =
+      'recovery_session_expired';
 
   /// True when `updateUser` failed because the session from the recovery link
   /// has expired or is gone (so only a new link can help).

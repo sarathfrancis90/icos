@@ -138,6 +138,16 @@ Save, reopen it, tick **Sign In with Apple**, press **Configure**:
   https://pdvgddvubxldjnemdkok.supabase.co/auth/v1/callback
   ```
 
+### Apple on Android
+
+Android shows the same Sign in with Apple button as iOS, directly under Google. It
+always uses the web flow through Supabase (`linkIdentity` for a guest, otherwise
+`signInWithOAuth`) with the Services ID `com.icos.game.signin`; the native Apple SDK is
+never called on Android. Nothing extra is needed in Google Play or the Play Console. The
+Services ID's Return URL must be the Supabase callback listed in the constants table
+above, and the app receives the result on `io.supabase.icos://login-callback`, which the
+Android manifest already handles.
+
 ## A3. Create a Sign in with Apple key
 
 Keys > **+**.

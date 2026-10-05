@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:icos/core/constants/app_strings.dart';
+import 'package:icos/features/auth/domain/auth_strategy.dart';
 import 'package:icos/features/auth/presentation/auth_screen.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show User;
@@ -122,6 +124,58 @@ void main() {
         reason: 'the 2.0 text scale must reach the widget under test',
       );
       expect(tester.takeException(), isNull);
+    });
+
+    group('on Android', () {
+      setUp(() => AuthNotifier.platformOverride = AuthPlatform.android);
+      tearDown(() => AuthNotifier.platformOverride = null);
+
+      testWidgets('offers Google then Apple, both labelled', (tester) async {
+        final handle = tester.ensureSemantics();
+        await tester.pumpWidget(build());
+        await tester.pump();
+
+        expect(
+          find.bySemanticsLabel(RegExp(AppStrings.signInWithGoogle)),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel(RegExp(AppStrings.signInWithApple)),
+          findsWidgets,
+        );
+        final googleY = tester
+            .getTopLeft(find.text(AppStrings.signInWithGoogle))
+            .dy;
+        final appleY = tester
+            .getTopLeft(find.text(AppStrings.signInWithApple))
+            .dy;
+        expect(
+          appleY,
+          greaterThan(googleY),
+          reason: 'Google first, Apple under',
+        );
+        expect(tester.getSize(find.byType(SignInWithAppleButton)).height, 52);
+        handle.dispose();
+      });
+
+      testWidgets('both buttons fit at 200% text on 320x568', (tester) async {
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(
+              size: Size(320, 568),
+              textScaler: TextScaler.linear(2),
+            ),
+            child: build(),
+          ),
+        );
+        await tester.pump();
+        expect(find.text(AppStrings.signInWithApple), findsOneWidget);
+        expect(find.text(AppStrings.signInWithGoogle), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
     });
 
     testWidgets('both providers are offered', (tester) async {

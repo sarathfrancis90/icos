@@ -187,7 +187,13 @@ class AuthNotifier extends _$AuthNotifier {
   /// *not* anonymous (nothing to link).
   bool get isAnonymous => currentUser?.isAnonymous ?? false;
 
+  /// Lets tests pose as another platform; null in production.
+  @visibleForTesting
+  static AuthPlatform? platformOverride;
+
   static AuthPlatform get platform {
+    final override = platformOverride;
+    if (override != null) return override;
     if (kIsWeb) return AuthPlatform.other;
     if (Platform.isIOS) return AuthPlatform.ios;
     if (Platform.isAndroid) return AuthPlatform.android;

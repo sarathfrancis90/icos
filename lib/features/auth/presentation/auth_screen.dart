@@ -171,7 +171,9 @@ class AuthScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: AppSizes.sm),
 
-                        // Apple sign in (iOS only — Apple HIG-compliant button)
+                        // Apple sign in (iOS native, Android via the web flow). Same size
+                        // as Google, directly under it: Apple's branding rules forbid
+                        // making it less prominent.
                         if (showApple) ...[
                           SignInWithAppleButton(
                             text: AppStrings.signInWithApple,

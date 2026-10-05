@@ -177,17 +177,45 @@ void main() {
   });
 
   group('AuthStrategy.showAppleButton', () {
-    test('shown on iOS, hidden on Android unless web allowed', () {
+    test('shown on iOS and Android, hidden elsewhere', () {
       expect(AuthStrategy.showAppleButton(AuthPlatform.ios), isTrue);
-      expect(AuthStrategy.showAppleButton(AuthPlatform.android), isFalse);
-      expect(
-        AuthStrategy.showAppleButton(
-          AuthPlatform.android,
-          allowWebOnAndroid: true,
-        ),
-        isTrue,
-      );
+      expect(AuthStrategy.showAppleButton(AuthPlatform.android), isTrue);
       expect(AuthStrategy.showAppleButton(AuthPlatform.other), isFalse);
+    });
+  });
+
+  group('AuthStrategy.forOAuth Apple on Android', () {
+    test('guest links through the web flow', () {
+      expect(
+        AuthStrategy.forOAuth(
+          isAnonymous: true,
+          platform: AuthPlatform.android,
+          provider: OAuthKind.apple,
+          hasClientIds: true,
+        ),
+        OAuthMethod.linkIdentityWeb,
+      );
+    });
+
+    test('signed-out or non-anonymous uses web OAuth, never native', () {
+      for (final hasIds in [true, false]) {
+        final method = AuthStrategy.forOAuth(
+          isAnonymous: false,
+          platform: AuthPlatform.android,
+          provider: OAuthKind.apple,
+          hasClientIds: hasIds,
+        );
+        expect(method, OAuthMethod.webOAuth);
+        expect(method, isNot(OAuthMethod.nativeIdToken));
+      }
+      expect(
+        AuthStrategy.nativeAvailable(
+          platform: AuthPlatform.android,
+          provider: OAuthKind.apple,
+          hasClientIds: true,
+        ),
+        isFalse,
+      );
     });
   });
 
@@ -197,7 +225,10 @@ void main() {
         AuthStrategy.isIdentityAlreadyExists(code: 'identity_already_exists'),
         isTrue,
       );
-      expect(AuthStrategy.isIdentityAlreadyExists(code: 'email_exists'), isTrue);
+      expect(
+        AuthStrategy.isIdentityAlreadyExists(code: 'email_exists'),
+        isTrue,
+      );
       expect(
         AuthStrategy.isIdentityAlreadyExists(code: 'user_already_exists'),
         isTrue,
@@ -222,7 +253,9 @@ void main() {
         isTrue,
       );
       expect(
-        AuthStrategy.isIdentityAlreadyExists(message: 'User already registered'),
+        AuthStrategy.isIdentityAlreadyExists(
+          message: 'User already registered',
+        ),
         isTrue,
       );
       expect(
