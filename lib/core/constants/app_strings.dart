@@ -85,6 +85,7 @@ abstract final class AppStrings {
   // Groups
   static const createGroup = 'Create Group';
   static const joinGroup = 'Join Group';
+  static String inviteCodeLine(String code) => 'Invite code $code';
   static const joinGroupAction = 'Join group';
   static const joinGroupConfirmTitle = 'Join this group?';
   static const groupInviteCode = 'Invite Code';

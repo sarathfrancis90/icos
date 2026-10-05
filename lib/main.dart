@@ -17,6 +17,7 @@ import 'core/services/notification_service.dart';
 import 'core/services/session_service.dart';
 import 'core/services/storage_service.dart';
 import 'core/services/supabase_service.dart';
+import 'core/theme/font_licenses.dart';
 import 'features/auth/providers/auth_provider.dart' show PasswordRecoveryLatch;
 
 Future<void> main() async {
@@ -30,10 +31,7 @@ Future<void> main() async {
   // Inter ships in assets/google_fonts/: never fetch fonts from the network
   // (an undeclared third-party call that also fails offline on first launch).
   GoogleFonts.config.allowRuntimeFetching = false;
-  LicenseRegistry.addLicense(() async* {
-    final license = await rootBundle.loadString('assets/google_fonts/OFL.txt');
-    yield LicenseEntryWithLineBreaks(<String>['Inter'], license);
-  });
+  registerFontLicenses();
 
   // Lock orientation to portrait on phones
   await SystemChrome.setPreferredOrientations([

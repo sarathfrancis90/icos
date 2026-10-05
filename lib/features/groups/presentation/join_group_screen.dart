@@ -115,7 +115,7 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
                           color: AppColors.purpleLight,
                         ),
                         title: AppStrings.joinGroupConfirmTitle,
-                        subtitle: 'Invite code $_code',
+                        subtitle: AppStrings.inviteCodeLine(_code),
                         actions: [
                           FilledButton(
                             key: const Key('join_confirm'),
@@ -140,7 +140,7 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
                           child: CircularProgressIndicator(),
                         ),
                         title: 'Joining group…',
-                        subtitle: 'Invite code $_code',
+                        subtitle: AppStrings.inviteCodeLine(_code),
                       ),
                     _JoinPhase.joined => const _Status(
                         icon: Icon(

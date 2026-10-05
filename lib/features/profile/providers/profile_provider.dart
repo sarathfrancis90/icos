@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show Rect;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart' show TimeOfDay;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -245,9 +246,7 @@ class ProfileNotifier extends _$ProfileNotifier {
       return const Result.failure(AppError.auth('Not authenticated'));
     }
 
-    await StorageService.setSoundEnabled(enabled);
-    // Start preparing the effects now, not on the first (then dropped) sound.
-    AudioService.instance.soundSettingChanged();
+    await persistSoundSetting(enabled);
 
     final repo = ref.read(profileRepositoryProvider);
     final result = await repo.updateSettings(
@@ -403,4 +402,13 @@ Future<ReminderSettings> reminderSettings(Ref ref) async {
     enabled: await NotificationService.isEnabled(),
     time: await NotificationService.reminderTime(),
   );
+}
+
+/// Stores the sound setting, then tells the audio service so that switching
+/// sound on starts preparing the effects now rather than on the first (then
+/// dropped) sound.
+@visibleForTesting
+Future<void> persistSoundSetting(bool enabled, {AudioService? audio}) async {
+  await StorageService.setSoundEnabled(enabled);
+  (audio ?? AudioService.instance).soundSettingChanged();
 }
