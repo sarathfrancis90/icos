@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/legal_consent_text.dart';
 import '../providers/auth_provider.dart';
 import 'widgets/auth_outcome_handler.dart';
 
@@ -258,7 +259,10 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                                 )
                               : Text(
                                   _isSignUp ? 'Create Account' : 'Sign In',
-                                  style: AppTheme.darkTheme.textTheme.titleMedium
+                                  style: AppTheme
+                                      .darkTheme
+                                      .textTheme
+                                      .titleMedium
                                       ?.copyWith(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w700,
@@ -268,19 +272,21 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: AppSizes.lg),
+                  const SizedBox(height: AppSizes.sm),
+                  const LegalConsentText(),
+                  const SizedBox(height: AppSizes.md),
 
                   // Toggle sign-up / sign-in
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         _isSignUp
                             ? 'Already have an account?'
                             : "Don't have an account?",
-                        style: AppTheme.darkTheme.textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondaryDark,
-                        ),
+                        style: AppTheme.darkTheme.textTheme.bodyMedium
+                            ?.copyWith(color: AppColors.textSecondaryDark),
                       ),
                       TextButton(
                         onPressed: () {

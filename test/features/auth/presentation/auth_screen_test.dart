@@ -84,6 +84,36 @@ void main() {
       expect(find.text(AppStrings.signUpWithEmail), findsOneWidget);
     });
 
+    testWidgets('shows the Terms/Privacy consent line with both links',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(build());
+      await tester.pump();
+
+      expect(find.textContaining('By continuing, you agree to our'),
+          findsOneWidget);
+      expect(find.bySemanticsLabel('Terms of Service'), findsOneWidget);
+      expect(find.bySemanticsLabel('Privacy Policy'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('does not overflow at 200% text on 320x568', (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 568),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: build(),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('both providers are offered', (tester) async {
       await tester.pumpWidget(build());
       await tester.pump();

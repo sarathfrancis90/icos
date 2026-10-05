@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/constants/app_urls.dart';
 import '../../../core/services/app_config_provider.dart';
 import '../../../core/services/app_logger.dart';
 import '../../../core/services/storage_service.dart';
@@ -20,9 +21,6 @@ import '../domain/models/profile.dart';
 import '../providers/profile_provider.dart';
 import 'widgets/colorblind_selector.dart';
 import 'widgets/edit_name_dialog.dart';
-
-const String kPrivacyPolicyUrl = 'https://icos.sarathfrancis.work/privacy-policy.html';
-const String kTermsUrl = 'https://icos.sarathfrancis.work/terms.html';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
