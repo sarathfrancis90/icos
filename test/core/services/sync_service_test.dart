@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +18,16 @@ import '../../helpers/storage_test_helpers.dart';
 class _Online extends ConnectivityNotifier {
   @override
   bool build() => true;
+}
+
+class _MutableAuth extends AuthSessionInfo {
+  _MutableAuth(this.userId);
+
+  @override
+  String? userId;
+
+  @override
+  bool get hasSession => userId != null;
 }
 
 class _SignedInGateway implements SessionGateway {
@@ -333,6 +344,61 @@ void main() {
     await c.read(syncNotifierProvider.notifier).flush();
 
     expect(gateway.signInCalls, 1);
+  });
+
+  group('user switching during a flush', () {
+    test('the second entry is not submitted and stays queued for its owner',
+        () async {
+      final auth = _MutableAuth('test-user');
+      final c = ProviderContainer(
+        overrides: [
+          edgeInvokerProvider.overrideWithValue(edge.call),
+          connectivityNotifierProvider.overrideWith(_Online.new),
+          authSessionProvider.overrideWithValue(auth),
+          sessionEnsurerProvider.overrideWithValue(_ensurer),
+        ],
+      );
+      addTearDown(c.dispose);
+      await StorageService.addToSyncQueue(_submitItem());
+      await StorageService.addToSyncQueue({..._submitItem(), 'puzzle_date': '2026-09-08'});
+      edge.handlers['submit-score'] = (_) async {
+        // The user signs in to another account while the request is out.
+        auth.userId = 'other-user';
+        await StorageService.setActiveUser('other-user');
+        return const EdgeResponse(200, {'completed': true, 'verified': true});
+      };
+
+      await c.read(syncNotifierProvider.notifier).flush();
+
+      expect(edge.calls.where((c) => c.$1 == 'submit-score'), hasLength(1));
+      final left = StorageService.getSyncQueueItems();
+      expect(left, hasLength(1));
+      expect(left.single.value['user_id'], 'test-user');
+      expect(left.single.value['puzzle_date'], '2026-09-08');
+      // The first result was saved for the user who submitted it.
+      expect(StorageService.getSubmissionResult(_date), isNull);
+      expect(
+        StorageService.getSubmissionResult(_date, userId: 'test-user'),
+        isNotNull,
+      );
+    });
+
+    test('a legacy entry with no user id is stamped and submitted in the '
+        'same flush', () async {
+      await StorageService.syncQueue.put(
+        '00001000000000',
+        jsonEncode(_submitItem()),
+      );
+      expect(
+        StorageService.getSyncQueueItems().single.value['user_id'],
+        isNull,
+      );
+
+      await container.read(syncNotifierProvider.notifier).flush();
+
+      expect(edge.calls.where((c) => c.$1 == 'submit-score'), hasLength(1));
+      expect(StorageService.getSyncQueueItems(), isEmpty);
+    });
   });
 
   group('per-user queue', () {

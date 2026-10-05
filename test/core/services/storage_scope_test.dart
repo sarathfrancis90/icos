@@ -195,4 +195,126 @@ void main() {
       );
     });
   });
+
+  group('adoption edge cases', () {
+    test('an interrupted adoption that is re-run completes without loss or '
+        'duplication', () async {
+      // Halfway state: the first key was copied under user-a but its legacy
+      // original was not yet removed; the second was not touched.
+      dir = await initTestStorage(
+        userId: null,
+        prefs: {
+          'submit_result_$_date': '{"status":"pending"}',
+          'u.user-a.submit_result_$_date': '{"status":"pending"}',
+          'game_state_$_date': '{"path":[]}',
+          'solve_count': 4,
+        },
+      );
+
+      await StorageService.setActiveUser('user-a');
+      await StorageService.setActiveUser('user-a');
+
+      expect(StorageService.getSubmissionResult(_date), {'status': 'pending'});
+      expect(StorageService.getGameState(_date), {'path': <Object>[]});
+      expect(StorageService.solveCount, 4);
+      expect(
+        StorageService.prefs.getKeys().where((k) => !k.startsWith('u.user-a.')
+            && k != 'local_scope_migrated_v1'),
+        isEmpty,
+      );
+    });
+
+    test('when both a legacy and a scoped key exist, scoped wins and the '
+        'legacy one is removed', () async {
+      dir = await initTestStorage(
+        userId: null,
+        prefs: {
+          'submit_result_$_date': '{"status":"legacy"}',
+          'u.user-a.submit_result_$_date': '{"status":"scoped"}',
+        },
+      );
+
+      await StorageService.setActiveUser('user-a');
+
+      expect(StorageService.getSubmissionResult(_date), {'status': 'scoped'});
+      expect(
+        StorageService.prefs.containsKey('submit_result_$_date'),
+        isFalse,
+      );
+    });
+
+    test('a user change while adoption runs does not split the records',
+        () async {
+      dir = await initTestStorage(
+        userId: null,
+        prefs: {
+          'submit_result_$_date': '{"status":"pending"}',
+          'game_state_$_date': '{"path":[]}',
+          'session_nonce_$_date': 'n',
+          'solve_count': 4,
+        },
+      );
+
+      final first = StorageService.setActiveUser('user-a');
+      final second = StorageService.setActiveUser('user-b');
+      await Future.wait([first, second]);
+
+      await StorageService.setActiveUser('user-a');
+      expect(StorageService.getSubmissionResult(_date), isNotNull);
+      expect(StorageService.getGameState(_date), isNotNull);
+      expect(StorageService.getSessionNonce(_date), 'n');
+      expect(StorageService.solveCount, 4);
+      await StorageService.setActiveUser('user-b');
+      expect(StorageService.getSubmissionResult(_date), isNull);
+      expect(StorageService.getSessionNonce(_date), isNull);
+    });
+  });
+
+  group('explicit owner', () {
+    setUp(() async {
+      dir = await initTestStorage(userId: 'user-a');
+    });
+
+    test('a write pinned to a user lands under that user, not the active one',
+        () async {
+      await StorageService.setActiveUser('user-b');
+      await StorageService.saveSubmissionResult(
+        _date,
+        {'status': 'pending'},
+        userId: 'user-a',
+      );
+
+      expect(StorageService.getSubmissionResult(_date), isNull);
+      expect(
+        StorageService.getSubmissionResult(_date, userId: 'user-a'),
+        {'status': 'pending'},
+      );
+    });
+
+    test('clearUserData removes that user\'s records and queue entries only',
+        () async {
+      await StorageService.saveSubmissionResult(_date, {'status': 'x'});
+      await StorageService.saveGameState(_date, {'path': <int>[]});
+      await StorageService.saveSessionNonce(_date, 'n');
+      await StorageService.incrementSolveCount();
+      await StorageService.addToSyncQueue({'type': 'submit_score'});
+      await StorageService.setActiveUser('user-b');
+      await StorageService.saveSubmissionResult(_date, {'status': 'b'});
+      await StorageService.addToSyncQueue({'type': 'submit_score'});
+      await StorageService.setThemeMode('light');
+
+      await StorageService.clearUserData('user-a');
+
+      expect(
+        StorageService.prefs.getKeys().where((k) => k.startsWith('u.user-a.')),
+        isEmpty,
+      );
+      expect(
+        StorageService.getSyncQueueItems().map((e) => e.value['user_id']),
+        ['user-b'],
+      );
+      expect(StorageService.getSubmissionResult(_date), {'status': 'b'});
+      expect(StorageService.themeMode, 'light');
+    });
+  });
 }

@@ -22,9 +22,13 @@ class PuzzleSessionService {
   final EdgeInvoker _invoke;
 
   /// Ensures a session nonce exists for [date]. Idempotent: the server
-  /// returns the same nonce on repeat calls.
-  Future<StartSessionOutcome> ensureStarted(String date) async {
-    if (StorageService.getSessionNonce(date) != null) {
+  /// returns the same nonce on repeat calls. [userId] pins the record to the
+  /// user who asked, whoever is active when the response arrives.
+  Future<StartSessionOutcome> ensureStarted(
+    String date, {
+    String? userId,
+  }) async {
+    if (StorageService.getSessionNonce(date, userId: userId) != null) {
       return StartSessionOutcome.ready;
     }
     try {
@@ -35,7 +39,7 @@ class PuzzleSessionService {
           AppLogger.warn('start-puzzle returned no nonce', data: {'date': date});
           return StartSessionOutcome.failed;
         }
-        await StorageService.saveSessionNonce(date, nonce);
+        await StorageService.saveSessionNonce(date, nonce, userId: userId);
         AppLogger.debug('puzzle session started', data: {'date': date});
         return StartSessionOutcome.ready;
       }

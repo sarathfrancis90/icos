@@ -263,6 +263,9 @@ class ProfileNotifier extends _$ProfileNotifier {
       await AnalyticsService.logEvent(AnalyticsEvents.accountDeleteRequested);
       await NotificationService.cancelReminder();
       await NotificationService.cancelStreakReminder();
+      // The account is gone: drop its results, game state, nonces and queued
+      // submissions from this device (other users' data stays).
+      await StorageService.clearUserData(user.id);
       await ref.read(authNotifierProvider.notifier).signOut();
     }
     return result;

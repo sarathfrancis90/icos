@@ -53,25 +53,54 @@ abstract final class StorageService {
   ///    adopted by the next user that appears.
   /// Calling it again with the same id (linkIdentity / updateUser keep the
   /// user id) moves nothing.
-  static Future<void> setActiveUser(String? userId) async {
+  static Future<void> setActiveUser(String? userId) {
     _userId = userId;
     _prefix = userId == null ? _noUserScope : 'u.$userId.';
-    if (userId == null) return;
+    if (userId == null) return Future.value();
+    // Adoption runs one at a time and works from the user id and prefix
+    // captured here, so a user change halfway cannot split records between
+    // two users.
+    final prefix = _prefix;
+    final run = _adoption.then((_) => _adopt(userId, prefix));
+    _adoption = run.then((_) {}, onError: (Object _) {});
+    return run;
+  }
 
+  static Future<void> _adopt(String userId, String prefix) async {
     if (!(_prefs.getBool(_migrationFlag) ?? false)) {
       await _moveKeys(
         matches: (k) =>
             _legacyPlayerKeys.contains(k) ||
             _legacyPlayerPrefixes.any(k.startsWith),
-        rename: (k) => '$_prefix$k',
+        rename: (k) => '$prefix$k',
       );
       await _prefs.setBool(_migrationFlag, true);
     }
     await _moveKeys(
       matches: (k) => k.startsWith(_noUserScope),
-      rename: (k) => '$_prefix${k.substring(_noUserScope.length)}',
+      rename: (k) => '$prefix${k.substring(_noUserScope.length)}',
     );
-    await _stampUnownedQueueEntries(userId);
+    await stampOwnerlessQueueEntries(userId);
+  }
+
+  static Future<void> _adoption = Future.value();
+
+  static String _prefixFor(String? userId) =>
+      userId == null ? _prefix : 'u.$userId.';
+
+  /// Removes everything stored for [userId] (e.g. after account deletion):
+  /// results, game state, nonces, solve count, practice stats and queue
+  /// entries. Other users and device settings are untouched.
+  static Future<void> clearUserData(String userId) async {
+    final prefix = 'u.$userId.';
+    for (final key in _prefs.getKeys().where((k) => k.startsWith(prefix)).toList()) {
+      await _prefs.remove(key);
+    }
+    for (final entry in getSyncQueueItems()) {
+      if (entry.value['user_id'] == userId) {
+        await _syncQueue.delete(entry.key);
+      }
+    }
   }
 
   /// Moves matching SharedPreferences entries to their new key. An existing
@@ -124,6 +153,7 @@ abstract final class StorageService {
     await _syncQueue.clear();
     _userId = null;
     _prefix = _noUserScope;
+    _adoption = Future.value();
   }
 
   // SharedPreferences - User Settings
@@ -248,7 +278,7 @@ abstract final class StorageService {
 
   /// Gives entries without an owner (made before scoping existed, or before
   /// any session) to [userId].
-  static Future<void> _stampUnownedQueueEntries(String userId) async {
+  static Future<void> stampOwnerlessQueueEntries(String userId) async {
     for (final entry in getSyncQueueItems()) {
       if (entry.value['user_id'] != null) continue;
       await _syncQueue.put(
@@ -294,24 +324,38 @@ abstract final class StorageService {
   }
 
   // Puzzle sessions (start-puzzle nonce per date)
-  static String? getSessionNonce(String date) =>
-      _prefs.getString('${_prefix}session_nonce_$date');
+  //
+  // Reads and writes after an `await` should pass the [userId] that started
+  // the operation: the active user may have changed in the meantime.
+  static String? getSessionNonce(String date, {String? userId}) =>
+      _prefs.getString('${_prefixFor(userId)}session_nonce_$date');
 
-  static Future<void> saveSessionNonce(String date, String nonce) =>
-      _prefs.setString('${_prefix}session_nonce_$date', nonce);
+  static Future<void> saveSessionNonce(
+    String date,
+    String nonce, {
+    String? userId,
+  }) =>
+      _prefs.setString('${_prefixFor(userId)}session_nonce_$date', nonce);
 
   // Submission results per date (see SubmissionResult in features/puzzle/data)
-  static Map<String, dynamic>? getSubmissionResult(String date) {
-    final data = _prefs.getString('${_prefix}submit_result_$date');
+  static Map<String, dynamic>? getSubmissionResult(
+    String date, {
+    String? userId,
+  }) {
+    final data = _prefs.getString('${_prefixFor(userId)}submit_result_$date');
     if (data == null) return null;
     return jsonDecode(data) as Map<String, dynamic>;
   }
 
   static Future<void> saveSubmissionResult(
     String date,
-    Map<String, dynamic> result,
-  ) =>
-      _prefs.setString('${_prefix}submit_result_$date', jsonEncode(result));
+    Map<String, dynamic> result, {
+    String? userId,
+  }) =>
+      _prefs.setString(
+        '${_prefixFor(userId)}submit_result_$date',
+        jsonEncode(result),
+      );
 
   static Future<void> clearSubmissionResult(String date) =>
       _prefs.remove('${_prefix}submit_result_$date');

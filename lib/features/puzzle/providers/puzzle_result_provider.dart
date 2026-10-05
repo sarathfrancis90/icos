@@ -26,17 +26,21 @@ class SubmissionResultsVersion extends _$SubmissionResultsVersion {
 Future<SubmissionResult?> puzzleResult(Ref ref, String date) async {
   ref.watch(submissionResultsVersionProvider);
 
-  final stored = StorageService.getSubmissionResult(date);
+  // Everything below belongs to the user who asked. The lookup is awaited;
+  // if the signed-in user changed meanwhile the answer is discarded rather
+  // than stored (or shown) under the new user.
+  final userId = ref.read(authSessionProvider).userId;
+  final stored = StorageService.getSubmissionResult(date, userId: userId);
   final local = stored == null ? null : SubmissionResult.fromJson(stored);
   if (local != null && !local.isPending) return local;
 
-  final userId = ref.read(authSessionProvider).userId;
   if (userId == null) return local;
 
   final server = await ref.read(puzzleRepositoryProvider).getOwnAttempt(
         userId,
         date,
       );
+  if (ref.read(authSessionProvider).userId != userId) return null;
   if (server != null) {
     // Keep the richer local path when the server row has none.
     final merged = server.path.isEmpty && local != null
@@ -53,7 +57,11 @@ Future<SubmissionResult?> puzzleResult(Ref ref, String date) async {
             rankHint: local.rankHint,
           )
         : server;
-    await StorageService.saveSubmissionResult(date, merged.toJson());
+    await StorageService.saveSubmissionResult(
+      date,
+      merged.toJson(),
+      userId: userId,
+    );
     return merged;
   }
   return local;

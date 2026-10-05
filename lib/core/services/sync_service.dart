@@ -67,9 +67,9 @@ class SyncNotifier extends _$SyncNotifier {
 
   /// Requests a `start-puzzle` session for [date]; queues it when offline.
   Future<void> ensureSessionStarted(String date) async {
-    final outcome = await _sessions.ensureStarted(date);
+    final userId = StorageService.activeUserId;
+    final outcome = await _sessions.ensureStarted(date, userId: userId);
     if (outcome == StartSessionOutcome.retry) {
-      final userId = StorageService.activeUserId;
       final alreadyQueued = StorageService.getSyncQueueItems().any(
         (e) =>
             e.value['type'] == 'start_puzzle' &&
@@ -129,27 +129,32 @@ class SyncNotifier extends _$SyncNotifier {
 
   /// Returns `false` when it stopped on a transient failure.
   Future<bool> _flushOnce() async {
-    final items = StorageService.getSyncQueueItems();
-    if (items.isEmpty) return true;
+    if (StorageService.syncQueue.isEmpty) return true;
 
     _retryTimer?.cancel();
     state = true;
     try {
       // Nothing can be submitted without a session; (re)create the guest one.
       await ref.read(sessionEnsurerProvider).ensureSession();
-      final sessionUserId = ref.read(authSessionProvider).userId;
+      // This flush belongs to one user. Everything below pins to [owner]; if
+      // the session user changes mid-flush the flush stops and the rest stays
+      // queued, untouched, for whoever it belongs to.
+      final owner = ref.read(authSessionProvider).userId;
       // Records are scoped to the storage's active user: it must be the
       // session's before anything is read or submitted.
-      if (sessionUserId != null &&
-          sessionUserId != StorageService.activeUserId) {
-        await StorageService.setActiveUser(sessionUserId);
+      if (owner != null && owner != StorageService.activeUserId) {
+        await StorageService.setActiveUser(owner);
+      }
+      if (owner != null) {
+        await StorageService.stampOwnerlessQueueEntries(owner);
       }
       await StorageService.purgeStaleForeignSyncEntries();
-      for (final entry in items) {
+      for (final entry in StorageService.getSyncQueueItems()) {
         // Another account's entries stay untouched: they sync if that user
         // signs back in, and are purged after the server's date window.
-        if (entry.value['user_id'] != sessionUserId) continue;
-        final done = await _processQueueItem(entry.value);
+        if (entry.value['user_id'] != owner) continue;
+        if (ref.read(authSessionProvider).userId != owner) return true;
+        final done = await _processQueueItem(entry.value, owner);
         if (!done) {
           _scheduleRetry();
           return false;
@@ -165,21 +170,24 @@ class SyncNotifier extends _$SyncNotifier {
 
   /// Returns `true` when the item is finished (success or permanent
   /// failure) and can be removed; `false` to retry later.
-  Future<bool> _processQueueItem(Map<String, dynamic> item) async {
+  Future<bool> _processQueueItem(
+    Map<String, dynamic> item,
+    String? owner,
+  ) async {
     switch (item['type'] as String?) {
       case 'submit_score':
-        return _submitScore(item);
+        return _submitScore(item, owner);
       case 'start_puzzle':
         final date = item['puzzle_date'] as String?;
         if (date == null) return true;
-        final outcome = await _sessions.ensureStarted(date);
+        final outcome = await _sessions.ensureStarted(date, userId: owner);
         return outcome != StartSessionOutcome.retry;
       default:
         return true;
     }
   }
 
-  Future<bool> _submitScore(Map<String, dynamic> item) async {
+  Future<bool> _submitScore(Map<String, dynamic> item, String? owner) async {
     final date = item['puzzle_date'] as String?;
     if (date == null) return true;
     if (!ref.read(authSessionProvider).hasSession) return false;
@@ -197,7 +205,7 @@ class SyncNotifier extends _$SyncNotifier {
 
     // Sign at flush time so a nonce obtained after queueing still counts.
     var signature = item['signature'] as String?;
-    final nonce = StorageService.getSessionNonce(date);
+    final nonce = StorageService.getSessionNonce(date, userId: owner);
     if (signature == null && nonce != null) {
       signature = computeScoreSignature(
         nonce: nonce,
@@ -240,10 +248,10 @@ class SyncNotifier extends _$SyncNotifier {
       case SubmitOutcome.retry:
         return false;
       case SubmitOutcome.rejected:
-        await _recordRejected(date, decision.code, item);
+        await _recordRejected(date, decision.code, item, owner);
         return true;
       case SubmitOutcome.success:
-        await _recordAccepted(date, response, decision, item);
+        await _recordAccepted(date, response, decision, item, owner);
         return true;
     }
   }
@@ -252,11 +260,13 @@ class SyncNotifier extends _$SyncNotifier {
     String date,
     String? code,
     Map<String, dynamic> item,
+    String? owner,
   ) async {
-    final local = _localResult(date, item);
+    final local = _localResult(date, item, owner);
     await StorageService.saveSubmissionResult(
       date,
       local.copyWith(status: SubmissionStatus.rejected, reason: code).toJson(),
+      userId: owner,
     );
     AppLogger.warn('score rejected', data: {'date': date, 'code': code});
     _notifyResultChanged();
@@ -267,16 +277,16 @@ class SyncNotifier extends _$SyncNotifier {
     EdgeResponse response,
     SubmitClassification decision,
     Map<String, dynamic> item,
+    String? owner,
   ) async {
-    var result = _localResult(date, item);
+    var result = _localResult(date, item, owner);
     final json = response.json;
 
     if (decision.alreadyCompleted) {
       // 409: the server has an earlier solve; prefer its values.
-      final userId = ref.read(authSessionProvider).userId;
-      final server = userId == null
+      final server = owner == null
           ? null
-          : await ref.read(puzzleRepositoryProvider).getOwnAttempt(userId, date);
+          : await ref.read(puzzleRepositoryProvider).getOwnAttempt(owner, date);
       result = server ?? result.copyWith(status: SubmissionStatus.unverified);
     } else if (json != null) {
       result = result.copyWith(
@@ -293,7 +303,11 @@ class SyncNotifier extends _$SyncNotifier {
       result = result.copyWith(status: SubmissionStatus.unverified);
     }
 
-    await StorageService.saveSubmissionResult(date, result.toJson());
+    await StorageService.saveSubmissionResult(
+      date,
+      result.toJson(),
+      userId: owner,
+    );
 
     await AnalyticsService.logEvent(AnalyticsEvents.puzzleComplete, {
       'puzzle_date': date,
@@ -303,14 +317,19 @@ class SyncNotifier extends _$SyncNotifier {
       'verified': result.status == SubmissionStatus.verified,
       'is_archive': result.isArchive,
     });
-    if (!result.isArchive) {
+    final stillOwner = ref.read(authSessionProvider).userId == owner;
+    if (!result.isArchive && stillOwner) {
       await NotificationService.cancelStreakReminder();
     }
     _notifyResultChanged();
   }
 
-  SubmissionResult _localResult(String date, Map<String, dynamic> item) {
-    final stored = StorageService.getSubmissionResult(date);
+  SubmissionResult _localResult(
+    String date,
+    Map<String, dynamic> item,
+    String? owner,
+  ) {
+    final stored = StorageService.getSubmissionResult(date, userId: owner);
     if (stored != null) return SubmissionResult.fromJson(stored);
     return SubmissionResult(
       date: date,

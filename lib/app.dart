@@ -4,17 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/app_sizes.dart';
 import 'core/router/app_router.dart';
 import 'core/services/app_config_provider.dart';
-import 'core/services/storage_service.dart';
 import 'core/services/sync_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/utils/date_utils.dart';
-import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/providers/session_keeper.dart';
+import 'features/auth/providers/user_scope_keeper.dart';
 import 'features/puzzle/domain/models/puzzle.dart';
 import 'features/puzzle/providers/daily_puzzle_provider.dart';
 import 'features/puzzle/providers/puzzle_result_provider.dart';
-import 'features/stats/providers/stats_provider.dart';
 
 class IcosApp extends ConsumerStatefulWidget {
   const IcosApp({super.key});
@@ -26,7 +24,6 @@ class IcosApp extends ConsumerStatefulWidget {
 class _IcosAppState extends ConsumerState<IcosApp>
     with WidgetsBindingObserver {
   String _lastKnownDate = AppDateUtils.todayUtc();
-  String? _lastUserId = StorageService.activeUserId;
 
   @override
   void initState() {
@@ -48,19 +45,8 @@ class _IcosAppState extends ConsumerState<IcosApp>
     ref.read(sessionKeeperProvider);
     ref.read(puzzleRepositoryProvider).preCacheTomorrowPuzzle();
 
-    // Local records are per user: when the signed-in user changes, everything
-    // derived from them is stale (main() has already switched the storage
-    // scope by the time this fires).
-    ref.listenManual(authStateChangesProvider, (prev, next) {
-      final id = next.valueOrNull?.session?.user.id;
-      if (id == _lastUserId) return;
-      _lastUserId = id;
-      ref.read(submissionResultsVersionProvider.notifier).bump();
-      ref.invalidate(statsOverviewProvider);
-      ref.invalidate(solveHistoryProvider);
-      ref.invalidate(streakProvider);
-      ref.read(syncNotifierProvider.notifier).flush();
-    });
+    // Resets per-player state when the signed-in user id changes.
+    ref.read(userScopeKeeperProvider);
   }
 
   @override
