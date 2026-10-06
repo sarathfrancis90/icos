@@ -524,6 +524,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
                           // per-cell tap targets, so treat it as the
                           // gesture's first move.
                           _lastDragPos = null;
+                          _pending = null;
                           _dragAt(details.localPosition, size, cellSize);
                         }
                         ..onUpdate = (details) {
@@ -602,28 +603,59 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     if (!_dragging) return;
     _dragging = false;
     _lastDragPos = null;
+    _pending = null;
     widget.onDragEnd?.call();
   }
 
-  /// Maps a pointer position to a cell and forwards it as a drag move. A move
-  /// that jumped over cells is walked in steps of a third of a cell, so the
-  /// cells in between are visited in order.
+  /// Maps a pointer position to the cells it reaches and forwards them as drag
+  /// moves, in order. Cells a fast move jumped over are found with an exact
+  /// grid walk ([walkGridCells]); the walk stops at the first cell that cannot
+  /// be entered, and fills nothing when the path of the finger between two
+  /// samples is ambiguous (it passes within 0.2 cell of a shared corner), so
+  /// the next sample decides. At most one sound and one haptic play per event.
   void _dragAt(Offset localPos, int size, double cellSize) {
+    final limit = size * cellSize - 0.001;
+    final to = Offset(
+      localPos.dx.clamp(0.0, limit),
+      localPos.dy.clamp(0.0, limit),
+    );
     final from = _lastDragPos;
-    _lastDragPos = localPos;
-    final points = <Offset>[];
+    _lastDragPos = to;
+    var extended = false;
+    var retracted = false;
+
+    void apply(int row, int col, _GridAction action) {
+      widget.onCellDrag(row, col);
+      _pending = _engine.handleCellTap(_state, row, col, countUndo: false);
+      if (action == _GridAction.extend) extended = true;
+      if (action == _GridAction.retract) retracted = true;
+    }
+
+    int cellOf(double v) => (v / cellSize).floor().clamp(0, size - 1);
+    final startRow = cellOf((from ?? to).dy);
+    final startCol = cellOf((from ?? to).dx);
+    // The cell the sample starts in: fill it if it is a legal next cell (the
+    // first sample, or a cell an ambiguous step left undecided), otherwise it
+    // is not a rejection, the finger is just resting there.
+    final startAction = _classify(startRow, startCol);
+    // A press on an earlier cell of the path also retracts to it.
+    if (startAction == _GridAction.extend ||
+        (from == null && startAction == _GridAction.retract)) {
+      apply(startRow, startCol, startAction);
+    }
     if (from != null) {
-      final steps = ((localPos - from).distance / (cellSize / 3)).ceil();
-      for (var i = 1; i < steps; i++) {
-        points.add(Offset.lerp(from, localPos, i / steps)!);
+      final walk = walkGridCells(from / cellSize, to / cellSize, size);
+      for (final (row, col) in walk ?? const <(int, int)>[]) {
+        final action = _classify(row, col);
+        if (action == _GridAction.reject) break;
+        if (action == _GridAction.noop) continue;
+        apply(row, col, action);
       }
     }
-    points.add(localPos);
-    for (final point in points) {
-      final row = (point.dy / cellSize).floor();
-      final col = (point.dx / cellSize).floor();
-      if (row < 0 || row >= size || col < 0 || col >= size) continue;
-      _handleCellDrag(row, col);
+    if (extended) {
+      _stepFeedback();
+    } else if (retracted) {
+      _retractFeedback();
     }
   }
 
@@ -659,26 +691,6 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
       case _GridAction.extend:
         _stepFeedback();
         widget.onCellTap(row, col);
-    }
-  }
-
-  void _handleCellDrag(int row, int col) {
-    if (widget.readOnly) return;
-    switch (_classify(row, col)) {
-      // A finger crossing the board passes over plenty of cells it cannot
-      // enter. Flashing and buzzing at each one would be constant noise, so a
-      // rejected drag is silent; only a rejected tap gets feedback.
-      case _GridAction.noop:
-      case _GridAction.reject:
-        return;
-      case _GridAction.retract:
-        _retractFeedback();
-        widget.onCellDrag(row, col);
-        _pending = _engine.handleCellTap(_state, row, col, countUndo: false);
-      case _GridAction.extend:
-        _stepFeedback();
-        widget.onCellDrag(row, col);
-        _pending = _engine.handleCellTap(_state, row, col, countUndo: false);
     }
   }
 
@@ -1368,4 +1380,82 @@ class _BoardPanRecognizer extends PanGestureRecognizer {
     PointerDeviceKind pointerDeviceKind,
     double? deviceTouchSlop,
   ) => _moved.distance > _claimSlop;
+}
+
+/// The cells the segment [a] -> [b] (in cell units, 1.0 = one cell) enters, in
+/// order, excluding the cell it starts in. Straight runs along a row or column
+/// are exact. Returns `null` when the walk is ambiguous: the segment passes
+/// within 0.2 cell of a corner shared by two cells it moves between
+/// diagonally, so it is unclear which of the two corner cells was meant.
+/// Positions are clamped to the [n]x[n] board first, which bounds the walk.
+List<(int, int)>? walkGridCells(Offset a, Offset b, int n) {
+  const edge = 0.000001;
+  Offset clamp(Offset p) => Offset(
+    p.dx.clamp(0.0, n - edge).toDouble(),
+    p.dy.clamp(0.0, n - edge).toDouble(),
+  );
+  final p0 = clamp(a);
+  final p1 = clamp(b);
+  final d = p1 - p0;
+  var col = p0.dx.floor();
+  var row = p0.dy.floor();
+  final endCol = p1.dx.floor();
+  final endRow = p1.dy.floor();
+
+  // Grid-line crossings, in order along the segment: (t, isX, line index).
+  final events = <(double, bool, int)>[];
+  if (endCol != col) {
+    final step = d.dx > 0 ? 1 : -1;
+    for (var c = col; c != endCol; c += step) {
+      final line = step > 0 ? c + 1 : c;
+      events.add(((line - p0.dx) / d.dx, true, line));
+    }
+  }
+  if (endRow != row) {
+    final step = d.dy > 0 ? 1 : -1;
+    for (var r = row; r != endRow; r += step) {
+      final line = step > 0 ? r + 1 : r;
+      events.add(((line - p0.dy) / d.dy, false, line));
+    }
+  }
+  // At equal t the x crossing comes first; Dart's sort is not stable, so
+  // order explicitly.
+  events.sort((e1, e2) {
+    final c = e1.$1.compareTo(e2.$1);
+    return c != 0 ? c : (e1.$2 == e2.$2 ? 0 : (e1.$2 ? -1 : 1));
+  });
+
+  double distanceToSegment(Offset p) {
+    final len2 = d.dx * d.dx + d.dy * d.dy;
+    if (len2 == 0) return (p - p0).distance;
+    final t = (((p.dx - p0.dx) * d.dx + (p.dy - p0.dy) * d.dy) / len2).clamp(
+      0.0,
+      1.0,
+    );
+    return (p - (p0 + d * t)).distance;
+  }
+
+  // Two neighbouring crossings on different axes are a diagonal step around
+  // the corner (x line, y line).
+  for (var i = 0; i + 1 < events.length; i++) {
+    final e1 = events[i];
+    final e2 = events[i + 1];
+    if (e1.$2 == e2.$2) continue;
+    final xLine = e1.$2 ? e1.$3 : e2.$3;
+    final yLine = e1.$2 ? e2.$3 : e1.$3;
+    if (distanceToSegment(Offset(xLine.toDouble(), yLine.toDouble())) < 0.2) {
+      return null;
+    }
+  }
+
+  final cells = <(int, int)>[];
+  for (final e in events) {
+    if (e.$2) {
+      col += d.dx > 0 ? 1 : -1;
+    } else {
+      row += d.dy > 0 ? 1 : -1;
+    }
+    cells.add((row, col));
+  }
+  return cells;
 }
