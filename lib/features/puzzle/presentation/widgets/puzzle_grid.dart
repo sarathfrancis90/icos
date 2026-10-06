@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/services/audio_service.dart';
 import '../../../../core/utils/haptics.dart';
 import '../../../../core/utils/motion.dart';
@@ -25,6 +26,7 @@ class PuzzleGrid extends StatefulWidget {
     this.wrongCell,
     this.readOnly = false,
     this.showStartCue = false,
+    this.tapToDraw = false,
     super.key,
   });
 
@@ -51,6 +53,10 @@ class PuzzleGrid extends StatefulWidget {
   /// First-time cue: a ring on waypoint 1 that pulses (static when motion is
   /// reduced). The owner turns it off after the first move.
   final bool showStartCue;
+
+  /// Tap-to-draw mode: announced to screen readers, with a per-cell hint on
+  /// what a double tap does. Dragging works either way.
+  final bool tapToDraw;
 
   @override
   State<PuzzleGrid> createState() => _PuzzleGridState();
@@ -116,7 +122,6 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     if (widget.gameState.hintCell != null) {
       _startHintPulse();
     }
-
   }
 
   @override
@@ -173,8 +178,9 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
         final parts = cellKey.split(',');
         final r = int.parse(parts[0]);
         final c = int.parse(parts[1]);
-        final stillInPath =
-            widget.gameState.path.any((p) => p.row == r && p.col == c);
+        final stillInPath = widget.gameState.path.any(
+          (p) => p.row == r && p.col == c,
+        );
         if (!stillInPath) cellKeysToRemove.add(cellKey);
       }
       for (final key in cellKeysToRemove) {
@@ -196,7 +202,8 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     // ── Phase 3: Hint pulse ─────────────────────────────────────
     final hadHint =
         oldWidget.gameState.hintCell != null || oldWidget.wrongCell != null;
-    final hasHint = widget.gameState.hintCell != null || widget.wrongCell != null;
+    final hasHint =
+        widget.gameState.hintCell != null || widget.wrongCell != null;
     if (hasHint && !hadHint) {
       _startHintPulse();
     } else if (!hasHint && hadHint && !widget.showStartCue) {
@@ -349,8 +356,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     _completionRippleController?.dispose();
     _completionRippleController = AnimationController(
       vsync: this,
-      duration:
-          const Duration(milliseconds: AppSizes.completionRippleMs + 200),
+      duration: const Duration(milliseconds: AppSizes.completionRippleMs + 200),
     )..forward();
   }
 
@@ -420,8 +426,17 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
       AppSizes.gridMaxWidth,
       media.height * AppSizes.gridMaxHeightFraction,
     );
-    return (media.width - AppSizes.gridPadding * 2).clamp(0.0, cap);
+    final byHeight = _maxHeight.isFinite ? _maxHeight : cap;
+    return (media.width - AppSizes.gridPadding * 2).clamp(
+      0.0,
+      math.min(cap, byHeight),
+    );
   }
+
+  /// Height the parent offers. When the surrounding chrome leaves less room
+  /// than the width would use (large text, small screens), the board shrinks
+  /// to fit instead of overflowing.
+  double _maxHeight = double.infinity;
 
   double get cellSize {
     final size = widget.gameState.puzzle.gridSize;
@@ -430,7 +445,6 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-
     _glowBreathController.dispose();
     _hintPulseController?.dispose();
     _waypointBurstController?.dispose();
@@ -448,6 +462,15 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _maxHeight = constraints.maxHeight;
+        return _buildBoard(context);
+      },
+    );
+  }
+
+  Widget _buildBoard(BuildContext context) {
     final size = widget.gameState.puzzle.gridSize;
     final gridWidth = _gridWidth;
     final cellSize = gridWidth / size;
@@ -489,28 +512,33 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
             // drag it never made.
             onPanEnd: (_) => _endDrag(),
             onPanCancel: _endDrag,
-            child: CustomPaint(
-              painter: _GridPainter(
-                gameState: widget.gameState,
-                cellSize: cellSize,
-                palette: widget.palette,
-                wrongCell: widget.wrongCell,
-                showStartCue: widget.showStartCue,
-                segmentProgressGetter: _getSegmentProgress,
-                glowBreathValueGetter: _getGlowBreathValue,
-                cellEntryScaleGetter: _getCellEntryScale,
-                cellEntryGlowGetter: _getCellEntryGlow,
-                hintPulseValueGetter: _getHintPulseValue,
-                waypointBurstProgressGetter: _getWaypointBurstProgress,
-                waypointBurstGridPos: _waypointBurstCenter,
-                completionRippleProgressGetter: _getCompletionRippleProgress,
-                invalidCell: _invalidCell,
-                invalidFlashProgressGetter: _getInvalidFlashProgress,
-                repaintNotifier: listenables.isNotEmpty
-                    ? Listenable.merge(listenables)
-                    : null,
+            child: Semantics(
+              container: widget.tapToDraw,
+              explicitChildNodes: widget.tapToDraw,
+              label: widget.tapToDraw ? AppStrings.tapToDrawModeOn : null,
+              child: CustomPaint(
+                painter: _GridPainter(
+                  gameState: widget.gameState,
+                  cellSize: cellSize,
+                  palette: widget.palette,
+                  wrongCell: widget.wrongCell,
+                  showStartCue: widget.showStartCue,
+                  segmentProgressGetter: _getSegmentProgress,
+                  glowBreathValueGetter: _getGlowBreathValue,
+                  cellEntryScaleGetter: _getCellEntryScale,
+                  cellEntryGlowGetter: _getCellEntryGlow,
+                  hintPulseValueGetter: _getHintPulseValue,
+                  waypointBurstProgressGetter: _getWaypointBurstProgress,
+                  waypointBurstGridPos: _waypointBurstCenter,
+                  completionRippleProgressGetter: _getCompletionRippleProgress,
+                  invalidCell: _invalidCell,
+                  invalidFlashProgressGetter: _getInvalidFlashProgress,
+                  repaintNotifier: listenables.isNotEmpty
+                      ? Listenable.merge(listenables)
+                      : null,
+                ),
+                child: _buildTapTargets(size, cellSize),
               ),
-              child: _buildTapTargets(size, cellSize),
             ),
           ),
         ),
@@ -533,6 +561,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
                 behavior: HitTestBehavior.opaque,
                 child: Semantics(
                   label: _cellSemanticLabel(row, col),
+                  hint: _cellSemanticHint(row, col),
                   child: const SizedBox.expand(),
                 ),
               ),
@@ -628,6 +657,18 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     widget.onInvalidMove?.call(row, col);
   }
 
+  String? _cellSemanticHint(int row, int col) {
+    if (!widget.tapToDraw || widget.readOnly) return null;
+    return switch (widget.gameState.grid[row][col]) {
+      CellState.empty => AppStrings.tapToDrawAddHint,
+      CellState.filled || CellState.waypoint =>
+        widget.gameState.path.any((p) => p.row == row && p.col == col)
+            ? AppStrings.tapToDrawRemoveHint
+            : AppStrings.tapToDrawAddHint,
+      CellState.wall => null,
+    };
+  }
+
   String _cellSemanticLabel(int row, int col) {
     final cellState = widget.gameState.grid[row][col];
     final stateLabel = switch (cellState) {
@@ -675,6 +716,7 @@ class _GridPainter extends CustomPainter {
   final GridPosition? wrongCell;
   final bool showStartCue;
   final double Function(int index) segmentProgressGetter;
+
   /// Animated values are read through closures rather than captured as
   /// numbers. The painter is only rebuilt when the widget rebuilds, but
   /// [repaint] fires on every animation tick and reuses the same painter
@@ -754,8 +796,10 @@ class _GridPainter extends CustomPainter {
       cellSize - _cellInset * 2,
       cellSize - _cellInset * 2,
     );
-    final rrect =
-        RRect.fromRectAndRadius(rect, const Radius.circular(_cellRadius));
+    final rrect = RRect.fromRectAndRadius(
+      rect,
+      const Radius.circular(_cellRadius),
+    );
     final color = palette.wrongCell;
 
     canvas.drawRRect(
@@ -783,8 +827,10 @@ class _GridPainter extends CustomPainter {
       cellSize - _cellInset * 2,
       cellSize - _cellInset * 2,
     );
-    final rrect =
-        RRect.fromRectAndRadius(rect, const Radius.circular(_cellRadius));
+    final rrect = RRect.fromRectAndRadius(
+      rect,
+      const Radius.circular(_cellRadius),
+    );
 
     final isInPath = gameState.path.any((p) => p.row == row && p.col == col);
 
@@ -806,10 +852,7 @@ class _GridPainter extends CustomPainter {
     final shadowPaint = Paint()
       ..color = palette.wallShadow.withValues(alpha: 0.5)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
-    canvas.drawRRect(
-      rrect.shift(const Offset(1.5, 1.5)),
-      shadowPaint,
-    );
+    canvas.drawRRect(rrect.shift(const Offset(1.5, 1.5)), shadowPaint);
 
     // Fill — darker than empty cells for a "solid block" feel
     final fillPaint = Paint()..color = palette.wallFill;
@@ -849,18 +892,12 @@ class _GridPainter extends CustomPainter {
     final shadowPaint = Paint()
       ..color = palette.cellShadow
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
-    canvas.drawRRect(
-      rrect.shift(const Offset(1.0, 1.0)),
-      shadowPaint,
-    );
+    canvas.drawRRect(rrect.shift(const Offset(1.0, 1.0)), shadowPaint);
 
     final highlightPaint = Paint()
       ..color = palette.cellHighlight.withValues(alpha: 0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.5);
-    canvas.drawRRect(
-      rrect.shift(const Offset(-0.5, -0.5)),
-      highlightPaint,
-    );
+    canvas.drawRRect(rrect.shift(const Offset(-0.5, -0.5)), highlightPaint);
 
     final fillPaint = Paint()..color = palette.cellBackground;
     canvas.drawRRect(rrect, fillPaint);
@@ -874,9 +911,15 @@ class _GridPainter extends CustomPainter {
 
   /// Draws a visited cell with warm amber tint + Phase 2 entry effects.
   void _drawVisitedCell(
-      Canvas canvas, Rect rect, RRect rrect, int row, int col) {
-    final pathIndex =
-        gameState.path.indexWhere((p) => p.row == row && p.col == col);
+    Canvas canvas,
+    Rect rect,
+    RRect rrect,
+    int row,
+    int col,
+  ) {
+    final pathIndex = gameState.path.indexWhere(
+      (p) => p.row == row && p.col == col,
+    );
     final progress = gameState.path.length > 1
         ? pathIndex / (gameState.path.length - 1)
         : 0.0;
@@ -950,10 +993,12 @@ class _GridPainter extends CustomPainter {
 
     final points = <Offset>[];
     for (final p in gameState.path) {
-      points.add(Offset(
-        p.col * cellSize + cellSize / 2,
-        p.row * cellSize + cellSize / 2,
-      ));
+      points.add(
+        Offset(
+          p.col * cellSize + cellSize / 2,
+          p.row * cellSize + cellSize / 2,
+        ),
+      );
     }
 
     final renderer = PathRenderer(
@@ -996,7 +1041,9 @@ class _GridPainter extends CustomPainter {
     }
 
     if (isVisited) {
-      final glowColor = isStart ? palette.waypointStartFill : palette.waypointFill;
+      final glowColor = isStart
+          ? palette.waypointStartFill
+          : palette.waypointFill;
       final glowPaint = Paint()
         ..color = glowColor.withValues(alpha: 0.2)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
@@ -1020,7 +1067,10 @@ class _GridPainter extends CustomPainter {
       ..color = Colors.black.withValues(alpha: 0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
     canvas.drawCircle(
-        center + const Offset(0, 1), radius * wpScale, shadowPaint);
+      center + const Offset(0, 1),
+      radius * wpScale,
+      shadowPaint,
+    );
 
     final circlePaint = Paint()..color = fillColor;
     canvas.drawCircle(center, radius * wpScale, circlePaint);
@@ -1032,7 +1082,9 @@ class _GridPainter extends CustomPainter {
             )
           : palette.waypointBorder.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isStart && palette.brightness == Brightness.light ? 2.5 : 1.5;
+      ..strokeWidth = isStart && palette.brightness == Brightness.light
+          ? 2.5
+          : 1.5;
     canvas.drawCircle(center, radius * wpScale, borderPaint);
 
     // Colorblind pattern: inner ring so waypoints read by shape too.
@@ -1045,7 +1097,9 @@ class _GridPainter extends CustomPainter {
       canvas.drawCircle(center, radius * wpScale * 0.78, ringPaint);
     }
 
-    final textColor = isStart ? palette.waypointStartText : palette.waypointText;
+    final textColor = isStart
+        ? palette.waypointStartText
+        : palette.waypointText;
     final textPainter = TextPainter(
       text: TextSpan(
         text: '${wp.order}',
@@ -1128,8 +1182,10 @@ class _GridPainter extends CustomPainter {
       cellSize - _cellInset * 2,
       cellSize - _cellInset * 2,
     );
-    final rrect =
-        RRect.fromRectAndRadius(rect, const Radius.circular(_cellRadius));
+    final rrect = RRect.fromRectAndRadius(
+      rect,
+      const Radius.circular(_cellRadius),
+    );
     final pulseAlpha = 0.25 + hintPulseValue * 0.2;
 
     canvas.drawRRect(

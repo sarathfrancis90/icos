@@ -205,6 +205,11 @@ abstract final class StorageService {
   static Future<bool> setHasSeenFirstPlayHint(bool value) =>
       _prefs.setBool('has_seen_first_play_hint', value);
 
+  /// Accessibility: draw by tapping one adjacent cell at a time (device-level).
+  static bool get tapToDraw => _prefs.getBool('tap_to_draw') ?? false;
+  static Future<bool> setTapToDraw(bool value) =>
+      _prefs.setBool('tap_to_draw', value);
+
   static bool get hasSeenOnboarding =>
       _prefs.getBool('has_seen_onboarding') ?? false;
   static Future<bool> setHasSeenOnboarding(bool value) =>

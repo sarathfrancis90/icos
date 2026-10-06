@@ -17,6 +17,14 @@ abstract final class AppStrings {
   static const puzzleTimer = 'Time';
   static const puzzlePar = 'Par';
   static const firstPlayTooltip = 'Drag to draw your path \u2014 start at 1';
+  static const firstPlayTooltipTap =
+      'Tap the next cell to draw your path \u2014 start at 1';
+  static const tapToDrawTitle = 'Tap to draw';
+  static const tapToDrawSubtitle =
+      'Build your path by tapping one adjacent cell at a time';
+  static const tapToDrawModeOn = 'Tap to draw mode on';
+  static const tapToDrawAddHint = 'Double tap to add to path';
+  static const tapToDrawRemoveHint = 'Double tap to remove from path';
   static const offlinePuzzleNotice =
       "Offline puzzle. This one is just for practice and won't count toward "
       'your streak.';

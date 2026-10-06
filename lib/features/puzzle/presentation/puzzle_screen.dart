@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:in_app_review/in_app_review.dart';
@@ -30,6 +32,7 @@ import '../providers/daily_puzzle_provider.dart';
 import '../providers/game_provider.dart';
 import '../providers/puzzle_result_provider.dart';
 import '../providers/score_submission_provider.dart';
+import '../providers/tap_to_draw_provider.dart';
 import 'widgets/celebration_overlay.dart';
 import 'widgets/first_play_tooltip.dart';
 import 'widgets/game_controls.dart';
@@ -37,6 +40,10 @@ import 'widgets/notification_prompt.dart';
 import 'widgets/offline_puzzle_notice.dart';
 import 'widgets/puzzle_grid.dart';
 import 'widgets/puzzle_palette.dart';
+
+/// Smallest cell the board shrinks to before the area above the controls
+/// scrolls instead.
+const double _minCellSize = 32;
 
 /// Solve count at which the store rating prompt is requested (once).
 const int reviewPromptSolveCount = 5;
@@ -95,9 +102,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
       return;
     }
     final fresh =
-        !replay &&
-        state.status != GameStatus.completed &&
-        state.path.isEmpty;
+        !replay && state.status != GameStatus.completed && state.path.isEmpty;
     _firstPlayEligible = fresh;
     _firstPlayActive = fresh;
     if (!fresh) _persistFirstPlaySeen();
@@ -415,144 +420,183 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
                 child: ContentWidth(
                   maxWidth: AppSizes.gridMaxWidth + AppSizes.gridPadding * 2,
                   child: Column(
-                  children: [
-                    const SizedBox(height: AppSizes.sm),
-                    Padding(
-                      // Same inset as the HUD below, so the home button's
-                      // leading edge lines up with the HUD and the grid.
-                      padding: EdgeInsetsDirectional.symmetric(
-                        horizontal: columnInset,
-                      ),
-                      child: Row(
-                        children: [
-                          _GlassCircleButton(
-                            icon: Icons.home_rounded,
-                            onPressed: () => leaveScreen(context, '/'),
-                          ),
-                          const Spacer(),
-                          if (source.isArchive)
-                            const _ModeTag(label: 'Archive')
-                          else if (source.isPractice)
-                            const _ModeTag(label: 'Practice'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSizes.sm),
-                    Padding(
-                      // On tablets the bar lines up with the grid's edges.
-                      padding: EdgeInsetsDirectional.symmetric(
-                        horizontal: columnInset,
-                      ),
-                      child: _GlassInfoBar(
-                        timer: AppDateUtils.formatTime(
-                          gameState.elapsedSeconds,
-                        ),
-                        gridSize: puzzle.gridSize,
-                        difficulty: puzzle.difficulty,
-                        parTimeSeconds: puzzle.parTimeSeconds,
-                      ),
-                    ),
-                    if (puzzle.origin == PuzzleOrigin.bundled)
-                      const Padding(
-                        padding: EdgeInsetsDirectional.only(
-                          start: AppSizes.md,
-                          end: AppSizes.md,
-                          top: AppSizes.sm,
-                        ),
-                        child: OfflinePuzzleNotice(),
-                      ),
-                    if (isReplay)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                          top: AppSizes.sm,
-                        ),
-                        child: Text(
-                          result?.isRejected ?? false
-                              ? 'Solved — not counted'
-                              : 'Solved in ${AppDateUtils.formatTime(gameState.elapsedSeconds)}',
-                          style: TextStyle(
-                            color: context.palette.success,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    if (_firstPlayEligible ?? false)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                          start: AppSizes.md,
-                          end: AppSizes.md,
-                          top: AppSizes.sm,
-                        ),
-                        child: IgnorePointer(
-                          ignoring: !_firstPlayActive,
-                          child: ExcludeSemantics(
-                            excluding: !_firstPlayActive,
-                            child: AnimatedOpacity(
-                              opacity: _firstPlayActive ? 1 : 0,
-                              duration: MotionUtils.shouldReduceMotion(context)
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 200),
-                              child: FirstPlayTooltip(
-                                onDismiss: _dismissFirstPlay,
+                    children: [
+                      // Everything above the controls scrolls only as a last
+                      // resort (200% text on a small screen); otherwise the
+                      // board takes the remaining height and shrinks to fit.
+                      Expanded(
+                        child: CustomScrollView(
+                          slivers: [
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: Column(
+                                children: [
+                                  const SizedBox(height: AppSizes.sm),
+                                  Padding(
+                                    // Same inset as the HUD below, so the home button's
+                                    // leading edge lines up with the HUD and the grid.
+                                    padding: EdgeInsetsDirectional.symmetric(
+                                      horizontal: columnInset,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        _GlassCircleButton(
+                                          icon: Icons.home_rounded,
+                                          onPressed: () =>
+                                              leaveScreen(context, '/'),
+                                        ),
+                                        const Spacer(),
+                                        if (source.isArchive)
+                                          const _ModeTag(label: 'Archive')
+                                        else if (source.isPractice)
+                                          const _ModeTag(label: 'Practice'),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSizes.sm),
+                                  Padding(
+                                    // On tablets the bar lines up with the grid's edges.
+                                    padding: EdgeInsetsDirectional.symmetric(
+                                      horizontal: columnInset,
+                                    ),
+                                    child: _GlassInfoBar(
+                                      timer: AppDateUtils.formatTime(
+                                        gameState.elapsedSeconds,
+                                      ),
+                                      gridSize: puzzle.gridSize,
+                                      difficulty: puzzle.difficulty,
+                                      parTimeSeconds: puzzle.parTimeSeconds,
+                                    ),
+                                  ),
+                                  if (puzzle.origin == PuzzleOrigin.bundled)
+                                    const Padding(
+                                      padding: EdgeInsetsDirectional.only(
+                                        start: AppSizes.md,
+                                        end: AppSizes.md,
+                                        top: AppSizes.sm,
+                                      ),
+                                      child: OfflinePuzzleNotice(),
+                                    ),
+                                  if (isReplay)
+                                    Padding(
+                                      padding: const EdgeInsetsDirectional.only(
+                                        top: AppSizes.sm,
+                                      ),
+                                      child: Text(
+                                        result?.isRejected ?? false
+                                            ? 'Solved — not counted'
+                                            : 'Solved in ${AppDateUtils.formatTime(gameState.elapsedSeconds)}',
+                                        style: TextStyle(
+                                          color: context.palette.success,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  if (_firstPlayEligible ?? false)
+                                    Padding(
+                                      padding: const EdgeInsetsDirectional.only(
+                                        start: AppSizes.md,
+                                        end: AppSizes.md,
+                                        top: AppSizes.sm,
+                                      ),
+                                      child: IgnorePointer(
+                                        ignoring: !_firstPlayActive,
+                                        child: ExcludeSemantics(
+                                          excluding: !_firstPlayActive,
+                                          child: AnimatedOpacity(
+                                            opacity: _firstPlayActive ? 1 : 0,
+                                            duration:
+                                                MotionUtils.shouldReduceMotion(
+                                                  context,
+                                                )
+                                                ? Duration.zero
+                                                : const Duration(
+                                                    milliseconds: 200,
+                                                  ),
+                                            child: FirstPlayTooltip(
+                                              tapToDraw: ref.watch(
+                                                tapToDrawProvider,
+                                              ),
+                                              onDismiss: _dismissFirstPlay,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(height: AppSizes.md),
+                                  Expanded(
+                                    child: _MinHeight(
+                                      height: math.min(
+                                        puzzle.gridSize * _minCellSize,
+                                        MediaQuery.sizeOf(context).width -
+                                            AppSizes.gridPadding * 2,
+                                      ),
+                                      child: Center(
+                                        child: PuzzleGrid(
+                                          gameState: gameState,
+                                          palette: palette,
+                                          wrongCell: hintUi.wrongCell,
+                                          readOnly: isReplay || completed,
+                                          showStartCue: _firstPlayActive,
+                                          tapToDraw: ref.watch(
+                                            tapToDrawProvider,
+                                          ),
+                                          // The grid owns move feedback: only it knows whether
+                                          // a touch extends the line, retracts it or is
+                                          // rejected.
+                                          onCellTap: (row, col) {
+                                            notifier.handleCellTap(row, col);
+                                            if (ref
+                                                    .read(
+                                                      gameNotifierProvider(
+                                                        source,
+                                                      ),
+                                                    )
+                                                    ?.path
+                                                    .isNotEmpty ??
+                                                false) {
+                                              _dismissFirstPlay();
+                                            }
+                                          },
+                                          onCellDrag: notifier.handleCellDrag,
+                                          onDragStart: () {
+                                            notifier.beginDrag();
+                                            _dismissFirstPlay();
+                                          },
+                                          onDragEnd: notifier.endDrag,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                    const SizedBox(height: AppSizes.md),
-                    Expanded(
-                      child: Center(
-                        child: PuzzleGrid(
-                          gameState: gameState,
-                          palette: palette,
-                          wrongCell: hintUi.wrongCell,
-                          readOnly: isReplay || completed,
-                          showStartCue: _firstPlayActive,
-                          // The grid owns move feedback: only it knows whether
-                          // a touch extends the line, retracts it or is
-                          // rejected.
-                          onCellTap: (row, col) {
-                            notifier.handleCellTap(row, col);
-                            if (ref
-                                    .read(gameNotifierProvider(source))
-                                    ?.path
-                                    .isNotEmpty ??
-                                false) {
-                              _dismissFirstPlay();
-                            }
-                          },
-                          onCellDrag: notifier.handleCellDrag,
-                          onDragStart: () {
-                            notifier.beginDrag();
-                            _dismissFirstPlay();
-                          },
-                          onDragEnd: notifier.endDrag,
-                        ),
+                      GameControls(
+                        gameState: gameState,
+                        hintThinking: hintUi.thinking,
+                        readOnly: isReplay,
+                        onUndo: () {
+                          Haptics.undo();
+                          AudioService.instance.play(SoundEffect.undo);
+                          notifier.undo();
+                        },
+                        onReset: () {
+                          Haptics.heavy();
+                          notifier.reset();
+                        },
+                        onHint: () {
+                          if (hintUi.thinking) return;
+                          Haptics.hintReveal();
+                          AudioService.instance.play(SoundEffect.hintReveal);
+                          notifier.useHint();
+                        },
                       ),
-                    ),
-                    GameControls(
-                      gameState: gameState,
-                      hintThinking: hintUi.thinking,
-                      readOnly: isReplay,
-                      onUndo: () {
-                        Haptics.undo();
-                        AudioService.instance.play(SoundEffect.undo);
-                        notifier.undo();
-                      },
-                      onReset: () {
-                        Haptics.heavy();
-                        notifier.reset();
-                      },
-                      onHint: () {
-                        if (hintUi.thinking) return;
-                        Haptics.hintReveal();
-                        AudioService.instance.play(SoundEffect.hintReveal);
-                        notifier.useHint();
-                      },
-                    ),
-                    const SizedBox(height: AppSizes.md),
-                  ],
-                ),
+                      const SizedBox(height: AppSizes.md),
+                    ],
+                  ),
                 ),
               ),
               if (_showCelebration)
@@ -634,9 +678,7 @@ class _LoadingWithExit extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Center(
-          child: CircularProgressIndicator(color: context.palette.accent),
-        ),
+        Center(child: CircularProgressIndicator(color: context.palette.accent)),
         SafeArea(
           child: Padding(
             padding: const EdgeInsetsDirectional.only(
@@ -733,7 +775,9 @@ class _ModeTag extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.palette.elevated.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(AppSizes.radiusXl),
-        border: Border.all(color: context.palette.border.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: context.palette.border.withValues(alpha: 0.5),
+        ),
       ),
       child: Text(
         label,
@@ -854,4 +898,42 @@ class _GlassCircleButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Passes constraints through unchanged but reports a fixed intrinsic height.
+/// The scroll fallback above the controls measures its content intrinsically,
+/// and the board (it sizes itself in a LayoutBuilder) cannot answer that.
+class _MinHeight extends SingleChildRenderObjectWidget {
+  const _MinHeight({required this.height, super.child});
+
+  final double height;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderMinHeight(height);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderMinHeight renderObject) {
+    renderObject.height = height;
+  }
+}
+
+class _RenderMinHeight extends RenderProxyBox {
+  _RenderMinHeight(this._height);
+
+  double _height;
+  set height(double value) {
+    if (value == _height) return;
+    _height = value;
+    markNeedsLayout();
+  }
+
+  @override
+  double computeMinIntrinsicHeight(double width) => _height;
+  @override
+  double computeMaxIntrinsicHeight(double width) => _height;
+  @override
+  double computeMinIntrinsicWidth(double height) => 0;
+  @override
+  double computeMaxIntrinsicWidth(double height) => 0;
 }

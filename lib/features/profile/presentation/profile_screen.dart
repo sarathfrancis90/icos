@@ -24,6 +24,7 @@ import 'widgets/colorblind_selector.dart';
 import 'widgets/contact_support_tile.dart';
 import 'widgets/edit_name_dialog.dart';
 import 'widgets/guest_account_card.dart';
+import 'widgets/tap_to_draw_tile.dart';
 import 'widgets/theme_mode_dropdown.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -300,6 +301,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ref.read(profileNotifierProvider.notifier).updateSound(value);
             },
           ),
+          const Divider(height: 1),
+          const TapToDrawTile(),
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.accessibility_new_rounded),
