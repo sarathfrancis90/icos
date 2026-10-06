@@ -170,14 +170,14 @@ class ProfileNotifier extends _$ProfileNotifier {
   Future<Result<UserProfile, AppError>> updateDisplayName(
     String displayName,
   ) async {
-    final user = SupabaseService.auth.currentUser;
-    if (user == null) {
+    final userId = ref.read(authSessionProvider).userId;
+    if (userId == null) {
       return const Result.failure(AppError.auth('Not authenticated'));
     }
 
     final repo = ref.read(profileRepositoryProvider);
     final result = await repo.updateProfile(
-      user.id,
+      userId,
       displayName: displayName,
     );
 

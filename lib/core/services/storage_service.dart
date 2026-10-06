@@ -218,6 +218,12 @@ abstract final class StorageService {
     await _prefs.remove('pending_invite_at');
   }
 
+  // Per account: the one-time "Choose your display name" prompt was shown.
+  static bool displayNamePromptShown(String userId) =>
+      _prefs.getBool('${_prefixFor(userId)}display_name_prompt_shown') ?? false;
+  static Future<bool> setDisplayNamePromptShown(String userId) =>
+      _prefs.setBool('${_prefixFor(userId)}display_name_prompt_shown', true);
+
   static bool get hasSeenNotificationPrompt =>
       _prefs.getBool('has_seen_notification_prompt') ?? false;
   static Future<bool> setHasSeenNotificationPrompt(bool value) =>

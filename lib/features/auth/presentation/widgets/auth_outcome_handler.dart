@@ -8,6 +8,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/deep_link.dart';
 import '../../../../core/router/invite_continuation.dart';
 import '../../../groups/domain/pending_invite.dart';
+import '../../../profile/presentation/widgets/choose_display_name_sheet.dart';
 import '../../providers/auth_provider.dart';
 
 /// Shows one-shot messages from [authFlowMessageProvider] (deep-link
@@ -55,7 +56,7 @@ Future<bool> handleAuthOutcome(
   var next = sanitizeJoinLink(nextLocation) ?? '/';
   final messenger = ScaffoldMessenger.of(context);
   switch (outcome) {
-    case AuthSuccess(:final isNewAccount, :final accountLinked):
+    case AuthSuccess(:final user, :final isNewAccount, :final accountLinked):
       // An invite stored before leaving for sign-in is used (and cleared)
       // here too, so it cannot fire a second time from the auth event.
       final stored = await PendingInvite.consume();
@@ -76,6 +77,12 @@ Future<bool> handleAuthOutcome(
           ),
         ),
       );
+      // The sheet goes first, over the auth screen, and the continuation
+      // (invite or Home) follows once it is closed: the router replaces this
+      // screen on `go`, which would take the sheet's context with it. The
+      // invite was consumed above, so waiting here cannot lose it.
+      await maybePromptForDisplayName(context, ref, user);
+      if (!context.mounted) return true;
       context.go(next, extra: resumed ? JoinEntry.resumedInvite : null);
       return true;
 

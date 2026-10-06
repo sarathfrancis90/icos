@@ -20,6 +20,13 @@ abstract final class AppStrings {
       "Offline puzzle. This one is just for practice and won't count toward "
       'your streak.';
 
+  // Choose a display name (after sign-in, when the name is a placeholder)
+  static const chooseNameTitle = 'Choose your display name';
+  static const chooseNameBody = 'This is how friends see you on leaderboards.';
+  static const chooseNameField = 'Display name';
+  static const chooseNameSave = 'Save';
+  static const chooseNameSemantics = 'Choose your display name';
+
   // Password recovery
   static const forgotPassword = 'Forgot password?';
   static const resetPasswordTitle = 'Reset your password';
