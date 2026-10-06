@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/theme/app_palette.dart';
 import 'group_ui.dart';
 
 /// Gate shown to anonymous users on social features. The primary CTA routes
@@ -45,16 +46,16 @@ class AccountRequiredCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     colors: [
-                      AppColors.purpleLight.withValues(alpha: 0.2),
+                      context.palette.accent.withValues(alpha: 0.2),
                       AppColors.purpleDeep.withValues(alpha: 0.03),
                     ],
                   ),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.lock_person_rounded,
                   size: 36,
-                  color: AppColors.purpleLight,
+                  color: context.palette.accent,
                 ),
               ),
               const SizedBox(height: AppSizes.md),

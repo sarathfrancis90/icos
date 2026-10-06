@@ -7,6 +7,7 @@ import '../../core/constants/app_sizes.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/constants/app_urls.dart';
 import '../../core/services/app_logger.dart';
+import '../../core/theme/app_palette.dart';
 import '../../features/profile/domain/account_deletion_copy.dart';
 
 /// Full-screen block shown when the installed version is below
@@ -35,7 +36,7 @@ class ForceUpdateScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return _BlockingScaffold(
       icon: Icons.system_update_rounded,
-      iconColor: AppColors.purpleLight,
+      iconColor: context.palette.accent,
       title: AppStrings.updateRequiredTitle,
       message: latestVersion != null
           ? AppStrings.updateAvailableVersion(latestVersion!)
@@ -60,7 +61,7 @@ class MaintenanceScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return _BlockingScaffold(
       icon: Icons.construction_rounded,
-      iconColor: AppColors.warning,
+      iconColor: context.palette.warning,
       title: AppStrings.maintenanceTitle,
       message: message ?? AppStrings.maintenanceMessage,
       action: onRetry != null
@@ -99,7 +100,7 @@ class BannedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return _BlockingScaffold(
       icon: Icons.block_rounded,
-      iconColor: AppColors.error,
+      iconColor: context.palette.error,
       title: AppStrings.bannedTitle,
       message: AppStrings.bannedMessage(supportEmail),
       action: Column(
@@ -179,7 +180,7 @@ class _AccountDeletionPendingScreenState
     final date = DateFormat.yMMMd().format(widget.deletionDate.toLocal());
     return _BlockingScaffold(
       icon: Icons.delete_forever_rounded,
-      iconColor: AppColors.error,
+      iconColor: context.palette.error,
       title: AppStrings.deletionPendingTitle,
       message: AppStrings.deletionPendingMessage(date),
       action: Column(
@@ -190,7 +191,7 @@ class _AccountDeletionPendingScreenState
               liveRegion: true,
               child: Text(
                 _error!,
-                style: const TextStyle(color: AppColors.error),
+                style: TextStyle(color: context.palette.error),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -233,7 +234,7 @@ class _BlockingScaffold extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final secondary = isDark
-        ? AppColors.textSecondaryDark
+        ? context.palette.textSecondary
         : AppColors.textSecondaryLight;
 
     return Scaffold(

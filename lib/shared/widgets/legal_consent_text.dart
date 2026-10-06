@@ -2,10 +2,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/constants/app_urls.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/external_links.dart';
 
@@ -152,14 +152,14 @@ class _LegalConsentTextState extends State<LegalConsentText> {
 
   @override
   Widget build(BuildContext context) {
-    final base = AppTheme.darkTheme.textTheme.bodySmall?.copyWith(
-      color: AppColors.textSecondaryDark,
+    final base = AppTheme.textThemeOf(context).bodySmall?.copyWith(
+      color: context.palette.textSecondary,
     );
     final linkStyle = base?.copyWith(
-      color: AppColors.purpleLight,
+      color: context.palette.accent,
       fontWeight: FontWeight.w700,
       decoration: TextDecoration.underline,
-      decorationColor: AppColors.purpleLight,
+      decorationColor: context.palette.accent,
     );
     final terms = _links[0];
     final privacy = _links[1];

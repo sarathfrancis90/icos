@@ -11,6 +11,7 @@ import '../../../core/constants/app_urls.dart';
 import '../../../core/services/app_config_provider.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/external_links.dart';
 import '../../../core/utils/result.dart';
@@ -119,8 +120,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: OutlinedButton(
                   onPressed: _busy ? null : () => _signOut(context),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.error,
-                    side: const BorderSide(color: AppColors.error),
+                    foregroundColor: context.palette.error,
+                    side: BorderSide(color: context.palette.error),
                   ),
                   child: const Text('Sign Out'),
                 ),
@@ -199,10 +200,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   if (profile != null) ...[
                     const SizedBox(width: AppSizes.xs),
-                    const Icon(
+                    Icon(
                       Icons.edit_rounded,
                       size: 18,
-                      color: AppColors.purpleLight,
+                      color: context.palette.accent,
                     ),
                   ],
                 ],
@@ -304,9 +305,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             leading: const Icon(Icons.accessibility_new_rounded),
             title: const Text('Colorblind Mode'),
             subtitle: Text(_colorblindModeLabel(_colorblindMode)),
-            trailing: const Icon(
+            trailing: Icon(
               Icons.chevron_right_rounded,
-              color: AppColors.textTertiaryDark,
+              color: context.palette.textTertiary,
             ),
             onTap: () => _showColorblindSelector(context),
           ),
@@ -328,9 +329,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               leading: const Icon(Icons.schedule_rounded),
               title: const Text('Reminder time'),
               subtitle: Text(_formatTime(context, reminderTime)),
-              trailing: const Icon(
+              trailing: Icon(
                 Icons.chevron_right_rounded,
-                color: AppColors.textTertiaryDark,
+                color: context.palette.textTertiary,
               ),
               onTap: () => _pickReminderTime(context, reminderTime),
             ),
@@ -352,9 +353,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             subtitle: Text(
               version == null ? 'Loading version…' : 'Version $version',
             ),
-            trailing: const Icon(
+            trailing: Icon(
               Icons.chevron_right_rounded,
-              color: AppColors.textTertiaryDark,
+              color: context.palette.textTertiary,
             ),
             onTap: () => _showAboutDialog(context, version),
           ),
@@ -362,9 +363,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('Privacy Policy'),
-            trailing: const Icon(
+            trailing: Icon(
               Icons.open_in_new_rounded,
-              color: AppColors.textTertiaryDark,
+              color: context.palette.textTertiary,
             ),
             onTap: () => _openUrl(context, kPrivacyPolicyUrl),
           ),
@@ -372,9 +373,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Terms of Service'),
-            trailing: const Icon(
+            trailing: Icon(
               Icons.open_in_new_rounded,
-              color: AppColors.textTertiaryDark,
+              color: context.palette.textTertiary,
             ),
             onTap: () => _openUrl(context, kTermsUrl),
           ),
@@ -383,9 +384,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             leading: const Icon(Icons.block_rounded),
             title: const Text(AppStrings.blockedUsers),
             subtitle: const Text(AppStrings.blockedUsersSubtitle),
-            trailing: const Icon(
+            trailing: Icon(
               Icons.chevron_right_rounded,
-              color: AppColors.textTertiaryDark,
+              color: context.palette.textTertiary,
             ),
             onTap: () => context.push('/blocked-users'),
           ),
@@ -402,29 +403,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(
+                : Icon(
                     Icons.chevron_right_rounded,
-                    color: AppColors.textTertiaryDark,
+                    color: context.palette.textTertiary,
                   ),
             onTap: _busy ? null : () => _exportData(rowContext),
           ),
           ),
           const Divider(height: 1),
           ListTile(
-            leading: const Icon(
+            leading: Icon(
               Icons.delete_forever_rounded,
-              color: AppColors.error,
+              color: context.palette.error,
             ),
-            title: const Text(
+            title: Text(
               'Delete Account',
-              style: TextStyle(color: AppColors.error),
+              style: TextStyle(color: context.palette.error),
             ),
             subtitle: isAnonymous
                 ? const Text('Removes this guest profile and its progress')
                 : null,
-            trailing: const Icon(
+            trailing: Icon(
               Icons.chevron_right_rounded,
-              color: AppColors.error,
+              color: context.palette.error,
             ),
             onTap: _busy ? null : () => _showDeleteAccountDialog(context),
           ),
@@ -594,7 +595,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.error,
+              backgroundColor: context.palette.error,
             ),
             child: const Text('Delete Account'),
           ),
@@ -661,11 +662,11 @@ class _Card extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.cardSurface : AppColors.lightSurface,
+        color: isDark ? context.palette.card : AppColors.lightSurface,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
         border: Border.all(
           color: isDark
-              ? AppColors.cellBorder.withValues(alpha: 0.3)
+              ? context.palette.border.withValues(alpha: 0.3)
               : AppColors.lightGridLine,
         ),
       ),

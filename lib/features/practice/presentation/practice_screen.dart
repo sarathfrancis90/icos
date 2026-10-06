@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../shared/widgets/animated_background.dart';
 import '../../../shared/widgets/content_width.dart';
@@ -35,98 +35,93 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
   Widget build(BuildContext context) {
     final stats = ref.watch(practiceStatsNotifierProvider);
 
-    // Always-dark screen (matches the puzzle screen); pin the theme so the
-    // AppBar and text stay legible when the system theme is light.
-    return Theme(
-      data: AppTheme.darkTheme,
-      child: Scaffold(
-        backgroundColor: AppColors.deepBlack,
-        appBar: AppBar(
-          title: const Text('Practice'),
-          backgroundColor: Colors.transparent,
-        ),
-        body: Stack(
-          children: [
-            const Positioned.fill(child: AnimatedBackground()),
-            SafeArea(
-              child: ContentWidth(child: ListView(
-                padding: const EdgeInsetsDirectional.all(AppSizes.lg),
-                children: [
-                  Text(
-                    'Unlimited puzzles, generated on your device. Practice '
-                    'solves never affect your streak or leaderboards.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondaryDark,
-                    ),
+    return Scaffold(
+      backgroundColor: context.palette.background,
+      appBar: AppBar(
+        title: const Text('Practice'),
+        backgroundColor: Colors.transparent,
+      ),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: AnimatedBackground()),
+          SafeArea(
+            child: ContentWidth(child: ListView(
+              padding: const EdgeInsetsDirectional.all(AppSizes.lg),
+              children: [
+                Text(
+                  'Unlimited puzzles, generated on your device. Practice '
+                  'solves never affect your streak or leaderboards.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: context.palette.textSecondary,
                   ),
-                  const SizedBox(height: AppSizes.lg),
-                  const _SectionLabel('Grid size'),
-                  const SizedBox(height: AppSizes.sm),
-                  Wrap(
-                    spacing: AppSizes.sm,
-                    children: [
-                      for (final size in practiceSizes)
-                        _ChoiceChip(
-                          label: '${size}x$size',
-                          selected: _size == size,
-                          onTap: () => setState(() => _size = size),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSizes.lg),
-                  const _SectionLabel('Difficulty'),
-                  const SizedBox(height: AppSizes.sm),
-                  Wrap(
-                    spacing: AppSizes.sm,
-                    children: [
-                      for (final d in practiceDifficulties)
-                        _ChoiceChip(
-                          label: '${d[0].toUpperCase()}${d.substring(1)}',
-                          selected: _difficulty == d,
-                          onTap: () => setState(() => _difficulty = d),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSizes.xl),
-                  SpringButton(
-                    onPressed: _start,
-                    child: Container(
-                      key: const Key('practice-start'),
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.purpleButtonGradient,
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: AppColors.purpleGlow,
-                            blurRadius: 16,
-                            offset: Offset(0, 6),
-                          ),
-                        ],
+                ),
+                const SizedBox(height: AppSizes.lg),
+                const _SectionLabel('Grid size'),
+                const SizedBox(height: AppSizes.sm),
+                Wrap(
+                  spacing: AppSizes.sm,
+                  children: [
+                    for (final size in practiceSizes)
+                      _ChoiceChip(
+                        label: '${size}x$size',
+                        selected: _size == size,
+                        onTap: () => setState(() => _size = size),
                       ),
-                      child: const Center(
-                        child: Text(
-                          'Start practice',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
+                  ],
+                ),
+                const SizedBox(height: AppSizes.lg),
+                const _SectionLabel('Difficulty'),
+                const SizedBox(height: AppSizes.sm),
+                Wrap(
+                  spacing: AppSizes.sm,
+                  children: [
+                    for (final d in practiceDifficulties)
+                      _ChoiceChip(
+                        label: '${d[0].toUpperCase()}${d.substring(1)}',
+                        selected: _difficulty == d,
+                        onTap: () => setState(() => _difficulty = d),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSizes.xl),
+                SpringButton(
+                  onPressed: _start,
+                  child: Container(
+                    key: const Key('practice-start'),
+                    width: double.infinity,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.purpleButtonGradient,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: AppColors.purpleGlow,
+                          blurRadius: 16,
+                          offset: Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Start practice',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: AppSizes.xl),
-                  const _SectionLabel('Your practice stats'),
-                  const SizedBox(height: AppSizes.sm),
-                  _PracticeStatsCard(stats: stats),
-                ],
-              ),
-            )),
-          ],
-        ),
+                ),
+                const SizedBox(height: AppSizes.xl),
+                const _SectionLabel('Your practice stats'),
+                const SizedBox(height: AppSizes.sm),
+                _PracticeStatsCard(stats: stats),
+              ],
+            ),
+          )),
+        ],
       ),
     );
   }
@@ -142,7 +137,7 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        color: AppColors.textPrimaryDark,
+        color: context.palette.textPrimary,
         fontWeight: FontWeight.w700,
       ),
     );
@@ -179,19 +174,19 @@ class _ChoiceChip extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             gradient: selected ? AppColors.purpleButtonGradient : null,
-            color: selected ? null : AppColors.elevatedSurface,
+            color: selected ? null : context.palette.elevated,
             borderRadius: BorderRadius.circular(AppSizes.radiusXl),
             border: Border.all(
               color: selected
-                  ? AppColors.purpleLight
-                  : AppColors.cellBorder.withValues(alpha: 0.6),
+                  ? context.palette.accent
+                  : context.palette.border.withValues(alpha: 0.6),
             ),
           ),
           child: Center(
             child: Text(
               label,
               style: TextStyle(
-                color: selected ? Colors.white : AppColors.textPrimaryDark,
+                color: selected ? Colors.white : context.palette.textPrimary,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -212,9 +207,9 @@ class _PracticeStatsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsetsDirectional.all(AppSizes.md),
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
+        color: context.palette.card,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.4)),
+        border: Border.all(color: context.palette.border.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,8 +217,8 @@ class _PracticeStatsCard extends StatelessWidget {
           Text(
             '${stats.count} solved'
             '${stats.count > 0 ? ' · avg ${AppDateUtils.formatTime(stats.averageTimeSeconds)}' : ''}',
-            style: const TextStyle(
-              color: AppColors.textPrimaryDark,
+            style: TextStyle(
+              color: context.palette.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -236,15 +231,15 @@ class _PracticeStatsCard extends StatelessWidget {
                 children: [
                   Text(
                     '${size}x$size best',
-                    style: const TextStyle(color: AppColors.textSecondaryDark),
+                    style: TextStyle(color: context.palette.textSecondary),
                   ),
                   const Spacer(),
                   Text(
                     stats.bestBySize[size] == null
                         ? '--:--'
                         : AppDateUtils.formatTime(stats.bestBySize[size]!),
-                    style: const TextStyle(
-                      color: AppColors.textPrimaryDark,
+                    style: TextStyle(
+                      color: context.palette.textPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../domain/models/group.dart';
 import 'group_ui.dart';
@@ -74,7 +75,7 @@ class VerifiedBadge extends StatelessWidget {
         child: Icon(
           verified ? Icons.verified_rounded : Icons.help_outline_rounded,
           size: 16,
-          color: verified ? AppColors.success : AppColors.warning,
+          color: verified ? context.palette.success : context.palette.warning,
         ),
       ),
     );

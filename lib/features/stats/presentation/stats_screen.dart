@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/text_scale.dart';
 import '../../practice/providers/practice_provider.dart';
@@ -25,8 +25,8 @@ class StatsScreen extends ConsumerWidget {
 
     return SafeArea(
       child: RefreshIndicator(
-        color: AppColors.purpleLight,
-        backgroundColor: AppColors.cardSurface,
+        color: context.palette.accent,
+        backgroundColor: context.palette.card,
         onRefresh: () async {
           ref.invalidate(statsOverviewProvider);
           ref.invalidate(solveHistoryProvider);
@@ -46,30 +46,23 @@ class StatsScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.displayMedium,
             ),
             const SizedBox(height: AppSizes.lg),
-            // Stat cards use the always-dark card surface; pin their text to
-            // the dark text theme so they stay legible in the light theme.
-            Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(textTheme: AppTheme.darkTheme.textTheme),
-              child: Builder(
-                builder: (context) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildOverviewSection(context, ref, overviewAsync),
-                    const SizedBox(height: AppSizes.sm),
-                    _PracticeStatsCard(stats: practiceStats),
-                    const SizedBox(height: AppSizes.lg),
-                    _buildCalendarSection(
-                      context,
-                      overviewAsync,
-                      historyAsync,
-                      ref,
-                    ),
-                    const SizedBox(height: AppSizes.lg),
-                    _buildTimeDistribution(context, historyAsync),
-                  ],
-                ),
+            Builder(
+              builder: (context) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildOverviewSection(context, ref, overviewAsync),
+                  const SizedBox(height: AppSizes.sm),
+                  _PracticeStatsCard(stats: practiceStats),
+                  const SizedBox(height: AppSizes.lg),
+                  _buildCalendarSection(
+                    context,
+                    overviewAsync,
+                    historyAsync,
+                    ref,
+                  ),
+                  const SizedBox(height: AppSizes.lg),
+                  _buildTimeDistribution(context, historyAsync),
+                ],
               ),
             ),
             const SizedBox(height: AppSizes.xxl),
@@ -119,10 +112,10 @@ class StatsScreen extends ConsumerWidget {
     return switch (historyAsync) {
       AsyncData(:final value) => Container(
         decoration: BoxDecoration(
-          color: AppColors.cardSurface,
+          color: context.palette.card,
           borderRadius: BorderRadius.circular(AppSizes.radiusMd),
           border: Border.all(
-            color: AppColors.cellBorder.withValues(alpha: 0.3),
+            color: context.palette.border.withValues(alpha: 0.3),
           ),
         ),
         padding: const EdgeInsetsDirectional.all(AppSizes.md),
@@ -138,14 +131,14 @@ class StatsScreen extends ConsumerWidget {
       ),
       _ => Container(
         decoration: BoxDecoration(
-          color: AppColors.cardSurface,
+          color: context.palette.card,
           borderRadius: BorderRadius.circular(AppSizes.radiusMd),
         ),
         padding: const EdgeInsetsDirectional.all(AppSizes.md),
-        child: const SizedBox(
+        child: SizedBox(
           height: 200,
           child: Center(
-            child: CircularProgressIndicator(color: AppColors.purpleLight),
+            child: CircularProgressIndicator(color: context.palette.accent),
           ),
         ),
       ),
@@ -186,7 +179,7 @@ class _StatsOverviewCards extends StatelessWidget {
             label: 'Puzzles Solved',
             value: '${overview.totalSolved}',
             icon: Icons.check_circle_rounded,
-            gradientColors: const [AppColors.success, AppColors.successDim],
+            gradientColors: [context.palette.success, AppColors.successDim],
           ),
           second: _StatCard(
             label: 'Average Time',
@@ -194,8 +187,8 @@ class _StatsOverviewCards extends StatelessWidget {
                 ? AppDateUtils.formatTime(overview.averageTimeSeconds)
                 : '--:--',
             icon: Icons.timer_rounded,
-            gradientColors: const [
-              AppColors.purpleLight,
+            gradientColors: [
+              context.palette.accent,
               AppColors.purpleDeep,
             ],
           ),
@@ -318,15 +311,15 @@ class _StreakHero extends StatelessWidget {
       value: longestStreak,
       label: 'Longest Streak',
       icon: Icons.emoji_events_rounded,
-      color: AppColors.streakGold,
-      deepColor: AppColors.streakGold,
+      color: context.palette.gold,
+      deepColor: context.palette.gold,
     );
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
+        color: context.palette.card,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
+        border: Border.all(color: context.palette.border.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsetsDirectional.all(AppSizes.md),
       // Side by side normally; stacked at large text so each keeps its width.
@@ -338,7 +331,7 @@ class _StreakHero extends StatelessWidget {
                 Container(
                   width: double.infinity,
                   height: 1,
-                  color: AppColors.cellBorder,
+                  color: context.palette.border,
                 ),
                 const SizedBox(height: AppSizes.sm),
                 longest,
@@ -347,7 +340,7 @@ class _StreakHero extends StatelessWidget {
           : Row(
               children: [
                 Expanded(child: current),
-                Container(width: 1, height: 80, color: AppColors.cellBorder),
+                Container(width: 1, height: 80, color: context.palette.border),
                 Expanded(child: longest),
               ],
             ),
@@ -421,9 +414,9 @@ class _StatCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
+        color: context.palette.card,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
+        border: Border.all(color: context.palette.border.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsetsDirectional.all(AppSizes.md),
       child: Row(
@@ -477,10 +470,10 @@ class _LoadingCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       height: 300,
       child: Center(
-        child: CircularProgressIndicator(color: AppColors.purpleLight),
+        child: CircularProgressIndicator(color: context.palette.accent),
       ),
     );
   }
@@ -497,10 +490,10 @@ class _SavedStatsNote extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.cloud_off_rounded,
               size: 16,
-              color: AppColors.textSecondaryDark,
+              color: context.palette.textSecondary,
             ),
             const SizedBox(width: AppSizes.xs),
             Flexible(
@@ -525,9 +518,9 @@ class _ErrorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
+        color: context.palette.card,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
+        border: Border.all(color: context.palette.border.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsetsDirectional.all(AppSizes.md),
       child: Column(
@@ -535,7 +528,7 @@ class _ErrorCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.error_outline_rounded, color: AppColors.error),
+              Icon(Icons.error_outline_rounded, color: context.palette.error),
               const SizedBox(width: AppSizes.sm),
               Expanded(
                 child: Text(
@@ -599,9 +592,9 @@ class _SolveTimeDistribution extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
+        color: context.palette.card,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
+        border: Border.all(color: context.palette.border.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsetsDirectional.all(AppSizes.md),
       child: Column(

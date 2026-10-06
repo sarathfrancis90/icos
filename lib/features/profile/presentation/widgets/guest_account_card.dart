@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/theme/app_palette.dart';
 
 /// Profile card nudging a guest to create an account.
 class GuestAccountCard extends StatelessWidget {
@@ -20,16 +21,16 @@ class GuestAccountCard extends StatelessWidget {
           ],
         ),
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: AppColors.purpleLight.withValues(alpha: 0.4)),
+        border: Border.all(color: context.palette.accent.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.person_outline_rounded,
-                color: AppColors.purpleLight,
+                color: context.palette.accent,
               ),
               const SizedBox(width: AppSizes.sm),
               Expanded(
@@ -46,9 +47,7 @@ class GuestAccountCard extends StatelessWidget {
             'groups and never lose your streak. Guest data is removed after '
             '${AppSizes.anonymousPurgeDays} days of inactivity.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
+              color: context.palette.textSecondary,
               height: 1.4,
             ),
           ),

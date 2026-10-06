@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/theme/app_palette.dart';
 
 /// Theme-aware card colours shared across the groups feature (mirrors the
 /// pattern used by the profile screen).
@@ -12,9 +13,9 @@ class GroupSurface {
   factory GroupSurface.of(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GroupSurface._(
-      background: isDark ? AppColors.cardSurface : AppColors.lightSurface,
+      background: isDark ? context.palette.card : AppColors.lightSurface,
       border: isDark
-          ? AppColors.cellBorder.withValues(alpha: 0.3)
+          ? context.palette.border.withValues(alpha: 0.3)
           : AppColors.lightGridLine,
     );
   }
@@ -36,7 +37,7 @@ class GroupSurface {
 
 Color secondaryTextColor(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
-        ? AppColors.textSecondaryDark
+        ? context.palette.textSecondary
         : AppColors.textSecondaryLight;
 
 /// Standard confirmation dialog. Returns `true` when confirmed.

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/theme/app_palette.dart';
 import 'animated_background.dart';
 import 'content_width.dart';
 import 'offline_banner.dart';
@@ -39,7 +41,7 @@ class AppShell extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.deepBlack : AppColors.lightBackground,
+      backgroundColor: isDark ? context.palette.background : AppColors.lightBackground,
       body: Stack(
         children: [
           if (isDark) ...[
@@ -59,7 +61,7 @@ class AppShell extends StatelessWidget {
           color: isDark ? AppColors.navBarBackground : AppColors.lightSurface,
           border: Border(
             top: BorderSide(
-              color: isDark ? AppColors.cellBorder : AppColors.lightGridLine,
+              color: isDark ? context.palette.border : AppColors.lightGridLine,
               width: 0.5,
             ),
           ),

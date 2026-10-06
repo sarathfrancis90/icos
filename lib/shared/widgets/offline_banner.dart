@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/services/connectivity_service.dart';
 import '../../core/services/sync_service.dart';
+import '../../core/theme/app_palette.dart';
 
 /// Offline notice + "results waiting to sync" chip, shown in the app shell
 /// (never during gameplay). Renders nothing while online with an empty queue.
@@ -29,7 +30,7 @@ class OfflineBanner extends ConsumerWidget {
               Container(
                 key: const Key('offline-banner'),
                 width: double.infinity,
-                color: AppColors.warning.withValues(alpha: 0.18),
+                color: context.palette.warning.withValues(alpha: 0.18),
                 padding: const EdgeInsetsDirectional.symmetric(
                   horizontal: AppSizes.md,
                   vertical: AppSizes.sm,
@@ -40,7 +41,7 @@ class OfflineBanner extends ConsumerWidget {
                       Icons.cloud_off_rounded,
                       size: 18,
                       color: Theme.of(context).brightness == Brightness.dark
-                          ? AppColors.warning
+                          ? context.palette.warning
                           : AppColors.warningOnLight,
                     ),
                     const SizedBox(width: AppSizes.sm),
@@ -75,25 +76,25 @@ class OfflineBanner extends ConsumerWidget {
                       vertical: AppSizes.xs,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.elevatedSurface,
+                      color: context.palette.elevated,
                       borderRadius: BorderRadius.circular(AppSizes.radiusXl),
                       border: Border.all(
-                        color: AppColors.cellBorder.withValues(alpha: 0.6),
+                        color: context.palette.border.withValues(alpha: 0.6),
                       ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.sync_rounded,
                           size: 14,
-                          color: AppColors.textSecondaryDark,
+                          color: context.palette.textSecondary,
                         ),
                         const SizedBox(width: AppSizes.xs),
                         Text(
                           '$queued result${queued == 1 ? '' : 's'} waiting to sync',
-                          style: const TextStyle(
-                            color: AppColors.textSecondaryDark,
+                          style: TextStyle(
+                            color: context.palette.textSecondary,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),

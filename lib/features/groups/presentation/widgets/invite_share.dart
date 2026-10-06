@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../domain/invite_code.dart';
 import '../../domain/models/group.dart';
 import 'group_ui.dart';
@@ -73,13 +73,13 @@ class InviteQrDialog extends StatelessWidget {
                 size: 220,
                 padding: EdgeInsets.zero,
                 backgroundColor: Colors.white,
-                eyeStyle: const QrEyeStyle(
+                eyeStyle: QrEyeStyle(
                   eyeShape: QrEyeShape.square,
-                  color: AppColors.deepBlack,
+                  color: context.palette.background,
                 ),
-                dataModuleStyle: const QrDataModuleStyle(
+                dataModuleStyle: QrDataModuleStyle(
                   dataModuleShape: QrDataModuleShape.square,
-                  color: AppColors.deepBlack,
+                  color: context.palette.background,
                 ),
               ),
             ),

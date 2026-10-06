@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/theme/app_palette.dart';
 import '../domain/models/group.dart';
 import '../providers/groups_provider.dart';
 import 'widgets/account_required_card.dart';
@@ -155,7 +156,7 @@ class _GlassIconButton extends StatelessWidget {
       child: Tooltip(
         message: tooltip,
         child: Material(
-          color: isDark ? AppColors.elevatedSurface : AppColors.lightSurface,
+          color: isDark ? context.palette.elevated : AppColors.lightSurface,
           borderRadius: BorderRadius.circular(AppSizes.radiusSm),
           child: InkWell(
             onTap: onPressed,
@@ -167,7 +168,7 @@ class _GlassIconButton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                 border: Border.all(
                   color: isDark
-                      ? AppColors.cellBorder.withValues(alpha: 0.5)
+                      ? context.palette.border.withValues(alpha: 0.5)
                       : AppColors.lightGridLine,
                 ),
               ),
@@ -201,7 +202,7 @@ class _EmptyState extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: RadialGradient(
                 colors: [
-                  AppColors.purpleLight.withValues(alpha: 0.15),
+                  context.palette.accent.withValues(alpha: 0.15),
                   AppColors.purpleDeep.withValues(alpha: 0.03),
                 ],
               ),
@@ -210,7 +211,7 @@ class _EmptyState extends StatelessWidget {
             child: Icon(
               Icons.group_add_rounded,
               size: 40,
-              color: AppColors.purpleLight.withValues(alpha: 0.6),
+              color: context.palette.accent.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: AppSizes.md),

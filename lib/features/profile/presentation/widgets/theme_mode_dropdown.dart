@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../../../core/theme/theme_provider.dart';
 
 /// System / Dark / Light selector shown in Profile settings.
@@ -16,7 +17,7 @@ class ThemeModeDropdown extends ConsumerWidget {
       underline: const SizedBox.shrink(),
       // The menu text follows the theme, so the menu surface must too.
       dropdownColor: Theme.of(context).brightness == Brightness.dark
-          ? AppColors.elevatedSurface
+          ? context.palette.elevated
           : AppColors.lightSurface,
       onChanged: (mode) {
         if (mode != null) {

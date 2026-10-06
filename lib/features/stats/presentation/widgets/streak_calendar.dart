@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../domain/models/streak.dart';
 
@@ -117,19 +117,19 @@ class _CalendarDay extends StatelessWidget {
 
     if (isFuture) {
       backgroundColor = Colors.transparent;
-      textColor = AppColors.textTertiaryDark;
+      textColor = context.palette.textTertiary;
     } else if (isSolved) {
-      backgroundColor = AppColors.success.withValues(alpha: 0.8);
+      backgroundColor = context.palette.success.withValues(alpha: 0.8);
       textColor = Colors.white;
     } else {
-      backgroundColor = AppColors.cellBackground;
-      textColor = AppColors.textSecondaryDark;
+      backgroundColor = context.palette.inset;
+      textColor = context.palette.textSecondary;
     }
 
     if (isUnderPar) {
-      border = Border.all(color: AppColors.streakGold, width: 2);
+      border = Border.all(color: context.palette.gold, width: 2);
     } else if (isToday) {
-      border = Border.all(color: AppColors.purpleLight, width: 2);
+      border = Border.all(color: context.palette.accent, width: 2);
     }
 
     return SizedBox(
@@ -169,18 +169,18 @@ class _CalendarLegend extends StatelessWidget {
       runSpacing: AppSizes.xs,
       children: [
         _LegendItem(
-          color: AppColors.success.withValues(alpha: 0.8),
+          color: context.palette.success.withValues(alpha: 0.8),
           label: 'Solved',
           textStyle: theme.textTheme.bodySmall,
         ),
         _LegendItem(
-          color: AppColors.cellBackground,
+          color: context.palette.inset,
           label: 'Missed',
           textStyle: theme.textTheme.bodySmall,
         ),
         _LegendItem(
-          color: AppColors.success.withValues(alpha: 0.8),
-          borderColor: AppColors.streakGold,
+          color: context.palette.success.withValues(alpha: 0.8),
+          borderColor: context.palette.gold,
           label: 'Under par',
           textStyle: theme.textTheme.bodySmall,
         ),

@@ -7,6 +7,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/router/deep_link.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/motion.dart';
 import '../../../shared/widgets/spring_button.dart';
 
@@ -70,7 +71,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.deepBlack,
+      backgroundColor: context.palette.background,
       body: SafeArea(
         // Tablets are much wider than the design grid; keep onboarding in a
         // readable column instead of stretching text and the button edge to edge.
@@ -91,10 +92,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     child: TextButton(
                       onPressed: _finish,
-                      child: const Text(
+                      child: Text(
                         'Skip',
                         style: TextStyle(
-                          color: AppColors.textSecondaryDark,
+                          color: context.palette.textSecondary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -137,7 +138,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             : null,
                         color: _currentPage == index
                             ? null
-                            : AppColors.cellBackground,
+                            : context.palette.inset,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -263,6 +264,7 @@ class _OnboardingPageState extends State<_OnboardingPage>
                   pageIndex: widget.pageIndex,
                   progress: reduceMotion ? 1.0 : _animController.value,
                   colors: widget.gradientColors,
+                  palette: context.palette,
                 ),
               ),
             ),
@@ -270,10 +272,8 @@ class _OnboardingPageState extends State<_OnboardingPage>
           const SizedBox(height: AppSizes.xl),
           Text(
             widget.title,
-            // Onboarding always renders on the dark backdrop, so pin the
-            // title colour instead of inheriting the (possibly light) theme.
             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-              color: AppColors.textPrimaryDark,
+              color: context.palette.textPrimary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -281,7 +281,7 @@ class _OnboardingPageState extends State<_OnboardingPage>
           Text(
             widget.description,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: AppColors.textSecondaryDark,
+              color: context.palette.textSecondary,
               height: 1.5,
             ),
             textAlign: TextAlign.center,
@@ -298,11 +298,13 @@ class _OnboardingIllustrationPainter extends CustomPainter {
     required this.pageIndex,
     required this.progress,
     required this.colors,
+    required this.palette,
   });
 
   final int pageIndex;
   final double progress;
   final List<Color> colors;
+  final AppPalette palette;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -340,7 +342,7 @@ class _OnboardingIllustrationPainter extends CustomPainter {
           cellSize - 2,
         );
         final cellPaint = Paint()
-          ..color = AppColors.cellBackground.withValues(alpha: 0.8 * progress);
+          ..color = palette.inset.withValues(alpha: 0.8 * progress);
         canvas.drawRRect(
           RRect.fromRectAndRadius(rect, const Radius.circular(3)),
           cellPaint,
@@ -412,7 +414,7 @@ class _OnboardingIllustrationPainter extends CustomPainter {
       final isFilled = i < filledCount;
       final cellColor = isFilled
           ? Color.lerp(colors.first, colors.last, i / totalCells)!
-          : AppColors.cellBackground;
+          : palette.inset;
 
       final paint = Paint()
         ..color = cellColor.withValues(alpha: isFilled ? 0.8 : 0.4);
@@ -457,8 +459,8 @@ class _OnboardingIllustrationPainter extends CustomPainter {
       colors.first,
       colors.last,
       AppColors.pathOrange,
-      AppColors.purpleLight,
-      AppColors.streakGold,
+      palette.accent,
+      palette.gold,
     ];
 
     for (int i = 0; i < angles.length; i++) {
@@ -523,6 +525,7 @@ class _OnboardingIllustrationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _OnboardingIllustrationPainter oldDelegate) {
     return oldDelegate.progress != progress ||
-        oldDelegate.pageIndex != pageIndex;
+        oldDelegate.pageIndex != pageIndex ||
+        oldDelegate.palette != palette;
   }
 }

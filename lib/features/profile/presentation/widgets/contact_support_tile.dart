@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_urls.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../../../core/utils/external_links.dart';
 
 /// "Contact support" row: opens the user's mail app addressed to support.
@@ -23,9 +23,9 @@ class ContactSupportTile extends StatelessWidget {
         leading: const Icon(Icons.mail_outline_rounded),
         title: const Text(AppStrings.contactSupport),
         subtitle: const Text(kSupportEmail),
-        trailing: const Icon(
+        trailing: Icon(
           Icons.open_in_new_rounded,
-          color: AppColors.textTertiaryDark,
+          color: context.palette.textTertiary,
         ),
         onTap: () async {
           final ok = await onOpen(kSupportMailtoUrl);

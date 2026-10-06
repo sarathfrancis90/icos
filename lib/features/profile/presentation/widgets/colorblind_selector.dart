@@ -5,6 +5,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/utils/app_error.dart';
 import '../../../../core/utils/result.dart';
+import '../../../puzzle/presentation/widgets/grid_palette.dart';
+import '../../../puzzle/providers/colorblind_mode_provider.dart';
 import '../../providers/profile_provider.dart';
 
 /// A bottom sheet widget for selecting colorblind mode.
@@ -144,6 +146,14 @@ class _ColorblindOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // On the light theme the swatches preview the light board's colours (the
+    // dark ones are kept for the dark theme).
+    final lightBoard = Theme.of(context).brightness == Brightness.light
+        ? GridPalette.forMode(
+            ColorblindMode.values.byName(option.key),
+            brightness: Brightness.light,
+          )
+        : null;
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -160,13 +170,15 @@ class _ColorblindOptionTile extends StatelessWidget {
             Row(
               children: [
                 _ColorSwatch(
-                  color: option.pathColor,
+                  color: lightBoard?.pathGradient[2] ?? option.pathColor,
                   label: 'P',
+                  labelColor: lightBoard?.waypointText,
                 ),
                 const SizedBox(width: AppSizes.xs),
                 _ColorSwatch(
-                  color: option.waypointColor,
+                  color: lightBoard?.waypointFill ?? option.waypointColor,
                   label: 'W',
+                  labelColor: lightBoard?.waypointText,
                 ),
               ],
             ),
@@ -204,10 +216,14 @@ class _ColorSwatch extends StatelessWidget {
   const _ColorSwatch({
     required this.color,
     required this.label,
+    this.labelColor,
   });
 
   final Color color;
   final String label;
+
+  /// Letter colour; white when not given (the dark-theme swatches).
+  final Color? labelColor;
 
   @override
   Widget build(BuildContext context) {
@@ -221,8 +237,8 @@ class _ColorSwatch extends StatelessWidget {
       child: Center(
         child: Text(
           label,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: labelColor ?? Colors.white,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),

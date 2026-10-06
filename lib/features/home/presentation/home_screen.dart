@@ -9,6 +9,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/services/auth_session_provider.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/theme/app_palette.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../shared/widgets/spring_button.dart';
@@ -67,8 +68,8 @@ class HomeScreen extends ConsumerWidget {
           children: [
             // App title with gradient accent
             ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [AppColors.purpleLight, AppColors.pathYellowBright],
+              shaderCallback: (bounds) => LinearGradient(
+                colors: context.palette.titleGradient,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ).createShader(bounds),
@@ -85,7 +86,7 @@ class HomeScreen extends ConsumerWidget {
                 Text(
                   AppStrings.appTagline,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondaryDark,
+                    color: context.palette.textSecondary,
                   ),
                 ),
                 const Spacer(),
@@ -178,25 +179,25 @@ class _StreakBadge extends StatelessWidget {
           vertical: AppSizes.xs,
         ),
         decoration: BoxDecoration(
-          color: AppColors.streakGold.withValues(alpha: 0.12),
+          color: context.palette.gold.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(AppSizes.radiusXl),
           border: Border.all(
-            color: AppColors.streakGold.withValues(alpha: 0.4),
+            color: context.palette.gold.withValues(alpha: 0.4),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.local_fire_department_rounded,
               size: 16,
-              color: AppColors.streakGold,
+              color: context.palette.gold,
             ),
             const SizedBox(width: 4),
             Text(
               '$streak',
-              style: const TextStyle(
-                color: AppColors.streakGold,
+              style: TextStyle(
+                color: context.palette.gold,
                 fontWeight: FontWeight.w800,
                 fontSize: 14,
               ),
@@ -235,143 +236,137 @@ class _PuzzleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final solved = result != null;
 
-    // The card surface is always dark, so pin its text to the dark text theme
-    // regardless of the ambient (possibly light) theme.
-    return Theme(
-      data: Theme.of(context).copyWith(textTheme: AppTheme.darkTheme.textTheme),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AppSizes.contentMaxWidth),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.cardSurface,
-                  AppColors.elevatedSurface.withValues(alpha: 0.7),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-              border: Border.all(
-                color: solved
-                    ? AppColors.success.withValues(alpha: 0.5)
-                    : AppColors.cellBorder.withValues(alpha: 0.4),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.purpleGlow.withValues(alpha: 0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AppSizes.contentMaxWidth),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                context.palette.card,
+                context.palette.elevated.withValues(alpha: 0.7),
               ],
             ),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.all(AppSizes.lg + 4),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Grid icon with glow
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        colors: solved
-                            ? const [AppColors.success, AppColors.successDim]
-                            : const [
-                                AppColors.pathAmber,
-                                AppColors.pathOrangeDeep,
-                              ],
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: solved
-                              ? AppColors.success.withValues(alpha: 0.4)
-                              : AppColors.pathGlowOrange,
-                          blurRadius: 20,
-                          spreadRadius: 2,
-                        ),
-                      ],
+            borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+            border: Border.all(
+              color: solved
+                  ? context.palette.success.withValues(alpha: 0.5)
+                  : context.palette.border.withValues(alpha: 0.4),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.purpleGlow.withValues(alpha: 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(AppSizes.lg + 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Grid icon with glow
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: solved
+                          ? [context.palette.success, AppColors.successDim]
+                          : const [
+                              AppColors.pathAmber,
+                              AppColors.pathOrangeDeep,
+                            ],
                     ),
-                    child: Icon(
-                      solved ? Icons.check_rounded : Icons.grid_4x4_rounded,
-                      size: 40,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: AppSizes.md + 4),
-
-                  Text(
-                    AppStrings.puzzleTitle,
-                    // Card surface is always dark; use the dark text style.
-                    style: AppTheme.darkTheme.textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: AppSizes.sm),
-
-                  // Stats row
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: AppSizes.sm,
-                    runSpacing: AppSizes.sm,
-                    children: [
-                      _InfoTag(
-                        icon: Icons.grid_view_rounded,
-                        label: '${gridSize}x$gridSize',
-                      ),
-                      _InfoTag(
-                        icon: Icons.speed_rounded,
-                        label:
-                            difficulty[0].toUpperCase() +
-                            difficulty.substring(1),
-                      ),
-                      _InfoTag(
-                        icon: Icons.timer_outlined,
-                        label: AppDateUtils.formatTimeHuman(parTime),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: solved
+                            ? context.palette.success.withValues(alpha: 0.4)
+                            : AppColors.pathGlowOrange,
+                        blurRadius: 20,
+                        spreadRadius: 2,
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSizes.lg + 4),
+                  child: Icon(
+                    solved ? Icons.check_rounded : Icons.grid_4x4_rounded,
+                    size: 40,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: AppSizes.md + 4),
 
-                  if (solved)
-                    _SolvedSummary(result: result!)
-                  else if (resultLoading)
-                    const _PuzzleActionSkeleton(),
+                Text(
+                  AppStrings.puzzleTitle,
+                  style: AppTheme.textThemeOf(context).headlineMedium,
+                ),
+                const SizedBox(height: AppSizes.sm),
 
-                  if (solved) ...[
-                    const SizedBox(height: AppSizes.md),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _OutlinedAction(
-                            key: const Key('home-view'),
-                            label: 'View',
-                            icon: Icons.visibility_rounded,
-                            onPressed: onView,
-                          ),
-                        ),
-                        const SizedBox(width: AppSizes.sm),
-                        Expanded(
-                          child: _GradientAction(
-                            key: const Key('home-share'),
-                            label: 'Share',
-                            icon: Icons.share_rounded,
-                            onPressed: onShare ?? () {},
-                          ),
-                        ),
-                      ],
+                // Stats row
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: AppSizes.sm,
+                  runSpacing: AppSizes.sm,
+                  children: [
+                    _InfoTag(
+                      icon: Icons.grid_view_rounded,
+                      label: '${gridSize}x$gridSize',
                     ),
-                  ] else if (!resultLoading)
-                    _GradientAction(
-                      key: const Key('home-play'),
-                      label: 'Play',
-                      onPressed: onPlay,
-                      height: 56,
-                      fontSize: 18,
+                    _InfoTag(
+                      icon: Icons.speed_rounded,
+                      label:
+                          difficulty[0].toUpperCase() +
+                          difficulty.substring(1),
                     ),
-                ],
-              ),
+                    _InfoTag(
+                      icon: Icons.timer_outlined,
+                      label: AppDateUtils.formatTimeHuman(parTime),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSizes.lg + 4),
+
+                if (solved)
+                  _SolvedSummary(result: result!)
+                else if (resultLoading)
+                  const _PuzzleActionSkeleton(),
+
+                if (solved) ...[
+                  const SizedBox(height: AppSizes.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _OutlinedAction(
+                          key: const Key('home-view'),
+                          label: 'View',
+                          icon: Icons.visibility_rounded,
+                          onPressed: onView,
+                        ),
+                      ),
+                      const SizedBox(width: AppSizes.sm),
+                      Expanded(
+                        child: _GradientAction(
+                          key: const Key('home-share'),
+                          label: 'Share',
+                          icon: Icons.share_rounded,
+                          onPressed: onShare ?? () {},
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else if (!resultLoading)
+                  _GradientAction(
+                    key: const Key('home-play'),
+                    label: 'Play',
+                    onPressed: onPlay,
+                    height: 56,
+                    fontSize: 18,
+                  ),
+              ],
             ),
           ),
         ),
@@ -406,8 +401,8 @@ class _SolvedSummary extends StatelessWidget {
           parts.join(' · '),
           key: const Key('home-solved-summary'),
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: AppColors.success,
+          style: TextStyle(
+            color: context.palette.success,
             fontSize: 15,
             fontWeight: FontWeight.w700,
           ),
@@ -419,8 +414,8 @@ class _SolvedSummary extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: result.isRejected
-                  ? AppColors.warning
-                  : AppColors.textSecondaryDark,
+                  ? context.palette.warning
+                  : context.palette.textSecondary,
               fontSize: 12,
             ),
           ),
@@ -508,19 +503,19 @@ class _OutlinedAction extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(26),
           border: Border.all(
-            color: AppColors.textSecondaryDark.withValues(alpha: 0.4),
+            color: context.palette.textSecondary.withValues(alpha: 0.4),
             width: 1.5,
           ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: AppColors.textPrimaryDark, size: 20),
+            Icon(icon, color: context.palette.textPrimary, size: 20),
             const SizedBox(width: AppSizes.sm),
             Text(
               label,
-              style: const TextStyle(
-                color: AppColors.textPrimaryDark,
+              style: TextStyle(
+                color: context.palette.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
@@ -625,13 +620,12 @@ class _EntryCard extends StatelessWidget {
   });
 
   static const double iconSize = 26;
+  // Colours are applied per theme in build; these are also used to measure.
   static const titleStyle = TextStyle(
-    color: AppColors.textPrimaryDark,
     fontWeight: FontWeight.w700,
     fontSize: 15,
   );
   static const subtitleStyle = TextStyle(
-    color: AppColors.textSecondaryDark,
     fontSize: 12,
   );
 
@@ -650,22 +644,32 @@ class _EntryCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsetsDirectional.all(AppSizes.md),
           decoration: BoxDecoration(
-            color: AppColors.cardSurface,
+            color: context.palette.card,
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
             border: Border.all(
-              color: AppColors.cellBorder.withValues(alpha: 0.4),
+              color: context.palette.border.withValues(alpha: 0.4),
             ),
           ),
           child: Row(
             children: [
-              Icon(icon, color: AppColors.purpleLight, size: iconSize),
+              Icon(icon, color: context.palette.accent, size: iconSize),
               const SizedBox(width: AppSizes.sm + 4),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: titleStyle),
-                    Text(subtitle, style: subtitleStyle),
+                    Text(
+                      title,
+                      style: titleStyle.copyWith(
+                        color: context.palette.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: subtitleStyle.copyWith(
+                        color: context.palette.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -691,19 +695,19 @@ class _InfoTag extends StatelessWidget {
         vertical: AppSizes.xs + 2,
       ),
       decoration: BoxDecoration(
-        color: AppColors.elevatedSurface,
+        color: context.palette.elevated,
         borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.3)),
+        border: Border.all(color: context.palette.border.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: AppColors.textSecondaryDark),
+          Icon(icon, size: 14, color: context.palette.textSecondary),
           const SizedBox(width: AppSizes.xs),
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.textPrimaryDark,
+            style: TextStyle(
+              color: context.palette.textPrimary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -723,7 +727,7 @@ class _PuzzleActionSkeleton extends StatelessWidget {
       width: double.infinity,
       height: 56,
       decoration: BoxDecoration(
-        color: AppColors.cellBackground,
+        color: context.palette.inset,
         borderRadius: BorderRadius.circular(28),
       ),
     );
@@ -740,10 +744,10 @@ class _PuzzleCardSkeleton extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: AppSizes.contentMaxWidth),
         child: Container(
           decoration: BoxDecoration(
-            color: AppColors.cardSurface,
+            color: context.palette.card,
             borderRadius: BorderRadius.circular(AppSizes.radiusLg),
             border: Border.all(
-              color: AppColors.cellBorder.withValues(alpha: 0.3),
+              color: context.palette.border.withValues(alpha: 0.3),
             ),
           ),
           child: Padding(
@@ -754,8 +758,8 @@ class _PuzzleCardSkeleton extends StatelessWidget {
                 Container(
                   width: 80,
                   height: 80,
-                  decoration: const BoxDecoration(
-                    color: AppColors.cellBackground,
+                  decoration: BoxDecoration(
+                    color: context.palette.inset,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -764,7 +768,7 @@ class _PuzzleCardSkeleton extends StatelessWidget {
                   width: 160,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: AppColors.cellBackground,
+                    color: context.palette.inset,
                     borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                   ),
                 ),

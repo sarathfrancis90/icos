@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../../../shared/widgets/content_width.dart';
@@ -109,10 +109,10 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
                   )
                 : switch (_phase) {
                     _JoinPhase.confirm => _Status(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.group_add_rounded,
                           size: 64,
-                          color: AppColors.purpleLight,
+                          color: context.palette.accent,
                         ),
                         title: AppStrings.joinGroupConfirmTitle,
                         subtitle: AppStrings.inviteCodeLine(_code),
@@ -142,11 +142,11 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
                         title: 'Joining group…',
                         subtitle: AppStrings.inviteCodeLine(_code),
                       ),
-                    _JoinPhase.joined => const _Status(
+                    _JoinPhase.joined => _Status(
                         icon: Icon(
                           Icons.check_circle_rounded,
                           size: 64,
-                          color: AppColors.success,
+                          color: context.palette.success,
                         ),
                         title: 'You\'re in!',
                         subtitle: 'Taking you to the group…',

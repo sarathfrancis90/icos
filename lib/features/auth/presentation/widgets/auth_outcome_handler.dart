@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/deep_link.dart';
 import '../../../../core/router/invite_continuation.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../../groups/domain/pending_invite.dart';
 import '../../../profile/presentation/widgets/choose_display_name_sheet.dart';
 import '../../providers/auth_provider.dart';
@@ -133,7 +133,7 @@ Future<bool> handleAuthOutcome(
       messenger.showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: AppColors.error,
+          backgroundColor: context.palette.error,
         ),
       );
       return false;
@@ -169,7 +169,7 @@ Future<bool> _offerExistingAccount(
           child: const Text('Cancel'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+          style: FilledButton.styleFrom(backgroundColor: context.palette.error),
           onPressed: () => Navigator.of(context).pop(true),
           child: const Text('Sign in anyway'),
         ),

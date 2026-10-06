@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../../../core/utils/app_error.dart';
 import '../../../../core/utils/result.dart';
 import '../../providers/auth_provider.dart';
@@ -114,7 +114,7 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
                         liveRegion: true,
                         child: Text(
                           _error!,
-                          style: const TextStyle(color: AppColors.error),
+                          style: TextStyle(color: context.palette.error),
                         ),
                       ),
                     ],

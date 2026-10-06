@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../domain/models/group.dart';
 import 'group_ui.dart';
 
@@ -137,7 +137,7 @@ class MemberTile extends StatelessWidget {
               GroupChip(
                 label: roleLabel,
                 color: member.isAdmin
-                    ? AppColors.coralOrange
+                    ? context.palette.coral
                     : secondaryTextColor(context),
               ),
               if (isCurrentUser) ...[
