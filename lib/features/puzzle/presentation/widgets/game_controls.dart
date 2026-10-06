@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../../../shared/widgets/spring_button.dart';
 import '../../domain/models/game_state.dart';
 
@@ -110,7 +111,7 @@ class _GradientPillButton extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               gradient: isEnabled ? gradient : null,
-              color: isEnabled ? null : AppColors.cellBackground,
+              color: isEnabled ? null : context.palette.inset,
               borderRadius: BorderRadius.circular(26),
               boxShadow: isEnabled
                   ? const [
@@ -133,7 +134,7 @@ class _GradientPillButton extends StatelessWidget {
                     Text(
                       label,
                       style: TextStyle(
-                        color: isEnabled ? Colors.white : AppColors.textDisabledOnElevated,
+                        color: isEnabled ? Colors.white : context.palette.textDisabled,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
@@ -141,7 +142,7 @@ class _GradientPillButton extends StatelessWidget {
                     const SizedBox(width: 8),
                     Icon(
                       icon,
-                      color: isEnabled ? Colors.white.withValues(alpha: 0.8) : AppColors.textDisabledOnElevated,
+                      color: isEnabled ? Colors.white.withValues(alpha: 0.8) : context.palette.textDisabled,
                       size: 20,
                     ),
                   ],
@@ -186,11 +187,13 @@ class _OutlinedPillButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(26),
               border: Border.all(
                 color: isEnabled
-                    ? AppColors.textSecondaryDark.withValues(alpha: 0.4)
-                    : AppColors.cellBorder,
+                    ? context.palette.textSecondary.withValues(
+                        alpha: context.palette.isDark ? 0.4 : 0.6,
+                      )
+                    : context.palette.border,
                 width: 1.5,
               ),
-              color: AppColors.deepBlack.withValues(alpha: 0.5),
+              color: context.palette.background.withValues(alpha: 0.5),
             ),
             // Shrinks to fit at large text sizes (the pill height is fixed).
             child: FittedBox(
@@ -203,7 +206,7 @@ class _OutlinedPillButton extends StatelessWidget {
                     Text(
                       label,
                       style: TextStyle(
-                        color: isEnabled ? AppColors.textPrimaryDark : AppColors.textDisabledOnElevated,
+                        color: isEnabled ? context.palette.textPrimary : context.palette.textDisabled,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -213,8 +216,8 @@ class _OutlinedPillButton extends StatelessWidget {
                       Container(
                         width: 22,
                         height: 22,
-                        decoration: const BoxDecoration(
-                          color: AppColors.hintPurple,
+                        decoration: BoxDecoration(
+                          color: context.palette.hint,
                           shape: BoxShape.circle,
                         ),
                         child: Center(
@@ -268,15 +271,15 @@ class _CircleIconButton extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.elevatedSurface,
+              color: context.palette.elevated,
               border: Border.all(
-                color: AppColors.cellBorder,
+                color: context.palette.border,
                 width: 1,
               ),
             ),
             child: Icon(
               icon,
-              color: isEnabled ? AppColors.textPrimaryDark : AppColors.textDisabledOnElevated,
+              color: isEnabled ? context.palette.textPrimary : context.palette.textDisabled,
               size: 24,
             ),
           ),

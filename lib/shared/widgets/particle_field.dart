@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_palette.dart';
 import '../../core/utils/motion.dart';
 
 /// Ambient floating particle system for atmospheric depth.
@@ -79,7 +80,7 @@ class _ParticleFieldState extends State<ParticleField>
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) => CustomPaint(
-          painter: _ParticlePainter(_particles),
+          painter: _ParticlePainter(_particles, context.palette.particle),
           size: Size.infinite,
         ),
       ),
@@ -108,15 +109,18 @@ class _Particle {
 }
 
 class _ParticlePainter extends CustomPainter {
-  _ParticlePainter(this.particles);
+  _ParticlePainter(this.particles, this.color);
 
   final List<_Particle> particles;
+
+  /// White specks on the dark theme, slate on the light one.
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
     for (final p in particles) {
       final paint = Paint()
-        ..color = Colors.white.withValues(alpha: p.alpha)
+        ..color = color.withValues(alpha: p.alpha)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(
         Offset(p.x * size.width, p.y * size.height),

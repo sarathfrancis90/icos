@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/date_utils.dart';
 
 /// Spoiler-free result card rendered through a [RepaintBoundary] so it can
@@ -45,7 +46,7 @@ class ShareCardWidget extends StatelessWidget {
         width: 360,
         padding: const EdgeInsetsDirectional.all(AppSizes.lg),
         decoration: BoxDecoration(
-          color: AppColors.deepNavy,
+          color: context.palette.background,
           borderRadius: BorderRadius.circular(AppSizes.radiusLg),
         ),
         child: Column(
@@ -55,18 +56,18 @@ class ShareCardWidget extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Icos',
                   style: TextStyle(
-                    color: AppColors.textPrimaryDark,
+                    color: context.palette.textPrimary,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: AppColors.textSecondaryDark,
+                  style: TextStyle(
+                    color: context.palette.textSecondary,
                     fontSize: 14,
                   ),
                 ),
@@ -85,8 +86,8 @@ class ShareCardWidget extends StatelessWidget {
             // Difficulty & grid info
             Text(
               '${gridSize}x$gridSize · ${difficulty[0].toUpperCase()}${difficulty.substring(1)}',
-              style: const TextStyle(
-                color: AppColors.textSecondaryDark,
+              style: TextStyle(
+                color: context.palette.textSecondary,
                 fontSize: 14,
               ),
             ),
@@ -120,10 +121,10 @@ class ShareCardWidget extends StatelessWidget {
             const SizedBox(height: AppSizes.sm),
 
             if (underPar)
-              const Text(
+              Text(
                 '⭐ Under Par!',
                 style: TextStyle(
-                  color: AppColors.streakGold,
+                  color: context.palette.gold,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -157,7 +158,12 @@ class PathBlocksVisualization extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _PathBlocksPainter(gridSize: gridSize, path: path, walls: walls),
+      painter: _PathBlocksPainter(
+        gridSize: gridSize,
+        path: path,
+        walls: walls,
+        palette: context.palette,
+      ),
     );
   }
 }
@@ -167,18 +173,30 @@ class _PathBlocksPainter extends CustomPainter {
     required this.gridSize,
     required this.path,
     required this.walls,
+    required this.palette,
   });
 
   final int gridSize;
   final List<List<int>> path;
   final List<List<int>> walls;
+  final AppPalette palette;
 
-  static const _bands = [
+  static const _darkBands = [
     AppColors.pathOrangeDeep,
     AppColors.pathOrange,
     AppColors.pathAmber,
     AppColors.pathYellow,
   ];
+
+  /// The same amber ramp, deep enough to stand out on the light card.
+  static const _lightBands = [
+    Color(0xFF9A3412),
+    Color(0xFFC2410C),
+    Color(0xFFD97706),
+    Color(0xFFCA8A04),
+  ];
+
+  List<Color> get _bands => palette.isDark ? _darkBands : _lightBands;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -200,11 +218,11 @@ class _PathBlocksPainter extends CustomPainter {
         final rrect = RRect.fromRectAndRadius(rect, Radius.circular(cell * 0.18));
         final Color color;
         if (wallSet.contains(idx)) {
-          color = AppColors.wallFill;
+          color = palette.isDark ? AppColors.wallFill : AppColors.lightWallFill;
         } else if (band.containsKey(idx)) {
           color = _bands[band[idx]!];
         } else {
-          color = AppColors.cellBackground;
+          color = palette.inset;
         }
         canvas.drawRRect(rrect, Paint()..color = color);
       }
@@ -215,7 +233,8 @@ class _PathBlocksPainter extends CustomPainter {
   bool shouldRepaint(covariant _PathBlocksPainter oldDelegate) =>
       oldDelegate.gridSize != gridSize ||
       oldDelegate.path != path ||
-      oldDelegate.walls != walls;
+      oldDelegate.walls != walls ||
+      oldDelegate.palette != palette;
 }
 
 class _ResultPill extends StatelessWidget {
@@ -239,7 +258,7 @@ class _ResultPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: highlight
             ? AppColors.electricBlue.withValues(alpha: 0.2)
-            : AppColors.mediumNavy,
+            : context.palette.card,
         borderRadius: BorderRadius.circular(AppSizes.radiusSm),
         border: highlight
             ? Border.all(color: AppColors.electricBlue.withValues(alpha: 0.4))
@@ -253,15 +272,15 @@ class _ResultPill extends StatelessWidget {
             size: 16,
             color: highlight
                 ? AppColors.electricBlue
-                : AppColors.textSecondaryDark,
+                : context.palette.textSecondary,
           ),
           const SizedBox(width: AppSizes.xs),
           Text(
             value,
             style: TextStyle(
               color: highlight
-                  ? AppColors.electricBlueLight
-                  : AppColors.textSecondaryDark,
+                  ? context.palette.info
+                  : context.palette.textSecondary,
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),

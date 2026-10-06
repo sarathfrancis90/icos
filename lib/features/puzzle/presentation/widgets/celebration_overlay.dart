@@ -8,6 +8,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/services/analytics_service.dart';
 import '../../../../core/services/app_logger.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/utils/motion.dart';
 import '../../../../core/utils/share_utils.dart';
@@ -15,6 +16,7 @@ import '../../../../shared/widgets/spring_button.dart';
 import '../../../sharing/domain/share_card_generator.dart';
 import '../../../sharing/presentation/share_card_widget.dart';
 import '../../data/submission_result.dart';
+import 'puzzle_palette.dart';
 
 class CelebrationOverlay extends StatefulWidget {
   const CelebrationOverlay({
@@ -253,7 +255,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
           ),
         ),
 
-        // Dark overlay with radial burst
+        // Scrim with radial burst (dark, or pale on the light theme)
         AnimatedBuilder(
           animation: _fadeController,
           builder: (context, child) => Opacity(
@@ -266,8 +268,8 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                 center: Alignment.topCenter,
                 radius: 1.5,
                 colors: [
-                  AppColors.pathOrange.withValues(alpha: 0.15),
-                  Colors.black.withValues(alpha: 0.85),
+                  context.puzzlePalette.scrimTop,
+                  context.puzzlePalette.scrimBottom,
                 ],
               ),
             ),
@@ -286,15 +288,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
             minBlastForce: 10,
             emissionFrequency: 0.06,
             gravity: 0.2,
-            colors: const [
-              AppColors.pathYellowBright,
-              AppColors.pathOrange,
-              AppColors.purpleLight,
-              AppColors.success,
-              AppColors.streakGold,
-              Colors.white,
-              AppColors.pathAmber,
-            ],
+            colors: context.puzzlePalette.confetti,
           ),
         ),
 
@@ -310,13 +304,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
             minBlastForce: 8,
             emissionFrequency: 0.05,
             gravity: 0.3,
-            colors: const [
-              AppColors.pathYellowBright,
-              AppColors.pathOrange,
-              AppColors.purpleLight,
-              AppColors.streakGold,
-              AppColors.pathAmber,
-            ],
+            colors: context.puzzlePalette.sparks,
           ),
         ),
 
@@ -354,7 +342,9 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                   onShare: _sharing ? null : _share,
                   onDone: widget.onDone ?? () => Navigator.of(context).pop(),
                   onNewPuzzle: widget.onNewPuzzle,
-                  trophyScale: reduceMotion ? 1.0 : _trophyScale.value,
+                  trophyScale: reduceMotion
+                      ? const AlwaysStoppedAnimation(1.0)
+                      : _trophyScale,
                   staggeredValue: reduceMotion ? (_) => 1.0 : _staggeredValue,
                   statsAnimation: _statsController,
                 ),
@@ -400,7 +390,10 @@ class _CelebrationCard extends StatelessWidget {
   final SubmissionStatus? status;
   final bool isArchive;
   final bool isPractice;
-  final double trophyScale;
+  /// Read on every stats tick (the stats stagger outlasts the bounce), so
+  /// the trophy is drawn at its current scale rather than the scale it had
+  /// when the overlay last rebuilt.
+  final Animation<double> trophyScale;
   final double Function(int delayMs) staggeredValue;
   final Animation<double> statsAnimation;
 
@@ -425,14 +418,14 @@ class _CelebrationCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
+        color: context.palette.card,
         borderRadius: BorderRadius.circular(AppSizes.radiusLg),
         border: Border.all(
-          color: AppColors.cellBorder.withValues(alpha: 0.5),
+          color: context.palette.border.withValues(alpha: 0.5),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
+            color: context.palette.shadow.withValues(alpha: 0.4),
             blurRadius: 30,
             offset: const Offset(0, 10),
           ),
@@ -450,7 +443,7 @@ class _CelebrationCard extends StatelessWidget {
                 underPar ? 'Crushed It!' : 'Puzzle Complete!',
                 style: TextStyle(
                   color:
-                      underPar ? AppColors.streakGold : AppColors.textPrimaryDark,
+                      underPar ? context.palette.gold : context.palette.textPrimary,
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
@@ -460,13 +453,13 @@ class _CelebrationCard extends StatelessWidget {
 
               // Phase 8: Trophy icon with bounce-in
               Transform.scale(
-                scale: trophyScale,
+                scale: trophyScale.value,
                 child: Icon(
                   underPar
                       ? Icons.emoji_events_rounded
                       : Icons.check_circle_rounded,
                   size: 40,
-                  color: underPar ? AppColors.streakGold : AppColors.success,
+                  color: underPar ? context.palette.gold : context.palette.success,
                 ),
               ),
               const SizedBox(height: AppSizes.md),
@@ -511,14 +504,14 @@ class _CelebrationCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(AppSizes.radiusMd),
                       border: Border.all(
-                        color: AppColors.purpleLight.withValues(alpha: 0.4),
+                        color: context.palette.accent.withValues(alpha: 0.4),
                       ),
                     ),
                     child: Text(
                       'Under par by ${AppDateUtils.formatTime(parTimeSeconds - timeSeconds)}!',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppColors.purpleLight,
+                      style: TextStyle(
+                        color: context.palette.accent,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -532,8 +525,8 @@ class _CelebrationCard extends StatelessWidget {
                   progress: staggeredValue(600),
                   child: Text(
                     '$hintsUsed hint${hintsUsed == 1 ? '' : 's'} used',
-                    style: const TextStyle(
-                      color: AppColors.textSecondaryDark,
+                    style: TextStyle(
+                      color: context.palette.textSecondary,
                       fontSize: 13,
                     ),
                   ),
@@ -547,16 +540,16 @@ class _CelebrationCard extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.local_fire_department_rounded,
-                        color: AppColors.streakGold,
+                        color: context.palette.gold,
                         size: 18,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '$streak day streak',
-                        style: const TextStyle(
-                          color: AppColors.streakGold,
+                        style: TextStyle(
+                          color: context.palette.gold,
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
@@ -575,8 +568,8 @@ class _CelebrationCard extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: status == SubmissionStatus.rejected
-                          ? AppColors.warning
-                          : AppColors.textSecondaryDark,
+                          ? context.palette.warning
+                          : context.palette.textSecondary,
                       fontSize: 12,
                     ),
                   ),
@@ -618,15 +611,15 @@ class _CelebrationCard extends StatelessWidget {
                             borderRadius:
                                 BorderRadius.circular(AppSizes.radiusXl),
                             border: Border.all(
-                              color: AppColors.textSecondaryDark
+                              color: context.palette.textSecondary
                                   .withValues(alpha: 0.4),
                             ),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
                               'Done',
                               style: TextStyle(
-                                color: AppColors.textPrimaryDark,
+                                color: context.palette.textPrimary,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -682,7 +675,7 @@ class _StatPill extends StatelessWidget {
         horizontal: AppSizes.md,
       ),
       decoration: BoxDecoration(
-        color: AppColors.elevatedSurface,
+        color: context.palette.elevated,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
       ),
       child: Row(
@@ -690,14 +683,14 @@ class _StatPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 16, color: AppColors.textSecondaryDark),
+            Icon(icon, size: 16, color: context.palette.textSecondary),
             const SizedBox(width: 6),
           ],
           Flexible(
             child: Text(
               label,
-              style: const TextStyle(
-                color: AppColors.textPrimaryDark,
+              style: TextStyle(
+                color: context.palette.textPrimary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),

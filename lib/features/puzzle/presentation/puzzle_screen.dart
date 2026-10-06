@@ -6,13 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:in_app_review/in_app_review.dart';
 
-import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/app_logger.dart';
 import '../../../core/services/audio_service.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../shared/widgets/animated_background.dart';
@@ -31,10 +31,10 @@ import '../providers/puzzle_result_provider.dart';
 import '../providers/score_submission_provider.dart';
 import 'widgets/celebration_overlay.dart';
 import 'widgets/game_controls.dart';
-import 'widgets/grid_palette.dart';
 import 'widgets/notification_prompt.dart';
 import 'widgets/offline_puzzle_notice.dart';
 import 'widgets/puzzle_grid.dart';
+import 'widgets/puzzle_palette.dart';
 
 /// Solve count at which the store rating prompt is requested (once).
 const int reviewPromptSolveCount = 5;
@@ -282,7 +282,9 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
     final puzzleAsync = ref.watch(_puzzleProvider);
     final gameState = ref.watch(gameNotifierProvider(source));
     final hintUi = ref.watch(hintUiProvider(source));
-    final palette = GridPalette.forMode(
+    // Board colours follow the app theme (a theme switch re-themes the grid
+    // live) and the colorblind mode.
+    final palette = context.puzzlePalette.grid(
       ref.watch(colorblindModeNotifierProvider),
     );
     final date = source.date;
@@ -342,7 +344,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
     }
 
     return Scaffold(
-      backgroundColor: AppColors.deepBlack,
+      backgroundColor: context.palette.background,
       body: puzzleAsync.when(
         data: (loaded) {
           final puzzle = _pinnedPuzzle ??= loaded;
@@ -429,8 +431,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
                           result?.isRejected ?? false
                               ? 'Solved — not counted'
                               : 'Solved in ${AppDateUtils.formatTime(gameState.elapsedSeconds)}',
-                          style: const TextStyle(
-                            color: AppColors.success,
+                          style: TextStyle(
+                            color: context.palette.success,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -516,15 +518,13 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
               Icon(
                 Icons.error_outline,
                 size: 48,
-                color: AppColors.error.withValues(alpha: 0.7),
+                color: context.palette.error.withValues(alpha: 0.7),
               ),
               const SizedBox(height: AppSizes.md),
               Text(
                 'Could not load puzzle',
-                // The puzzle screen is always dark: use its own on-dark
-                // colour, not the ambient (possibly light) theme's.
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.textPrimaryDark,
+                  color: context.palette.textPrimary,
                 ),
               ),
               const SizedBox(height: AppSizes.md),
@@ -538,7 +538,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
               const SizedBox(height: AppSizes.sm),
               TextButton(
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.purpleLight,
+                  foregroundColor: context.palette.accent,
                 ),
                 onPressed: () => leaveScreen(context, '/'),
                 child: const Text('Back'),
@@ -559,8 +559,8 @@ class _LoadingWithExit extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        const Center(
-          child: CircularProgressIndicator(color: AppColors.purpleLight),
+        Center(
+          child: CircularProgressIndicator(color: context.palette.accent),
         ),
         SafeArea(
           child: Padding(
@@ -589,7 +589,7 @@ class _NotYetAvailable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.deepBlack,
+      backgroundColor: context.palette.background,
       body: Stack(
         children: [
           Center(
@@ -598,25 +598,24 @@ class _NotYetAvailable extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.lock_clock_rounded,
                     size: 48,
-                    color: AppColors.textSecondaryDark,
+                    color: context.palette.textSecondary,
                   ),
                   const SizedBox(height: AppSizes.md),
                   Text(
                     'This puzzle is not available yet',
                     textAlign: TextAlign.center,
-                    // Always-dark screen: on-dark text whatever the app theme.
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppColors.textPrimaryDark,
+                      color: context.palette.textPrimary,
                     ),
                   ),
                   const SizedBox(height: AppSizes.sm),
-                  const Text(
+                  Text(
                     'Each day\'s puzzle unlocks at midnight UTC.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.textSecondaryDark),
+                    style: TextStyle(color: context.palette.textSecondary),
                   ),
                 ],
               ),
@@ -657,14 +656,14 @@ class _ModeTag extends StatelessWidget {
         vertical: AppSizes.xs + 2,
       ),
       decoration: BoxDecoration(
-        color: AppColors.elevatedSurface.withValues(alpha: 0.7),
+        color: context.palette.elevated.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(AppSizes.radiusXl),
-        border: Border.all(color: AppColors.cellBorder.withValues(alpha: 0.5)),
+        border: Border.all(color: context.palette.border.withValues(alpha: 0.5)),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: AppColors.textSecondaryDark,
+        style: TextStyle(
+          color: context.palette.textSecondary,
           fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
@@ -702,9 +701,9 @@ class _GlassInfoBar extends StatelessWidget {
             vertical: AppSizes.sm + 4,
           ),
           decoration: BoxDecoration(
-            color: AppColors.glassFill,
+            color: context.palette.glassFill,
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            border: Border.all(color: AppColors.glassBorder, width: 0.5),
+            border: Border.all(color: context.palette.glassBorder, width: 0.5),
           ),
           // A Wrap, not a Row: at large text sizes the three readings drop
           // onto further lines instead of overflowing.
@@ -716,17 +715,17 @@ class _GlassInfoBar extends StatelessWidget {
             children: [
               Text(
                 timer,
-                style: const TextStyle(
-                  color: AppColors.textPrimaryDark,
+                style: TextStyle(
+                  color: context.palette.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  fontFeatures: [FontFeature.tabularFigures()],
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               Text(
                 '${gridSize}x$gridSize · ${difficulty[0].toUpperCase()}${difficulty.substring(1)}',
-                style: const TextStyle(
-                  color: AppColors.glassText,
+                style: TextStyle(
+                  color: context.palette.glassText,
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                 ),
@@ -734,7 +733,11 @@ class _GlassInfoBar extends StatelessWidget {
               Text(
                 'Par ${AppDateUtils.formatTimeHuman(parTimeSeconds)}',
                 style: TextStyle(
-                  color: AppColors.glassText.withValues(alpha: 0.7),
+                  // Muted on the dark glass; the light glass needs the full
+                  // secondary tone for 4.5:1.
+                  color: context.palette.isDark
+                      ? context.palette.glassText.withValues(alpha: 0.7)
+                      : context.palette.textSecondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -766,12 +769,12 @@ class _GlassCircleButton extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppColors.elevatedSurface.withValues(alpha: 0.7),
+            color: context.palette.elevated.withValues(alpha: 0.7),
             border: Border.all(
-              color: AppColors.cellBorder.withValues(alpha: 0.5),
+              color: context.palette.border.withValues(alpha: 0.5),
             ),
           ),
-          child: Icon(icon, color: AppColors.textSecondaryDark, size: 22),
+          child: Icon(icon, color: context.palette.textSecondary, size: 22),
         ),
       ),
     );

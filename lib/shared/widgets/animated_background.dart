@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_colors.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/utils/motion.dart';
 
 /// Animated mesh-like gradient background with slowly drifting color points.
@@ -41,17 +41,18 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MotionUtils.shouldReduceMotion(context);
+    final palette = context.palette;
 
     if (reduceMotion) {
       return Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.deepBlack,
-              Color(0xFF0D1420),
-              AppColors.deepBlack,
+              palette.meshBase,
+              palette.isDark ? const Color(0xFF0D1420) : palette.meshColors[2],
+              palette.meshBase,
             ],
           ),
         ),
@@ -62,7 +63,11 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) => CustomPaint(
-        painter: _MeshGradientPainter(progress: _controller.value),
+        painter: _MeshGradientPainter(
+          progress: _controller.value,
+          base: palette.meshBase,
+          colors: palette.meshColors,
+        ),
         child: child,
       ),
       child: widget.child,
@@ -71,24 +76,25 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
 }
 
 class _MeshGradientPainter extends CustomPainter {
-  _MeshGradientPainter({required this.progress});
+  _MeshGradientPainter({
+    required this.progress,
+    required this.base,
+    required this.colors,
+  });
 
   final double progress;
 
-  // 4 mesh control points with deep navy/purple hues
-  static const _colors = [
-    Color(0xFF0F1A2E), // deep navy
-    Color(0xFF141028), // purple-navy
-    Color(0xFF0A1628), // deep blue-navy
-    Color(0xFF1A0E28), // subtle purple
-  ];
+  /// Base fill and the 4 mesh control-point hues (deep navy/purple in the
+  /// dark theme, pale tints in the light one).
+  final Color base;
+  final List<Color> colors;
 
   @override
   void paint(Canvas canvas, Size size) {
     // Fill with base color
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = AppColors.deepBlack,
+      Paint()..color = base,
     );
 
     final t = progress * 2 * math.pi;
@@ -119,8 +125,8 @@ class _MeshGradientPainter extends CustomPainter {
       final paint = Paint()
         ..shader = RadialGradient(
           colors: [
-            _colors[i].withValues(alpha: 0.6),
-            _colors[i].withValues(alpha: 0.0),
+            colors[i].withValues(alpha: 0.6),
+            colors[i].withValues(alpha: 0.0),
           ],
         ).createShader(
           Rect.fromCircle(center: points[i], radius: radius),
@@ -134,6 +140,6 @@ class _MeshGradientPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MeshGradientPainter oldDelegate) {
-    return oldDelegate.progress != progress;
+    return oldDelegate.progress != progress || oldDelegate.base != base;
   }
 }

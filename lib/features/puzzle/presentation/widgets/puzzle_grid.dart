@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/services/audio_service.dart';
 import '../../../../core/utils/haptics.dart';
@@ -784,7 +783,7 @@ class _GridPainter extends CustomPainter {
   void _drawWallCell(Canvas canvas, Rect rect, RRect rrect) {
     // Outer shadow for raised 3D look
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.5)
+      ..color = palette.wallShadow.withValues(alpha: 0.5)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
     canvas.drawRRect(
       rrect.shift(const Offset(1.5, 1.5)),
@@ -792,12 +791,12 @@ class _GridPainter extends CustomPainter {
     );
 
     // Fill — darker than empty cells for a "solid block" feel
-    final fillPaint = Paint()..color = AppColors.wallFill;
+    final fillPaint = Paint()..color = palette.wallFill;
     canvas.drawRRect(rrect, fillPaint);
 
     // Border — bright enough to see the cell outline clearly
     final borderPaint = Paint()
-      ..color = AppColors.wallBorder
+      ..color = palette.wallBorder
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     canvas.drawRRect(rrect, borderPaint);
@@ -806,7 +805,7 @@ class _GridPainter extends CustomPainter {
     canvas.save();
     canvas.clipRRect(rrect);
     final crossPaint = Paint()
-      ..color = AppColors.wallCross
+      ..color = palette.wallCross
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
@@ -827,7 +826,7 @@ class _GridPainter extends CustomPainter {
   /// Draws the 3D inset empty cell (dark sunken look).
   void _drawInsetCell(Canvas canvas, Rect rect, RRect rrect) {
     final shadowPaint = Paint()
-      ..color = AppColors.cellShadow
+      ..color = palette.cellShadow
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
     canvas.drawRRect(
       rrect.shift(const Offset(1.0, 1.0)),
@@ -835,18 +834,18 @@ class _GridPainter extends CustomPainter {
     );
 
     final highlightPaint = Paint()
-      ..color = AppColors.cellHighlight.withValues(alpha: 0.3)
+      ..color = palette.cellHighlight.withValues(alpha: 0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.5);
     canvas.drawRRect(
       rrect.shift(const Offset(-0.5, -0.5)),
       highlightPaint,
     );
 
-    final fillPaint = Paint()..color = AppColors.cellBackground;
+    final fillPaint = Paint()..color = palette.cellBackground;
     canvas.drawRRect(rrect, fillPaint);
 
     final borderPaint = Paint()
-      ..color = AppColors.cellBorder.withValues(alpha: 0.3)
+      ..color = palette.cellBorder.withValues(alpha: palette.cellBorderAlpha)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.5;
     canvas.drawRRect(rrect, borderPaint);
@@ -885,7 +884,7 @@ class _GridPainter extends CustomPainter {
     // Phase 2: White glow ring flash on entry
     if (entryGlow > 0) {
       final glowPaint = Paint()
-        ..color = Colors.white.withValues(alpha: entryGlow)
+        ..color = palette.entryGlow.withValues(alpha: entryGlow)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
@@ -984,7 +983,9 @@ class _GridPainter extends CustomPainter {
     }
 
     Color fillColor;
-    if (isStart) {
+    if (!palette.dimUnvisitedWaypoints) {
+      fillColor = isStart ? palette.waypointStartFill : palette.waypointFill;
+    } else if (isStart) {
       fillColor = isVisited
           ? palette.waypointStartFill
           : palette.waypointStartFill.withValues(alpha: 0.7);
@@ -1005,10 +1006,12 @@ class _GridPainter extends CustomPainter {
 
     final borderPaint = Paint()
       ..color = isStart
-          ? palette.waypointStartBorder.withValues(alpha: 0.5)
+          ? palette.waypointStartBorder.withValues(
+              alpha: palette.waypointStartBorderAlpha,
+            )
           : palette.waypointBorder.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
+      ..strokeWidth = isStart && palette.brightness == Brightness.light ? 2.5 : 1.5;
     canvas.drawCircle(center, radius * wpScale, borderPaint);
 
     // Colorblind pattern: inner ring so waypoints read by shape too.
@@ -1140,7 +1143,7 @@ class _GridPainter extends CustomPainter {
 
     // Expanding gold ring
     final ringPaint = Paint()
-      ..color = AppColors.streakGold.withValues(alpha: ringAlpha)
+      ..color = palette.burst.withValues(alpha: ringAlpha)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5 * (1.0 - t)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 3 * t);
@@ -1153,7 +1156,7 @@ class _GridPainter extends CustomPainter {
       final px = center.dx + math.cos(angle) * particleRadius;
       final py = center.dy + math.sin(angle) * particleRadius;
       final dotPaint = Paint()
-        ..color = AppColors.streakGold.withValues(alpha: ringAlpha * 0.8);
+        ..color = palette.burst.withValues(alpha: ringAlpha * 0.8);
       canvas.drawCircle(Offset(px, py), 2.5 * (1.0 - t), dotPaint);
     }
   }
@@ -1169,7 +1172,7 @@ class _GridPainter extends CustomPainter {
     final rippleAlpha = (1.0 - t) * 0.4;
 
     final ripplePaint = Paint()
-      ..color = Colors.white.withValues(alpha: rippleAlpha)
+      ..color = palette.ripple.withValues(alpha: rippleAlpha)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0 * (1.0 - t)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4 + 8 * t);
@@ -1177,7 +1180,7 @@ class _GridPainter extends CustomPainter {
 
     // Inner brighter ring
     final innerPaint = Paint()
-      ..color = Colors.white.withValues(alpha: rippleAlpha * 0.5)
+      ..color = palette.ripple.withValues(alpha: rippleAlpha * 0.5)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0 * (1.0 - t);
     canvas.drawCircle(center, rippleRadius * 0.95, innerPaint);
