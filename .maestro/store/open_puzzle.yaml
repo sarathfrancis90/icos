@@ -1,0 +1,13 @@
+# Fresh install -> onboarding -> home -> today's puzzle (ready to be solved).
+appId: com.icos.game
+---
+- launchApp:
+    clearState: true
+- tapOn: "Next"
+- tapOn: "Next"
+- tapOn: "Get Started"
+- extendedWaitUntil:
+    visible: "Play"
+    timeout: 20000
+- tapOn: "Play"
+- waitForAnimationToEnd

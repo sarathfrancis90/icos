@@ -1,0 +1,10 @@
+# Store screenshot: first onboarding page of the real app (fresh install state).
+# Pass -e SHOTS=<dir>; the file is <dir>/store_01_onboarding.png
+appId: com.icos.game
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd:
+    timeout: 8000
+- assertVisible: "Next"
+- takeScreenshot: ${SHOTS}/store_01_onboarding
