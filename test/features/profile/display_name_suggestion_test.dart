@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icos/features/profile/domain/display_name_suggestion.dart';
 
@@ -22,6 +23,17 @@ void main() {
       expect(tidyEmailLocalPart(''), isNull);
       expect(tidyEmailLocalPart('@example.com'), isNull);
       expect(tidyEmailLocalPart('..@example.com'), isNull);
+    });
+
+    test('cap does not split an emoji at the boundary', () {
+      final out = tidyEmailLocalPart('${'a' * 29}\u{1F600}b@example.com')!;
+      expect(out.characters.length, 30);
+      expect(out.endsWith('\u{1F600}'), isTrue);
+      final name = suggestDisplayName(
+        meta: {'full_name': '${'a' * 29}\u{1F468}\u200D\u{1F469}x'},
+        email: null,
+      );
+      expect(name.characters.length, 30);
     });
 
     test('capped at 30 characters', () {

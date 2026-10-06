@@ -1,6 +1,11 @@
+import 'package:flutter/widgets.dart' show StringCharacters;
+
 import 'display_name_placeholder.dart';
 
 const int _maxLength = 30;
+
+/// Caps at 30 characters without splitting a grapheme cluster.
+String _cap(String v) => v.characters.take(_maxLength).toString();
 
 /// Name the identity provider gave us, in the same order as
 /// `public.provider_display_name` in the database; null when there is none.
@@ -41,7 +46,7 @@ String? tidyEmailLocalPart(String? email) {
   }
   final tidy = buffer.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
   if (tidy.isEmpty) return null;
-  return tidy.length > _maxLength ? tidy.substring(0, _maxLength) : tidy;
+  return _cap(tidy);
 }
 
 /// Prefill for the "Choose your display name" sheet: the provider's name, else
@@ -51,7 +56,7 @@ String suggestDisplayName({
   required String? email,
 }) {
   final name = providerName(meta) ?? tidyEmailLocalPart(email) ?? '';
-  return name.length > _maxLength ? name.substring(0, _maxLength) : name;
+  return _cap(name);
 }
 
 /// What to prefill given the account's current name: a name the player (or a

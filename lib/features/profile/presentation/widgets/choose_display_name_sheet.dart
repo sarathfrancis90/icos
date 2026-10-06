@@ -10,6 +10,7 @@ import '../../../../core/utils/app_error.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/utils/text_sanitizer.dart';
 import '../../domain/display_name_suggestion.dart';
+import '../../domain/models/profile.dart';
 import '../../providers/profile_provider.dart';
 
 /// After the first sign-in or link completes for an account: asks the player
@@ -24,18 +25,24 @@ Future<void> maybePromptForDisplayName(
   User? user,
 ) async {
   if (user == null) return;
+  // Claimed synchronously, so overlapping invocations cannot both show.
+  if (StorageService.displayNamePromptShown(user.id) ||
+      !_promptsInProgress.add(user.id)) {
+    return;
+  }
   try {
-    if (StorageService.displayNamePromptShown(user.id)) return;
     final result = await ref
         .read(profileRepositoryProvider)
         .getProfile(user.id);
-    final currentName = switch (result) {
-      Success(data: final p) => p.displayName,
-      _ => null,
-    };
+    // Without the current name we could overwrite a name the player already
+    // chose, so skip this time and leave the flag unset for a later sign-in.
+    if (result is! Success<UserProfile, AppError>) return;
+    final currentName = result.data.displayName;
     if (!context.mounted) return;
     // Marked before showing, so a dismissal by any route never repeats it.
     await StorageService.setDisplayNamePromptShown(user.id);
+    // The persisted flag guards from here on; the sheet may stay open long.
+    _promptsInProgress.remove(user.id);
     if (!context.mounted) return;
     final initial = initialDisplayName(
       currentName: currentName,
@@ -53,8 +60,12 @@ Future<void> maybePromptForDisplayName(
     );
   } catch (e, st) {
     AppLogger.warn('Display name prompt failed', error: e, st: st);
+  } finally {
+    _promptsInProgress.remove(user.id);
   }
 }
+
+final Set<String> _promptsInProgress = {};
 
 class ChooseDisplayNameSheet extends ConsumerStatefulWidget {
   const ChooseDisplayNameSheet({super.key, this.initialName = '', this.hint});

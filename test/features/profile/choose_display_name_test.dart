@@ -15,6 +15,7 @@ import 'package:icos/features/groups/domain/pending_invite.dart';
 import 'package:icos/features/profile/data/profile_repository.dart';
 import 'package:icos/features/profile/domain/display_name_placeholder.dart';
 import 'package:icos/features/profile/domain/models/profile.dart';
+import 'package:icos/features/profile/presentation/widgets/choose_display_name_sheet.dart';
 import 'package:icos/features/profile/providers/profile_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show User;
 
@@ -24,14 +25,20 @@ import '../../helpers/test_helpers.dart';
 class _Repo extends ProfileRepository {
   _Repo(this.name);
   String name;
+  bool failGet = false;
+  int gets = 0;
   final saved = <String>[];
 
   UserProfile _p(String id) =>
       UserProfile(id: id, displayName: name, isAnonymous: false);
 
   @override
-  Future<Result<UserProfile, AppError>> getProfile(String userId) async =>
-      Result.success(_p(userId));
+  Future<Result<UserProfile, AppError>> getProfile(String userId) async {
+    gets++;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    if (failGet) return Result.failure(AppError.network('offline'));
+    return Result.success(_p(userId));
+  }
 
   @override
   Future<Result<UserProfile, AppError>> updateProfile(
@@ -190,6 +197,52 @@ void main() {
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.controller!.text, isEmpty);
     expect(field.decoration!.hintText, 'Player 1234');
+  });
+
+  testWidgets('profile fetch failure: no sheet, flag stays unset, later ok', (
+    tester,
+  ) async {
+    final (router, repo) = await run(tester, name: 'Ada Lovelace');
+    repo.failGet = true;
+    await finish(tester);
+    expect(find.text(AppStrings.chooseNameTitle), findsNothing);
+    expect(StorageService.displayNamePromptShown('u1'), isFalse);
+    expect(_at(router), '/');
+
+    repo.failGet = false;
+    router.go('/auth');
+    await tester.pumpAndSettle();
+    await finish(tester);
+    expect(find.text(AppStrings.chooseNameTitle), findsOneWidget);
+  });
+
+  testWidgets('two overlapping invocations show one sheet', (tester) async {
+    final repo = _Repo('Player 1234');
+    await tester.pumpWidget(
+      buildTestWidgetWithRouter(
+        GoRouter(
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (_, _) => Consumer(
+                builder: (context, ref, _) => TextButton(
+                  onPressed: () {
+                    maybePromptForDisplayName(context, ref, _user());
+                    maybePromptForDisplayName(context, ref, _user());
+                  },
+                  child: const Text('go'),
+                ),
+              ),
+            ),
+          ],
+        ),
+        overrides: [profileRepositoryProvider.overrideWithValue(repo)],
+      ),
+    );
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    expect(find.text(AppStrings.chooseNameTitle), findsOneWidget);
+    expect(repo.gets, 1);
   });
 
   testWidgets('Save validates, persists through the profile path', (
