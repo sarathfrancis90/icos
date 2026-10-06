@@ -49,7 +49,26 @@ enum EmailMethod {
 /// Redirect used for all web OAuth / linkIdentity flows.
 const String kAuthRedirectUri = 'io.supabase.icos://login-callback';
 
+/// Redirect for web OAuth (Google/Apple). Deliberately a different host from
+/// [kAuthRedirectUri]: on Android the flutter_web_auth_2 `CallbackActivity`
+/// owns `io.supabase.icos://oauth-callback`, while `MainActivity` keeps
+/// `login-callback` for emailed links (password recovery, confirmation). Two
+/// activities on one URL would make Android show a chooser. Must be in the
+/// Supabase redirect allowlist.
+const String kOAuthRedirectUri = 'io.supabase.icos://oauth-callback';
+
 abstract final class AuthStrategy {
+  /// Replaces every URL in [text] with just its host and path, so a log line
+  /// never carries the authorize URL (state, PKCE challenge, redirect).
+  static String redactUrls(String text) => text.replaceAllMapped(
+    RegExp(r'[a-zA-Z][a-zA-Z0-9+.-]*://[^\s<>]+'),
+    (m) {
+      final uri = Uri.tryParse(m[0]!);
+      if (uri == null) return '<url>';
+      return '${uri.host}${uri.path}';
+    },
+  );
+
   /// Decides how to handle an OAuth button press.
   ///
   /// [hasClientIds] — for Google: whether `GOOGLE_WEB_CLIENT_ID` (and on iOS

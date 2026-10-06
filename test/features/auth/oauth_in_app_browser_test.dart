@@ -1,19 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icos/features/auth/data/oauth_web_gateway.dart';
 import 'package:icos/features/auth/domain/auth_strategy.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../helpers/test_helpers.dart';
 
 // Apple App Review, Guideline 4 (Design), build 1.0.0 (4): signing in must
-// not send people to the default browser. Every web OAuth page opens in the
-// in-app browser (Safari View Controller / Custom Tab).
+// not send people to the default browser. Every web OAuth page runs in the
+// platform authentication session (ASWebAuthenticationSession / Custom Tab).
 
 const _guest = User(
   id: 'g',
@@ -32,10 +32,14 @@ const _member = User(
 );
 
 class _FakeGateway extends OAuthWebGateway {
-  final modes = <LaunchMode>[];
-  final authorizeCalls = <({OAuthProvider provider, bool link})>[];
-  int closeCalls = 0;
-  Completer<bool>? hold;
+  final authorizeCalls =
+      <({OAuthProvider provider, bool link, String redirect})>[];
+  final authenticated = <Uri>[];
+  final completed = <Uri>[];
+  Object? authorizeError;
+  Object? authenticateError;
+  Object? completeError;
+  Completer<Uri>? hold;
 
   @override
   Future<Uri> authorizeUrl(
@@ -43,18 +47,24 @@ class _FakeGateway extends OAuthWebGateway {
     required bool link,
     required String redirectTo,
   }) async {
-    authorizeCalls.add((provider: provider, link: link));
-    return Uri.parse('https://example.test/authorize');
+    authorizeCalls.add((provider: provider, link: link, redirect: redirectTo));
+    if (authorizeError != null) throw authorizeError!;
+    return Uri.parse('https://example.test/authorize?state=s');
   }
 
   @override
-  Future<bool> launch(Uri url, LaunchMode mode) {
-    modes.add(mode);
-    return hold?.future ?? Future.value(true);
+  Future<Uri> authenticate(Uri url) {
+    authenticated.add(url);
+    if (authenticateError != null) throw authenticateError!;
+    return hold?.future ??
+        Future.value(Uri.parse('io.supabase.icos://oauth-callback?code=abc'));
   }
 
   @override
-  Future<void> close() async => closeCalls++;
+  Future<void> completeSession(Uri callback) async {
+    completed.add(callback);
+    if (completeError != null) throw completeError!;
+  }
 }
 
 class _FakeAuth extends AuthNotifier {
@@ -87,20 +97,24 @@ void main() {
     return container.read(authNotifierProvider.notifier);
   }
 
+  bool loading() => container.read(authNotifierProvider).isLoading;
+
   setUp(() {
     gateway = _FakeGateway();
     OAuthWebGateway.current = gateway;
+    AuthNotifier.platformOverride = AuthPlatform.ios;
   });
   tearDown(() {
     OAuthWebGateway.current = const OAuthWebGateway();
     AuthNotifier.platformOverride = null;
   });
 
-  test('the launch mode is the in-app browser, never the system browser', () {
-    expect(OAuthWebGateway.launchMode, LaunchMode.inAppBrowserView);
+  test('the session API is told the callback scheme', () {
+    expect(OAuthWebGateway.callbackScheme, 'io.supabase.icos');
+    expect(Uri.parse(kOAuthRedirectUri).scheme, OAuthWebGateway.callbackScheme);
   });
 
-  group('every web OAuth launch opens in the app', () {
+  group('every web OAuth launch goes through the session API', () {
     for (final platform in [AuthPlatform.ios, AuthPlatform.android]) {
       test('linkIdentity (guest) with Google on ${platform.name}', () async {
         AuthNotifier.platformOverride = platform;
@@ -108,7 +122,8 @@ void main() {
         expect(outcome, isA<AuthRedirected>());
         expect(gateway.authorizeCalls.single.link, isTrue);
         expect(gateway.authorizeCalls.single.provider, OAuthProvider.google);
-        expect(gateway.modes, [LaunchMode.inAppBrowserView]);
+        expect(gateway.authorizeCalls.single.redirect, kOAuthRedirectUri);
+        expect(gateway.authenticated, hasLength(1));
       });
 
       test(
@@ -118,79 +133,107 @@ void main() {
           final outcome = await start(_member).signInWithGoogle();
           expect(outcome, isA<AuthRedirected>());
           expect(gateway.authorizeCalls.single.link, isFalse);
-          expect(gateway.modes, [LaunchMode.inAppBrowserView]);
+          expect(gateway.authenticated, hasLength(1));
         },
       );
     }
 
-    test('linkIdentity (guest) with Apple on Android', () async {
+    test('linkIdentity (guest) and sign-in with Apple on Android', () async {
       AuthNotifier.platformOverride = AuthPlatform.android;
-      final outcome = await start(_guest).signInWithApple();
-      expect(outcome, isA<AuthRedirected>());
+      await start(_guest).signInWithApple();
       expect(gateway.authorizeCalls.single.link, isTrue);
       expect(gateway.authorizeCalls.single.provider, OAuthProvider.apple);
-      expect(gateway.modes, [LaunchMode.inAppBrowserView]);
-    });
-
-    test('signInWithOAuth with Apple on Android', () async {
-      AuthNotifier.platformOverride = AuthPlatform.android;
       await start(_member).signInWithApple();
-      expect(gateway.authorizeCalls.single.link, isFalse);
-      expect(gateway.modes, [LaunchMode.inAppBrowserView]);
+      expect(gateway.authorizeCalls.last.link, isFalse);
     });
+  });
 
+  group('outcomes', () {
     test(
-      'a page that cannot be shown is a failure, not a stuck spinner',
+      'success: the callback is processed exactly once, busy cleared',
       () async {
-        AuthNotifier.platformOverride = AuthPlatform.ios;
-        gateway.hold = Completer<bool>()..complete(false);
         final notifier = start(_guest);
         final outcome = await notifier.signInWithGoogle();
-        expect(outcome, isA<AuthFailure>());
-        expect(container.read(authNotifierProvider).isLoading, isFalse);
+        expect(outcome, isA<AuthRedirected>());
+        expect(gateway.completed, [
+          Uri.parse('io.supabase.icos://oauth-callback?code=abc'),
+        ]);
+        expect(loading(), isFalse);
       },
     );
-  });
 
-  group('the in-app browser is dismissed by the callback', () {
     test(
-      'closeInAppWebView runs once when the linked session arrives',
+      'cancel (CANCELED) is AuthCancelled, guest kept, busy cleared',
       () async {
-        AuthNotifier.platformOverride = AuthPlatform.ios;
-        final notifier = start(_guest);
-        await notifier.signInWithGoogle();
-        expect(gateway.closeCalls, 0);
-
-        final linked = AuthState(
-          AuthChangeEvent.userUpdated,
-          Session(accessToken: 't', tokenType: 'bearer', user: _member),
+        gateway.authenticateError = PlatformException(
+          code: 'CANCELED',
+          message: 'User canceled login',
         );
-        notifier.handleAuthEvent(linked);
-        notifier.handleAuthEvent(linked);
-        expect(gateway.closeCalls, 1);
+        final notifier = start(_guest);
+        final outcome = await notifier.signInWithGoogle();
+        expect(outcome, isA<AuthCancelled>());
+        expect(gateway.completed, isEmpty);
+        expect(loading(), isFalse);
+        expect(container.read(authNotifierProvider).valueOrNull?.id, 'g');
       },
     );
 
-    test('an event with no web flow open does not close anything', () {
-      final notifier = start(_guest);
-      notifier.handleAuthEvent(
-        AuthState(
-          AuthChangeEvent.signedIn,
-          Session(accessToken: 't', tokenType: 'bearer', user: _member),
-        ),
-      );
-      expect(gateway.closeCalls, 0);
+    test('failure before launch is AuthFailure, busy cleared', () async {
+      gateway.authorizeError = const AuthException('network down');
+      final outcome = await start(_guest).signInWithGoogle();
+      expect(outcome, isA<AuthFailure>());
+      expect(gateway.authenticated, isEmpty);
+      expect(loading(), isFalse);
     });
+
+    test(
+      'failure during launch is AuthFailure (not cancelled), busy cleared',
+      () async {
+        gateway.authenticateError = PlatformException(
+          code: 'FAILED',
+          message: 'boom https://x.supabase.co/auth/v1/authorize?state=SECRET',
+        );
+        final outcome = await start(_guest).signInWithGoogle();
+        expect(outcome, isA<AuthFailure>());
+        expect((outcome as AuthFailure).message, isNot(contains('SECRET')));
+        expect(gateway.completed, isEmpty);
+        expect(loading(), isFalse);
+      },
+    );
+
+    test(
+      'an unexpected launch error never leaks the URL to the user',
+      () async {
+        gateway.authenticateError = StateError(
+          'bad https://x.supabase.co/authorize?state=SECRET',
+        );
+        final outcome = await start(_guest).signInWithGoogle();
+        expect(outcome, isA<AuthFailure>());
+        expect((outcome as AuthFailure).message, isNot(contains('SECRET')));
+      },
+    );
+
+    test(
+      'identity already exists from the exchange offers sign-in instead',
+      () async {
+        gateway.completeError = const AuthException(
+          'Identity is already linked to another user',
+          code: 'identity_already_exists',
+        );
+        final outcome = await start(_guest).signInWithGoogle();
+        expect(outcome, isA<AuthIdentityExists>());
+        expect(loading(), isFalse);
+      },
+    );
   });
 
-  group('closing the in-app browser without finishing', () {
+  group('closing the sheet without finishing', () {
     test('resuming without a new session clears the busy state', () async {
-      AuthNotifier.platformOverride = AuthPlatform.ios;
-      gateway.hold = Completer<bool>();
+      gateway.hold = Completer<Uri>();
       final notifier = start(_guest);
       final pending = notifier.signInWithGoogle();
       await Future<void>.delayed(Duration.zero);
-      expect(container.read(authNotifierProvider).isLoading, isTrue);
+      expect(loading(), isTrue);
 
       notifier.handleAppResumed();
 
@@ -200,39 +243,57 @@ void main() {
       expect(state.valueOrNull?.id, 'g');
       expect(state.valueOrNull?.isAnonymous, isTrue);
 
-      gateway.hold!.complete(true);
-      await pending;
+      gateway.hold!.completeError(PlatformException(code: 'CANCELED'));
+      expect(await pending, isA<AuthCancelled>());
     });
 
     test(
       'the lifecycle observer calls it on AppLifecycleState.resumed',
       () async {
-        AuthNotifier.platformOverride = AuthPlatform.ios;
-        gateway.hold = Completer<bool>();
+        gateway.hold = Completer<Uri>();
         final notifier = start(_guest);
         final pending = notifier.signInWithGoogle();
         await Future<void>.delayed(Duration.zero);
-        expect(container.read(authNotifierProvider).isLoading, isTrue);
+        expect(loading(), isTrue);
 
         TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
           AppLifecycleState.paused,
         );
-        expect(container.read(authNotifierProvider).isLoading, isTrue);
+        expect(loading(), isTrue);
         TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
           AppLifecycleState.resumed,
         );
-        expect(container.read(authNotifierProvider).isLoading, isFalse);
+        expect(loading(), isFalse);
 
-        gateway.hold!.complete(true);
+        gateway.hold!.completeError(PlatformException(code: 'CANCELED'));
         await pending;
       },
     );
 
-    test('resume does not touch an unrelated busy state', () {
+    test('resume does not touch a busy state with no sheet showing', () async {
+      // Callback is being exchanged: the sheet is gone, so resume must not
+      // hide the spinner early.
+      final exchange = Completer<void>();
       final notifier = start(_guest);
-      // No web flow open.
-      expect(() => notifier.handleAppResumed(), returnsNormally);
-      expect(container.read(authNotifierProvider).isLoading, isFalse);
+      gateway.completeError = null;
+      final slow = _SlowExchange(exchange.future);
+      OAuthWebGateway.current = slow;
+      final pending = notifier.signInWithGoogle();
+      await Future<void>.delayed(Duration.zero);
+      expect(loading(), isTrue);
+      notifier.handleAppResumed();
+      expect(loading(), isTrue);
+      exchange.complete();
+      await pending;
+      expect(loading(), isFalse);
     });
   });
+}
+
+class _SlowExchange extends _FakeGateway {
+  _SlowExchange(this._gate);
+  final Future<void> _gate;
+
+  @override
+  Future<void> completeSession(Uri callback) => _gate;
 }

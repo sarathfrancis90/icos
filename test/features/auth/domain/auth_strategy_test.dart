@@ -347,4 +347,23 @@ void main() {
   test('redirect uri matches the registered scheme', () {
     expect(kAuthRedirectUri, 'io.supabase.icos://login-callback');
   });
+
+  test('web OAuth redirect shares the scheme but not the host', () {
+    // Android: CallbackActivity owns oauth-callback, MainActivity owns
+    // login-callback (emailed links); one URL on two activities = chooser.
+    expect(kOAuthRedirectUri, 'io.supabase.icos://oauth-callback');
+    expect(Uri.parse(kOAuthRedirectUri).scheme,
+        Uri.parse(kAuthRedirectUri).scheme);
+    expect(Uri.parse(kOAuthRedirectUri).host,
+        isNot(Uri.parse(kAuthRedirectUri).host));
+  });
+
+  test('redactUrls keeps host and path only', () {
+    final out = AuthStrategy.redactUrls(
+      'failed https://abc.supabase.co/auth/v1/authorize?provider=google'
+      '&code_challenge=SECRET&state=XYZ now',
+    );
+    expect(out, 'failed abc.supabase.co/auth/v1/authorize now');
+    expect(out, isNot(contains('SECRET')));
+  });
 }

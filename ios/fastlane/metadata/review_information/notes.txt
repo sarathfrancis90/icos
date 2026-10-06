@@ -4,7 +4,7 @@ LOGIN
 No login is needed. The app starts in guest mode and the daily puzzle, practice and archive work immediately. Accounts are optional and are only needed for groups.
 
 SIGN-IN (guideline 4)
-Sign in with Google and Sign in with Apple open inside the app (Safari View Controller on iOS, Chrome Custom Tabs on Android); the app never sends people to the default browser to sign in or register. Sign in with Apple is offered alongside Google and email. No login is required to play. Account deletion is in Profile > Delete Account.
+Sign in with Google and Sign in with Apple open inside the app (ASWebAuthenticationSession on iOS, Custom Tabs on Android); the app never sends people to the default browser to sign in or register. Sign in with Apple is offered alongside Google and email. No login is required to play. Account deletion is in Profile > Delete Account.
 
 USER-GENERATED CONTENT
 User-generated content is limited to display names, group names and the automatic group activity entries (for example "solved today's puzzle"). There is no free-text chat, no messaging and no image or photo upload.

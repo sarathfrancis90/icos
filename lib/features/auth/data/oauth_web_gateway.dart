@@ -1,26 +1,33 @@
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/supabase_service.dart';
 
-/// The only place a web OAuth page is opened or closed.
+/// The only place a web OAuth page is shown.
 ///
 /// Apple (App Review Guideline 4, build 1.0.0 (4)) rejected the app for
-/// sending people to the default browser to sign in. Every web flow now opens
-/// in an in-app browser: SFSafariViewController on iOS, a Chrome Custom Tab
-/// on Android (`LaunchMode.inAppBrowserView`).
+/// sending people to the default browser to sign in. Web OAuth now runs in the
+/// platform's authentication session: ASWebAuthenticationSession on iOS and a
+/// Chrome Custom Tab plus the package's `CallbackActivity` on Android. Both
+/// hand the redirect URL straight back to [authenticate] and dismiss
+/// themselves, so nothing relies on the custom-scheme intent reaching
+/// `MainActivity` or on the app closing a browser sheet.
 ///
 /// supabase_flutter 2.12.0 is not used to launch the page: its
-/// `signInWithOAuth`/`linkIdentity` force `externalApplication` for Google on
-/// Android. This gateway asks gotrue for the authorize URL (which also stores
-/// the PKCE verifier, exactly as the SDK does) and launches it itself.
+/// `signInWithOAuth`/`linkIdentity` open the system browser (and force it for
+/// Google on Android). This gateway asks gotrue for the authorize URL, which
+/// also stores the PKCE verifier exactly as the SDK does, shows it, then
+/// finishes the sign-in with `getSessionFromUrl`, the SDK's own handler for
+/// the redirect.
 ///
-/// Tests replace [current] to observe the launch mode without a network.
+/// Tests replace [current] to run the flow without a network or a platform
+/// channel.
 class OAuthWebGateway {
   const OAuthWebGateway();
 
-  /// How every web OAuth page is shown. Never `externalApplication`.
-  static const LaunchMode launchMode = LaunchMode.inAppBrowserView;
+  /// Callback scheme registered for the session API (iOS) and for the
+  /// Android `CallbackActivity`.
+  static const String callbackScheme = 'io.supabase.icos';
 
   /// Swapped by tests; production never reassigns it.
   static OAuthWebGateway current = const OAuthWebGateway();
@@ -44,16 +51,26 @@ class OAuthWebGateway {
     return Uri.parse(res.url);
   }
 
-  /// Opens [url] in the in-app browser. False if it could not be shown.
-  /// [mode] is always [launchMode]; it is a parameter so tests can assert it.
-  Future<bool> launch(Uri url, LaunchMode mode) => launchUrl(url, mode: mode);
-
-  /// Dismisses the in-app browser.
+  /// Shows [url] in the authentication session and returns the redirect URL.
   ///
-  /// iOS: url_launcher_ios 6.4.1 `closeSafariViewController` calls
-  /// `safariViewControllerDidFinish`, which dismisses the presented
-  /// SFSafariViewController. Android: only closes url_launcher's fallback
-  /// WebViewActivity; a Custom Tab is not closed by this call (see the
-  /// `launchMode` note in AndroidManifest.xml).
-  Future<void> close() => closeInAppWebView();
+  /// Throws a `PlatformException` with code `CANCELED` when the person closes
+  /// the sheet or tab (before or after it loaded).
+  ///
+  /// `preferEphemeral` keeps the session apart from Safari's cookies and
+  /// suppresses iOS's "wants to use supabase.co to sign in" consent alert; the
+  /// trade-off is no single sign-on from an existing Safari Google session.
+  Future<Uri> authenticate(Uri url) async {
+    final result = await FlutterWebAuth2.authenticate(
+      url: url.toString(),
+      callbackUrlScheme: callbackScheme,
+      options: const FlutterWebAuth2Options(preferEphemeral: true),
+    );
+    return Uri.parse(result);
+  }
+
+  /// Completes the sign-in from the redirect [callback] (PKCE code exchange).
+  /// Emits the usual auth events; throws [AuthException] on a provider error.
+  Future<void> completeSession(Uri callback) async {
+    await SupabaseService.auth.getSessionFromUrl(callback);
+  }
 }

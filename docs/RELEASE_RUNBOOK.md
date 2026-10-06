@@ -118,7 +118,8 @@ Connect accepts the upload and then fails the asset with `MOV_RESAVE_STEREO`.
 
 - **2026-09-24, Guideline 4 (Design), build 1.0.0 (4), iPad Air 11-inch M3.** Apple: "We noticed that the user is taken to the default web browser to sign in or register for an account, which provides a poor user experience. ... please revise the app to enable users to sign in or register for an account in the app. You may also choose to implement the Safari View Controller API to display web content within the app."
   - Cause: `lib/features/auth/providers/auth_provider.dart` launched the web OAuth flows (`linkIdentity` for guests, `signInWithOAuth`) with `LaunchMode.externalApplication`, i.e. Safari.
-  - Fix: every web OAuth page now opens with `LaunchMode.inAppBrowserView` (SFSafariViewController on iOS, Chrome Custom Tab on Android) through `lib/features/auth/data/oauth_web_gateway.dart`; the callback deep link dismisses it (`closeInAppWebView`), and the busy state clears when the app resumes after the sheet was closed. Reviewer notes updated in `ios/fastlane/metadata/review_information/notes.txt`. Android `MainActivity` is now `singleTask` so the callback reuses the app instead of stacking a second instance above the Custom Tab.
+  - Fix: every web OAuth page now runs in the platform authentication session (ASWebAuthenticationSession on iOS, Custom Tab plus flutter_web_auth_2 `CallbackActivity` on Android) through `lib/features/auth/data/oauth_web_gateway.dart`. The session returns the redirect URL to the app and dismisses itself; the app finishes sign-in with `getSessionFromUrl`. Cancelling reads as cancelled and the busy state clears. iOS uses `preferEphemeral` (no Safari SSO, no "wants to use supabase.co" alert). Reviewer notes updated in `ios/fastlane/metadata/review_information/notes.txt`.
+  - **New redirect URL to allowlist before this build is used:** `io.supabase.icos://oauth-callback` (see 5d). `login-callback` stays for emailed links.
   - Ships in: 1.0.0+5.
 
 ## 1. Domain: `icos.sarathfrancis.work` (needed before universal links / app links verify)
@@ -357,8 +358,11 @@ and set the same two as the `GOOGLE_WEB_CLIENT_ID` / `GOOGLE_IOS_CLIENT_ID` GitH
 
 Supabase > Authentication > URL Configuration > Redirect URLs must include:
 ```
+io.supabase.icos://oauth-callback
 io.supabase.icos://login-callback
 ```
+`oauth-callback` is the web Google/Apple return (build 1.0.0+5 onward); `login-callback`
+is still used by emailed links (password recovery, confirmation).
 The app signs in anonymously on first launch, so every sign-in press goes through
 `linkIdentity`, which is a web redirect. Without this entry the browser opens and then
 dead-ends.
