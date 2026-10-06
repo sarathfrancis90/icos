@@ -78,10 +78,10 @@ Future<bool> handleAuthOutcome(
       return true;
 
     case AuthRedirected():
-      // The browser is open; the deep link will finish the flow.
+      // The in-app browser is open; the deep link will finish the flow.
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Continue in your browser to finish signing in.'),
+          content: Text('Finish signing in in the window that just opened.'),
         ),
       );
       return false;

@@ -22,10 +22,16 @@
         android:label="Icos"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- singleTask (was singleTop): web sign-in runs in a Chrome Custom
+             Tab inside this task. When the io.supabase.icos://login-callback
+             intent arrives the Custom Tab is the top activity, so singleTop
+             would start a second MainActivity (and Flutter engine) above it.
+             singleTask reuses the existing instance, finishes the Custom Tab
+             above it and delivers the intent via onNewIntent. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"

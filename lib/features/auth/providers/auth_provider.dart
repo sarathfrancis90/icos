@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -21,6 +22,7 @@ import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../../groups/domain/pending_invite.dart';
+import '../data/oauth_web_gateway.dart';
 import '../domain/auth_outcome.dart';
 import '../domain/auth_strategy.dart';
 
@@ -120,6 +122,20 @@ class PasswordRecoveryPending extends _$PasswordRecoveryPending {
   }
 }
 
+class _WebPageNotShown implements Exception {
+  const _WebPageNotShown();
+}
+
+class _ResumeObserver with WidgetsBindingObserver {
+  _ResumeObserver(this._onResumed);
+  final void Function() _onResumed;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _onResumed();
+  }
+}
+
 @riverpod
 class AuthNotifier extends _$AuthNotifier {
   StreamSubscription<AuthState>? _subscription;
@@ -129,8 +145,14 @@ class AuthNotifier extends _$AuthNotifier {
   /// does not say which provider failed, so remember it on the way out.
   OAuthKind? _pendingRedirectProvider;
 
+  /// True from launching a web OAuth page until the callback closes it.
+  bool _webFlowOpen = false;
+
+  late final _ResumeObserver _resumeObserver = _ResumeObserver(handleAppResumed);
+
   @override
   AsyncValue<User?> build() {
+    attachLifecycleObserver();
     _subscription?.cancel();
     _subscription = SupabaseService.auth.onAuthStateChange.listen(
       handleAuthEvent,
@@ -138,6 +160,18 @@ class AuthNotifier extends _$AuthNotifier {
     );
     ref.onDispose(() => _subscription?.cancel());
     return AsyncValue.data(SupabaseService.auth.currentUser);
+  }
+
+  /// Starts listening for the app returning to the foreground; removed again
+  /// when the provider is disposed. Public so test fakes that override
+  /// [build] can opt in.
+  @visibleForTesting
+  void attachLifecycleObserver() {
+    WidgetsFlutterBinding.ensureInitialized();
+    WidgetsBinding.instance.addObserver(_resumeObserver);
+    ref.onDispose(
+      () => WidgetsBinding.instance.removeObserver(_resumeObserver),
+    );
   }
 
   /// Handles a Supabase auth event. Public only so tests can drive it.
@@ -164,6 +198,8 @@ class AuthNotifier extends _$AuthNotifier {
             data.event == AuthChangeEvent.signedIn) &&
         user != null &&
         !user.isAnonymous) {
+      // The deep link brought the session back: dismiss the in-app browser.
+      _closeWebFlow();
       unawaited(_resumePendingInvite());
     }
   }
@@ -177,6 +213,7 @@ class AuthNotifier extends _$AuthNotifier {
     AppLogger.warn('Auth stream error', error: error, st: st);
     final provider = _pendingRedirectProvider;
     _pendingRedirectProvider = null;
+    _closeWebFlow();
 
     if (error is AuthException &&
         AuthStrategy.isIdentityAlreadyExists(
@@ -316,22 +353,12 @@ class AuthNotifier extends _$AuthNotifier {
     try {
       switch (method) {
         case OAuthMethod.linkIdentityWeb:
-          _pendingRedirectProvider = provider;
-          await SupabaseService.auth.linkIdentity(
-            supabaseProvider,
-            redirectTo: kAuthRedirectUri,
-            authScreenLaunchMode: LaunchMode.externalApplication,
-          );
+          await _launchWeb(supabaseProvider, provider, link: true);
           _setUser();
           return AuthRedirected(provider: provider, linking: true);
 
         case OAuthMethod.webOAuth:
-          _pendingRedirectProvider = provider;
-          await SupabaseService.auth.signInWithOAuth(
-            supabaseProvider,
-            redirectTo: kAuthRedirectUri,
-            authScreenLaunchMode: LaunchMode.externalApplication,
-          );
+          await _launchWeb(supabaseProvider, provider, link: false);
           _setUser();
           return AuthRedirected(provider: provider, linking: false);
 
@@ -355,6 +382,11 @@ class AuthNotifier extends _$AuthNotifier {
         return AuthIdentityExists(provider: provider, message: e.message);
       }
       return AuthFailure(AuthStrategy.friendlyMessage(e.message), raw: e);
+    } on _WebPageNotShown {
+      _setUser();
+      return const AuthFailure(
+        'Could not open the sign-in page. Please try again.',
+      );
     } on SignInWithAppleAuthorizationException catch (e) {
       _setUser();
       if (e.code == AuthorizationErrorCode.canceled) {
@@ -377,6 +409,49 @@ class AuthNotifier extends _$AuthNotifier {
       _setUser();
       return AuthFailure(AuthStrategy.friendlyMessage(e.toString()), raw: e);
     }
+  }
+
+  /// Opens the provider's page inside the app (Safari View Controller /
+  /// Custom Tab). The deep link brings the session back later.
+  Future<void> _launchWeb(
+    OAuthProvider supabaseProvider,
+    OAuthKind provider, {
+    required bool link,
+  }) async {
+    _pendingRedirectProvider = provider;
+    _webFlowOpen = true;
+    final gateway = OAuthWebGateway.current;
+    final url = await gateway.authorizeUrl(
+      supabaseProvider,
+      link: link,
+      redirectTo: kAuthRedirectUri,
+    );
+    final shown = await gateway.launch(url, OAuthWebGateway.launchMode);
+    if (!shown) {
+      _webFlowOpen = false;
+      _pendingRedirectProvider = null;
+      throw const _WebPageNotShown();
+    }
+  }
+
+  /// Dismisses the in-app browser once the deep link has settled the flow
+  /// (success or error). Runs at most once per launched page.
+  void _closeWebFlow() {
+    if (!_webFlowOpen) return;
+    _webFlowOpen = false;
+    unawaited(OAuthWebGateway.current.close().catchError((Object e) {
+      AppLogger.debug('Closing the in-app browser failed', error: e);
+    }));
+  }
+
+  /// App came back to the foreground. If a web sign-in is still showing the
+  /// busy state, clear it: there is no completion signal when the person
+  /// closes the sheet with Done/Cancel (SFSafariViewController) or Back
+  /// (Custom Tab), and a session that did arrive has already replaced the
+  /// state through [handleAuthEvent]. The guest session is untouched.
+  @visibleForTesting
+  void handleAppResumed() {
+    if (_webFlowOpen && state.isLoading) _setUser();
   }
 
   Future<AuthOutcome> _nativeGoogle() async {
