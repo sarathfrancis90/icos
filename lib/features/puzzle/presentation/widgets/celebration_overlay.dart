@@ -328,7 +328,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 340),
-                child: _CelebrationCard(
+                child: CelebrationCard(
                   underPar: underPar,
                   timeSeconds: widget.timeSeconds,
                   hintsUsed: widget.hintsUsed,
@@ -357,8 +357,10 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
   }
 }
 
-class _CelebrationCard extends StatelessWidget {
-  const _CelebrationCard({
+/// The result card inside [CelebrationOverlay]. Public so its animation
+/// wiring can be tested on its own.
+class CelebrationCard extends StatelessWidget {
+  const CelebrationCard({
     required this.underPar,
     required this.timeSeconds,
     required this.hintsUsed,
@@ -375,6 +377,7 @@ class _CelebrationCard extends StatelessWidget {
     this.status,
     this.isArchive = false,
     this.isPractice = false,
+    super.key,
   });
 
   final bool underPar;
@@ -390,9 +393,8 @@ class _CelebrationCard extends StatelessWidget {
   final SubmissionStatus? status;
   final bool isArchive;
   final bool isPractice;
-  /// Read on every stats tick (the stats stagger outlasts the bounce), so
-  /// the trophy is drawn at its current scale rather than the scale it had
-  /// when the overlay last rebuilt.
+  /// Drives the trophy bounce through its own transition, independent of
+  /// the stats stagger and of overlay rebuilds.
   final Animation<double> trophyScale;
   final double Function(int delayMs) staggeredValue;
   final Animation<double> statsAnimation;
@@ -452,8 +454,8 @@ class _CelebrationCard extends StatelessWidget {
               const SizedBox(height: AppSizes.xs),
 
               // Phase 8: Trophy icon with bounce-in
-              Transform.scale(
-                scale: trophyScale.value,
+              ScaleTransition(
+                scale: trophyScale,
                 child: Icon(
                   underPar
                       ? Icons.emoji_events_rounded

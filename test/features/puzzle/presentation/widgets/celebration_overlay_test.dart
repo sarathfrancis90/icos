@@ -54,7 +54,57 @@ void main() {
             )
             .first,
       );
-      expect(transform.transform.getMaxScaleOnAxis(), closeTo(1.0, 0.01));
+      expect(transform.transform.entry(0, 0), closeTo(1.0, 0.01));
+    });
+
+    testWidgets('trophy bounces on its own animation, not the stats one', (
+      tester,
+    ) async {
+      final trophy = AnimationController(
+        vsync: const TestVSync(),
+        duration: const Duration(milliseconds: 600),
+      );
+      addTearDown(trophy.dispose);
+      await tester.pumpWidget(
+        buildTestWidget(
+          Scaffold(
+            body: CelebrationCard(
+              underPar: true,
+              timeSeconds: 40,
+              hintsUsed: 0,
+              parTimeSeconds: 60,
+              gridSize: 5,
+              difficulty: 'easy',
+              trophyScale: trophy,
+              staggeredValue: (_) => 1.0,
+              // Stats already finished: nothing else ticks the card.
+              statsAnimation: const AlwaysStoppedAnimation(1.0),
+              onShare: null,
+              onDone: () {},
+            ),
+          ),
+        ),
+      );
+      // The nearest Transform above the trophy icon.
+      double scale() {
+        Transform? nearest;
+        tester.element(find.byIcon(Icons.emoji_events_rounded))
+            .visitAncestorElements((e) {
+          if (e.widget is Transform) {
+            nearest = e.widget as Transform;
+            return false;
+          }
+          return true;
+        });
+        return nearest!.transform.entry(0, 0);
+      }
+      expect(scale(), closeTo(0, 0.001));
+      trophy.value = 0.5;
+      await tester.pump();
+      expect(scale(), closeTo(0.5, 0.001));
+      trophy.value = 1;
+      await tester.pump();
+      expect(scale(), closeTo(1, 0.001));
     });
 
     group('Under par message', () {
