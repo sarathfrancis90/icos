@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_sizes.dart';
@@ -9,6 +10,7 @@ import 'core/router/pending_invite_sweeper.dart';
 import 'core/services/app_config_provider.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/sync_service.dart';
+import 'core/theme/app_palette.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/utils/date_utils.dart';
@@ -98,9 +100,15 @@ class _IcosAppState extends ConsumerState<IcosApp>
       routerConfig: router,
       // Layouts are verified to 200% text scale; larger system sizes (iOS
       // accessibility sizes reach ~310%) are clamped rather than broken.
-      builder: (context, child) => PendingInviteSweeper(
-        router: router,
-        child: TextScaleLimit(child: child ?? const SizedBox()),
+      // Status and navigation bar icons follow the theme (dark icons on the
+      // light theme) on screens without an AppBar; AppBars set the same
+      // style through the theme's AppBarTheme.
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: context.palette.overlayStyle,
+        child: PendingInviteSweeper(
+          router: router,
+          child: TextScaleLimit(child: child ?? const SizedBox()),
+        ),
       ),
     );
   }
