@@ -408,6 +408,13 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
           final isReplay = notifier.isReplay;
           final completed = gameState.status == GameStatus.completed;
           _decideFirstPlay(gameState, replay: isReplay);
+          if (_firstPlayActive && gameState.path.isNotEmpty) {
+            // The first move drew something: that is what ends the cue (a
+            // rejected press draws nothing and leaves it up).
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _dismissFirstPlay();
+            });
+          }
 
           return Stack(
             children: [
@@ -426,6 +433,9 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
                       // board takes the remaining height and shrinks to fit.
                       Expanded(
                         child: CustomScrollView(
+                          // Clamping scrolls only when the content really overflows, so no
+                          // drag recognizer competes with the board otherwise.
+                          physics: const ClampingScrollPhysics(),
                           slivers: [
                             SliverFillRemaining(
                               hasScrollBody: false,
@@ -559,10 +569,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
                                             }
                                           },
                                           onCellDrag: notifier.handleCellDrag,
-                                          onDragStart: () {
-                                            notifier.beginDrag();
-                                            _dismissFirstPlay();
-                                          },
+                                          onDragStart: notifier.beginDrag,
                                           onDragEnd: notifier.endDrag,
                                         ),
                                       ),

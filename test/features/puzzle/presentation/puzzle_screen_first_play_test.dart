@@ -9,7 +9,11 @@ import 'package:icos/core/services/connectivity_service.dart';
 import 'package:icos/core/services/edge_function_client.dart';
 import 'package:icos/core/services/session_service.dart';
 import 'package:icos/core/services/storage_service.dart';
+import 'package:icos/core/utils/date_utils.dart';
 import 'package:icos/features/practice/providers/practice_provider.dart';
+import 'package:icos/features/puzzle/data/puzzle_repository.dart';
+import 'package:icos/features/puzzle/data/submission_result.dart';
+import 'package:icos/features/puzzle/providers/daily_puzzle_provider.dart';
 import 'package:icos/features/puzzle/data/puzzle_source.dart';
 import 'package:icos/features/puzzle/domain/models/puzzle.dart';
 import 'package:icos/features/puzzle/presentation/puzzle_screen.dart';
@@ -228,4 +232,71 @@ void main() {
     expect(tip.bottom, lessThanOrEqualTo(grid.top));
     await _leave(tester);
   });
+
+  testWidgets('a pan that draws nothing does not burn the flag', (
+    tester,
+  ) async {
+    phone(tester);
+    await _open(tester, _container(puzzle));
+    // Start on an empty cell that is not waypoint 1: rejected, no path.
+    final cell = tester.getSize(_board).width / 3;
+    await tester.dragFrom(
+      tester.getTopLeft(_board) + Offset(cell * 2.5, cell * 2.5),
+      Offset(0, -cell),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(_cue(tester), isTrue);
+    expect(StorageService.hasSeenFirstPlayHint, isFalse);
+    await _drag(tester);
+    expect(_cue(tester), isFalse);
+    expect(StorageService.hasSeenFirstPlayHint, isTrue);
+    await _leave(tester);
+  });
+
+  testWidgets('daily source: ring and tooltip on first open, gone after a '
+      'drag', (tester) async {
+    phone(tester);
+    final today = AppDateUtils.todayUtc();
+    final daily = PuzzleSource.daily(today);
+    final dp = smallTestPuzzle.copyWith(puzzleDate: today);
+    final c = ProviderContainer(
+      overrides: [
+        puzzleForDateProvider(today).overrideWith((ref) async => dp),
+        puzzleRepositoryProvider.overrideWithValue(_NoAttempts()),
+        authSessionProvider.overrideWithValue(const FakeAuthSessionInfo()),
+        connectivityNotifierProvider.overrideWith(_Online.new),
+        edgeInvokerProvider.overrideWithValue(
+          (fn, body) async => const EdgeResponse(200, {'nonce': 'n'}),
+        ),
+        sessionEnsurerProvider.overrideWithValue(
+          SessionEnsurer(gateway: _SignedIn()),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(home: PuzzleScreen(source: daily)),
+      ),
+    );
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(_cue(tester), isTrue);
+    expect(find.text(AppStrings.firstPlayTooltip), findsOneWidget);
+    await _drag(tester);
+    expect(_cue(tester), isFalse);
+    expect(StorageService.hasSeenFirstPlayHint, isTrue);
+    await _leave(tester);
+  });
+}
+
+class _NoAttempts extends PuzzleRepository {
+  _NoAttempts()
+    : super(invoker: (fn, body) async => const EdgeResponse(500, {}));
+
+  @override
+  Future<SubmissionResult?> getOwnAttempt(String userId, String date) async =>
+      null;
 }

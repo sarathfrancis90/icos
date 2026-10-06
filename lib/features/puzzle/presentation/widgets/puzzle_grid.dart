@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_sizes.dart';
@@ -494,24 +495,36 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
         child: SizedBox(
           width: gridWidth,
           height: gridWidth,
-          child: GestureDetector(
-            onPanStart: (details) {
-              if (widget.readOnly) return;
-              _dragging = true;
-              widget.onDragStart?.call();
-              // The press that starts a drag never reaches the per-cell tap
-              // targets, so treat it as the gesture's first move.
-              _dragAt(details.localPosition, size, cellSize);
+          child: RawGestureDetector(
+            gestures: {
+              _BoardPanRecognizer:
+                  GestureRecognizerFactoryWithHandlers<_BoardPanRecognizer>(
+                    _BoardPanRecognizer.new,
+                    (recognizer) {
+                      recognizer
+                        ..onStart = (details) {
+                          if (widget.readOnly) return;
+                          _dragging = true;
+                          widget.onDragStart?.call();
+                          // The press that starts a drag never reaches the
+                          // per-cell tap targets, so treat it as the
+                          // gesture's first move.
+                          _dragAt(details.localPosition, size, cellSize);
+                        }
+                        ..onUpdate = (details) {
+                          if (widget.readOnly) return;
+                          _dragAt(details.localPosition, size, cellSize);
+                        }
+                        // A plain tap also cancels the pan recognizer, so end
+                        // the gesture only if one actually started. Otherwise
+                        // every tap would report a drag it never made.
+                        ..onEnd = (_) {
+                          _endDrag();
+                        }
+                        ..onCancel = _endDrag;
+                    },
+                  ),
             },
-            onPanUpdate: (details) {
-              if (widget.readOnly) return;
-              _dragAt(details.localPosition, size, cellSize);
-            },
-            // A plain tap also cancels the pan recognizer, so end the gesture
-            // only if one actually started. Otherwise every tap would report a
-            // drag it never made.
-            onPanEnd: (_) => _endDrag(),
-            onPanCancel: _endDrag,
             child: Semantics(
               container: widget.tapToDraw,
               explicitChildNodes: widget.tapToDraw,
@@ -1294,4 +1307,33 @@ class _GridPainter extends CustomPainter {
         oldDelegate.invalidCell != invalidCell ||
         oldDelegate.waypointBurstGridPos != waypointBurstGridPos;
   }
+}
+
+/// Pan recognizer that claims the gesture after 8dp of movement in any
+/// direction, ahead of an ancestor scroll view's drag (18dp) and the stock pan
+/// slop (36dp). Without it a mostly vertical drag on the board would scroll
+/// the page instead of drawing when the screen has to scroll.
+class _BoardPanRecognizer extends PanGestureRecognizer {
+  _BoardPanRecognizer({super.debugOwner});
+
+  static const double _claimSlop = 8;
+  Offset _moved = Offset.zero;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    _moved = Offset.zero;
+    super.addAllowedPointer(event);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerMoveEvent) _moved += event.delta;
+    super.handleEvent(event);
+  }
+
+  @override
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) => _moved.distance > _claimSlop;
 }

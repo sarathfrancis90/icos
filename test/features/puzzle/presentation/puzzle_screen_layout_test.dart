@@ -14,6 +14,7 @@ import 'package:icos/features/puzzle/data/puzzle_source.dart';
 import 'package:icos/features/puzzle/domain/models/puzzle.dart';
 import 'package:icos/features/puzzle/presentation/puzzle_screen.dart';
 import 'package:icos/features/puzzle/presentation/widgets/game_controls.dart';
+import 'package:icos/features/puzzle/presentation/widgets/offline_puzzle_notice.dart';
 import 'package:icos/features/puzzle/presentation/widgets/puzzle_grid.dart';
 import 'package:icos/features/puzzle/providers/game_provider.dart';
 
@@ -166,4 +167,93 @@ void main() {
       await _leave(tester);
     });
   }
+
+  int pathLength(ProviderContainer c) =>
+      c.read(gameNotifierProvider(_source))?.path.length ?? 0;
+
+  Future<void> verticalDrawDrag(
+    WidgetTester tester,
+    ProviderContainer c,
+  ) async {
+    final board = tester.getRect(_board);
+    final cell = board.width / 3;
+    final g = await tester.startGesture(
+      board.topLeft + Offset(cell / 2, cell / 2),
+    );
+    for (var i = 0; i < 20; i++) {
+      await g.moveBy(Offset(0, cell * 2 / 20));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await g.up();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  for (final size in sizes) {
+    testWidgets('vertical drag draws when the content fits, '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await StorageService.setHasSeenFirstPlayHint(true);
+      final c = _container(puzzle);
+      await _open(tester, c);
+      // Nothing to scroll: no vertical drag recognizer competes with the grid.
+      final position = tester
+          .state<ScrollableState>(find.byType(Scrollable))
+          .position;
+      expect(position.maxScrollExtent, 0);
+      await verticalDrawDrag(tester, c);
+      expect(pathLength(c), 3);
+      expect(position.pixels, 0);
+      await _leave(tester);
+    });
+  }
+
+  testWidgets('overflowing: a vertical drag on the board draws, on the HUD '
+      'it scrolls', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await StorageService.setHasSeenFirstPlayHint(true);
+    final c = _container(puzzle.copyWith(origin: PuzzleOrigin.bundled));
+    await _open(tester, c, textScale: 2);
+    final position = tester
+        .state<ScrollableState>(find.byType(Scrollable))
+        .position;
+    expect(position.maxScrollExtent, greaterThan(0));
+
+    await tester.drag(
+      find.byKey(const Key('puzzle_hud')),
+      const Offset(0, -150),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    final scrolled = position.pixels;
+    expect(scrolled, greaterThan(0));
+
+    await tester.drag(find.byType(OfflinePuzzleNotice), const Offset(0, 40));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(position.pixels, lessThan(scrolled));
+
+    await tester.drag(
+      find.byKey(const Key('puzzle_hud')),
+      const Offset(0, -2000),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    final atBottom = position.pixels;
+    await verticalDrawDrag(tester, c);
+    expect(pathLength(c), 3);
+    expect(position.pixels, atBottom);
+    await _leave(tester);
+  });
+
+  testWidgets('iPad 834x1194 at 1.0: grid is capped at 500dp', (tester) async {
+    tester.view.physicalSize = const Size(834, 1194);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await StorageService.setHasSeenFirstPlayHint(true);
+    await _open(tester, _container(puzzle));
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(_board).width, 500);
+    await _leave(tester);
+  });
 }
