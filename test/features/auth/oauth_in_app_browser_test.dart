@@ -100,11 +100,13 @@ void main() {
   bool loading() => container.read(authNotifierProvider).isLoading;
 
   setUp(() {
+    AuthNotifier.resumeGrace = const Duration(milliseconds: 30);
     gateway = _FakeGateway();
     OAuthWebGateway.current = gateway;
     AuthNotifier.platformOverride = AuthPlatform.ios;
   });
   tearDown(() {
+    AuthNotifier.resumeGrace = const Duration(seconds: 1);
     OAuthWebGateway.current = const OAuthWebGateway();
     AuthNotifier.platformOverride = null;
   });
@@ -119,7 +121,7 @@ void main() {
       test('linkIdentity (guest) with Google on ${platform.name}', () async {
         AuthNotifier.platformOverride = platform;
         final outcome = await start(_guest).signInWithGoogle();
-        expect(outcome, isA<AuthRedirected>());
+        expect(outcome, isA<AuthSuccess>());
         expect(gateway.authorizeCalls.single.link, isTrue);
         expect(gateway.authorizeCalls.single.provider, OAuthProvider.google);
         expect(gateway.authorizeCalls.single.redirect, kOAuthRedirectUri);
@@ -131,7 +133,7 @@ void main() {
         () async {
           AuthNotifier.platformOverride = platform;
           final outcome = await start(_member).signInWithGoogle();
-          expect(outcome, isA<AuthRedirected>());
+          expect(outcome, isA<AuthSuccess>());
           expect(gateway.authorizeCalls.single.link, isFalse);
           expect(gateway.authenticated, hasLength(1));
         },
@@ -154,7 +156,7 @@ void main() {
       () async {
         final notifier = start(_guest);
         final outcome = await notifier.signInWithGoogle();
-        expect(outcome, isA<AuthRedirected>());
+        expect(outcome, isA<AuthSuccess>());
         expect(gateway.completed, [
           Uri.parse('io.supabase.icos://oauth-callback?code=abc'),
         ]);
@@ -236,6 +238,9 @@ void main() {
       expect(loading(), isTrue);
 
       notifier.handleAppResumed();
+      // A resume alone is not abandonment: the spinner stays for the grace.
+      expect(loading(), isTrue);
+      await Future<void>.delayed(AuthNotifier.resumeGrace * 2);
 
       final state = container.read(authNotifierProvider);
       expect(state.isLoading, isFalse);
@@ -263,10 +268,31 @@ void main() {
         TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
           AppLifecycleState.resumed,
         );
+        expect(loading(), isTrue);
+        await Future<void>.delayed(AuthNotifier.resumeGrace * 2);
         expect(loading(), isFalse);
 
         gateway.hold!.completeError(PlatformException(code: 'CANCELED'));
         await pending;
+      },
+    );
+
+    test(
+      'a resume that is followed by the sheet finishing never flickers',
+      () async {
+        gateway.hold = Completer<Uri>();
+        final notifier = start(_guest);
+        final pending = notifier.signInWithGoogle();
+        await Future<void>.delayed(Duration.zero);
+        notifier.handleAppResumed();
+        // The sheet finishes inside the grace period.
+        gateway.hold!.complete(
+          Uri.parse('io.supabase.icos://oauth-callback?code=1'),
+        );
+        await pending;
+        expect(loading(), isFalse);
+        await Future<void>.delayed(AuthNotifier.resumeGrace * 2);
+        expect(loading(), isFalse);
       },
     );
 
@@ -282,6 +308,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(loading(), isTrue);
       notifier.handleAppResumed();
+      await Future<void>.delayed(AuthNotifier.resumeGrace * 2);
       expect(loading(), isTrue);
       exchange.complete();
       await pending;

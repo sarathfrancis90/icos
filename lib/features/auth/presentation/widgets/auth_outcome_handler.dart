@@ -55,7 +55,7 @@ Future<bool> handleAuthOutcome(
   var next = sanitizeJoinLink(nextLocation) ?? '/';
   final messenger = ScaffoldMessenger.of(context);
   switch (outcome) {
-    case AuthSuccess(:final isNewAccount):
+    case AuthSuccess(:final isNewAccount, :final accountLinked):
       // An invite stored before leaving for sign-in is used (and cleared)
       // here too, so it cannot fire a second time from the auth event.
       final stored = await PendingInvite.consume();
@@ -68,23 +68,16 @@ Future<bool> handleAuthOutcome(
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            isNewAccount
-                ? 'Account created. Your progress is saved.'
-                : 'Signed in.',
+            accountLinked
+                ? 'Account linked. Your progress is saved.'
+                : isNewAccount
+                    ? 'Account created. Your progress is saved.'
+                    : 'Signed in.',
           ),
         ),
       );
       context.go(next, extra: resumed ? JoinEntry.resumedInvite : null);
       return true;
-
-    case AuthRedirected():
-      // The in-app browser is open; the deep link will finish the flow.
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Finish signing in in the window that just opened.'),
-        ),
-      );
-      return false;
 
     case AuthEmailConfirmationRequired(:final email, :final fromSignUp):
       await showDialog<void>(

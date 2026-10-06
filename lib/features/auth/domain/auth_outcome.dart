@@ -11,24 +11,20 @@ sealed class AuthOutcome {
 
 /// The session was established / upgraded synchronously.
 class AuthSuccess extends AuthOutcome {
-  const AuthSuccess({required this.user, this.isNewAccount = false});
+  const AuthSuccess({
+    required this.user,
+    this.isNewAccount = false,
+    this.accountLinked = false,
+  });
 
   final User? user;
 
   /// True when a guest was converted or a brand-new account was created.
   final bool isNewAccount;
-}
 
-/// A browser / external app was opened for a PKCE flow. The session will
-/// arrive later via the deep link; watch `authNotifierProvider` /
-/// `authFlowMessageProvider` for the result.
-class AuthRedirected extends AuthOutcome {
-  const AuthRedirected({required this.provider, required this.linking});
-
-  final OAuthKind provider;
-
-  /// True when the flow is `linkIdentity` (guest upgrade).
-  final bool linking;
+  /// True when a guest was upgraded in place by linking a provider identity
+  /// (progress kept); the UI says so instead of "Signed in.".
+  final bool accountLinked;
 }
 
 /// Supabase requires the user to confirm the new email before the account

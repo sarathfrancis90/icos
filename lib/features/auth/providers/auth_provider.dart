@@ -146,6 +146,25 @@ class AuthNotifier extends _$AuthNotifier {
   /// way out of [_launchWeb].
   bool _webFlowOpen = false;
 
+  /// True while a web sign-in's callback is exchanged and for a moment after,
+  /// because auth events can be delivered a tick after the call returns.
+  bool _webCompleting = false;
+  DateTime? _webCompletedAt;
+
+  bool get _webCompletionInProgress {
+    if (_webCompleting) return true;
+    final at = _webCompletedAt;
+    return at != null &&
+        DateTime.now().difference(at) < const Duration(seconds: 3);
+  }
+
+  Timer? _resumeTimer;
+
+  /// How long a resume must leave the busy state untouched before it is
+  /// treated as stuck; a resume with the sheet still up is not abandonment.
+  @visibleForTesting
+  static Duration resumeGrace = const Duration(seconds: 1);
+
   late final _ResumeObserver _resumeObserver = _ResumeObserver(handleAppResumed);
 
   @override
@@ -167,9 +186,10 @@ class AuthNotifier extends _$AuthNotifier {
   void attachLifecycleObserver() {
     WidgetsFlutterBinding.ensureInitialized();
     WidgetsBinding.instance.addObserver(_resumeObserver);
-    ref.onDispose(
-      () => WidgetsBinding.instance.removeObserver(_resumeObserver),
-    );
+    ref.onDispose(() {
+      _resumeTimer?.cancel();
+      WidgetsBinding.instance.removeObserver(_resumeObserver);
+    });
   }
 
   /// Handles a Supabase auth event. Public only so tests can drive it.
@@ -186,9 +206,13 @@ class AuthNotifier extends _$AuthNotifier {
         !user.isAnonymous) {
       // Deep-link linkIdentity completed for a former guest.
       _pendingRedirectProvider = null;
-      ref.read(authFlowMessageProvider.notifier).show(
-            'Account linked. Your progress is saved.',
-          );
+      // A web sign-in reports its own result through AuthSuccess; saying it
+      // here too would show the message twice.
+      if (!_webCompletionInProgress) {
+        ref.read(authFlowMessageProvider.notifier).show(
+              'Account linked. Your progress is saved.',
+            );
+      }
     }
     // A non-guest account just got linked or signed in: resume the invite the
     // guest was joining, if one is pending (consumed exactly once).
@@ -350,12 +374,14 @@ class AuthNotifier extends _$AuthNotifier {
         case OAuthMethod.linkIdentityWeb:
           await _launchWeb(supabaseProvider, provider, link: true);
           _setUser();
-          return AuthRedirected(provider: provider, linking: true);
+          // The session API already returned the redirect and the exchange is
+          // done, so this is a finished sign-in, like the native paths.
+          return AuthSuccess(user: currentUser, accountLinked: true);
 
         case OAuthMethod.webOAuth:
           await _launchWeb(supabaseProvider, provider, link: false);
           _setUser();
-          return AuthRedirected(provider: provider, linking: false);
+          return AuthSuccess(user: currentUser);
 
         case OAuthMethod.nativeIdToken:
           final outcome = switch (provider) {
@@ -439,7 +465,13 @@ class AuthNotifier extends _$AuthNotifier {
       }
       // Processed here, once. The session API consumes the redirect, so the
       // app-link handler never sees this URL.
-      await gateway.completeSession(callback);
+      _webCompleting = true;
+      try {
+        await gateway.completeSession(callback);
+      } finally {
+        _webCompleting = false;
+        _webCompletedAt = DateTime.now();
+      }
     } finally {
       // Success clears it in handleAuthEvent too; every other exit lands here.
       _pendingRedirectProvider = null;
@@ -453,7 +485,13 @@ class AuthNotifier extends _$AuthNotifier {
   /// state through [handleAuthEvent]. The guest session is untouched.
   @visibleForTesting
   void handleAppResumed() {
-    if (_webFlowOpen && state.isLoading) _setUser();
+    if (!_webFlowOpen || !state.isLoading) return;
+    // Re-check after a grace period: a resume while the sheet is still up
+    // (lock screen, Face ID) must not hide the spinner early.
+    _resumeTimer?.cancel();
+    _resumeTimer = Timer(resumeGrace, () {
+      if (_webFlowOpen && state.isLoading) _setUser();
+    });
   }
 
   Future<AuthOutcome> _nativeGoogle() async {
