@@ -100,6 +100,16 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   /// A drag gesture has been started and not yet ended.
   bool _dragging = false;
 
+  /// The board as this gesture has left it. Pointer events can arrive faster
+  /// than frames (120Hz screens, quick flicks), so [widget.gameState] may still
+  /// be the state from before the previous event; classifying against it would
+  /// drop cells. Cleared as soon as the owner hands over a new state.
+  GameState? _pending;
+  GameState get _state => _pending ?? widget.gameState;
+
+  /// Where the last drag event was, to fill in cells a fast move skipped.
+  Offset? _lastDragPos;
+
   /// Rule oracle. Pure and cheap to build: it only wraps the puzzle, and keeps
   /// the grid from re-deriving adjacency and waypoint-order rules of its own.
   late GameEngine _engine;
@@ -147,6 +157,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   @override
   void didUpdateWidget(covariant PuzzleGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.gameState != oldWidget.gameState) _pending = null;
 
     if (widget.gameState.puzzle != oldWidget.gameState.puzzle) {
       _engine = GameEngine(widget.gameState.puzzle);
@@ -502,6 +513,9 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
                     _BoardPanRecognizer.new,
                     (recognizer) {
                       recognizer
+                        // The path starts where the finger went down, not
+                        // where it was when the pan was recognised.
+                        ..dragStartBehavior = DragStartBehavior.down
                         ..onStart = (details) {
                           if (widget.readOnly) return;
                           _dragging = true;
@@ -509,6 +523,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
                           // The press that starts a drag never reaches the
                           // per-cell tap targets, so treat it as the
                           // gesture's first move.
+                          _lastDragPos = null;
                           _dragAt(details.localPosition, size, cellSize);
                         }
                         ..onUpdate = (details) {
@@ -586,15 +601,30 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   void _endDrag() {
     if (!_dragging) return;
     _dragging = false;
+    _lastDragPos = null;
     widget.onDragEnd?.call();
   }
 
-  /// Maps a pointer position to a cell and forwards it as a drag move.
+  /// Maps a pointer position to a cell and forwards it as a drag move. A move
+  /// that jumped over cells is walked in steps of a third of a cell, so the
+  /// cells in between are visited in order.
   void _dragAt(Offset localPos, int size, double cellSize) {
-    final row = (localPos.dy / cellSize).floor();
-    final col = (localPos.dx / cellSize).floor();
-    if (row < 0 || row >= size || col < 0 || col >= size) return;
-    _handleCellDrag(row, col);
+    final from = _lastDragPos;
+    _lastDragPos = localPos;
+    final points = <Offset>[];
+    if (from != null) {
+      final steps = ((localPos - from).distance / (cellSize / 3)).ceil();
+      for (var i = 1; i < steps; i++) {
+        points.add(Offset.lerp(from, localPos, i / steps)!);
+      }
+    }
+    points.add(localPos);
+    for (final point in points) {
+      final row = (point.dy / cellSize).floor();
+      final col = (point.dx / cellSize).floor();
+      if (row < 0 || row >= size || col < 0 || col >= size) continue;
+      _handleCellDrag(row, col);
+    }
   }
 
   /// What touching [row], [col] means right now.
@@ -604,12 +634,12 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   /// waypoint 1" rule and waypoint ordering. Asking it keeps one rulebook
   /// between what the grid accepts and what the engine will actually apply.
   _GridAction _classify(int row, int col) {
-    final path = widget.gameState.path;
+    final path = _state.path;
     final index = path.indexWhere((p) => p.row == row && p.col == col);
     if (index >= 0) {
       return index == path.length - 1 ? _GridAction.noop : _GridAction.retract;
     }
-    return _engine.canMoveToCell(widget.gameState, row, col)
+    return _engine.canMoveToCell(_state, row, col)
         ? _GridAction.extend
         : _GridAction.reject;
   }
@@ -644,9 +674,11 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
       case _GridAction.retract:
         _retractFeedback();
         widget.onCellDrag(row, col);
+        _pending = _engine.handleCellTap(_state, row, col, countUndo: false);
       case _GridAction.extend:
         _stepFeedback();
         widget.onCellDrag(row, col);
+        _pending = _engine.handleCellTap(_state, row, col, countUndo: false);
     }
   }
 
