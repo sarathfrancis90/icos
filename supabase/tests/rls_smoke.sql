@@ -562,6 +562,23 @@ BEGIN
 END $$;
 
 -- ===========================================================================
+-- 16. provider_display_name: Apple relay addresses never become a name.
+-- ===========================================================================
+DO $$
+DECLARE v text;
+BEGIN
+  v := public.provider_display_name('{}'::jsonb, 'k3x9q2@privaterelay.appleid.com');
+  IF v IS NOT NULL THEN RAISE EXCEPTION 'FAIL 16a: relay email gave name %', v; END IF;
+  v := public.provider_display_name('{}'::jsonb, 'k3x9q2@PrivateRelay.AppleID.com');
+  IF v IS NOT NULL THEN RAISE EXCEPTION 'FAIL 16b: relay email (mixed case) gave name %', v; END IF;
+  v := public.provider_display_name('{"full_name":"Ada Lovelace"}'::jsonb, 'k3x9q2@privaterelay.appleid.com');
+  IF v IS DISTINCT FROM 'Ada Lovelace' THEN RAISE EXCEPTION 'FAIL 16c: relay + full_name gave %', v; END IF;
+  v := public.provider_display_name('{}'::jsonb, 'ada.lovelace@example.com');
+  IF v IS DISTINCT FROM 'Ada Lovelace' THEN RAISE EXCEPTION 'FAIL 16d: normal email gave %', v; END IF;
+  RAISE NOTICE 'PASS 16: provider_display_name relay handling OK';
+END $$;
+
+-- ===========================================================================
 -- 15. app_config is readable by anon; service-only tables are not.
 -- ===========================================================================
 SELECT set_config('role', 'anon', true);
