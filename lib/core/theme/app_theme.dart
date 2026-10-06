@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../features/puzzle/presentation/widgets/puzzle_palette.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_sizes.dart';
+import 'app_palette.dart';
 
 abstract final class AppTheme {
   static ThemeData get darkTheme => ThemeData(
@@ -19,8 +22,10 @@ abstract final class AppTheme {
           onError: Colors.white,
         ),
         scaffoldBackgroundColor: AppColors.deepBlack,
+        extensions: const [AppPalette.dark, PuzzlePalette.dark],
         textTheme: _buildTextTheme(Brightness.dark),
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
+          systemOverlayStyle: AppPalette.overlayStyleFor(Brightness.dark),
           backgroundColor: Colors.transparent,
           foregroundColor: AppColors.textPrimaryDark,
           elevation: 0,
@@ -162,8 +167,10 @@ abstract final class AppTheme {
           onError: Colors.white,
         ),
         scaffoldBackgroundColor: AppColors.lightBackground,
+        extensions: const [AppPalette.light, PuzzlePalette.light],
         textTheme: _buildTextTheme(Brightness.light),
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
+          systemOverlayStyle: AppPalette.overlayStyleFor(Brightness.light),
           backgroundColor: AppColors.lightBackground,
           foregroundColor: AppColors.lightOnBackground,
           elevation: 0,
@@ -300,13 +307,21 @@ abstract final class AppTheme {
         ),
       );
 
+  /// The app text theme for the ambient brightness, as built (without the
+  /// line-height geometry [Theme.of] merges in). A few titles have always
+  /// been laid out with these metrics; keeping them keeps those layouts.
+  static TextTheme textThemeOf(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? darkTheme.textTheme
+      : lightTheme.textTheme;
+
   static TextTheme _buildTextTheme(Brightness brightness) {
     final baseColor = brightness == Brightness.dark
         ? AppColors.textPrimaryDark
         : AppColors.textPrimaryLight;
     final secondaryColor = brightness == Brightness.dark
         ? AppColors.textSecondaryDark
-        : AppColors.textSecondaryLight;
+        : AppColors.textSecondaryOnLight;
 
     final base = GoogleFonts.interTextTheme(
       const TextTheme(

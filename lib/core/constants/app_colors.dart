@@ -128,6 +128,56 @@ abstract final class AppColors {
   static const lightGridLine = Color(0xFFCBD5E1);
   static const lightFilledCell = Color(0xFFDBEAFE);
 
+  // ─── Light theme tokens (resolved through AppPalette / PuzzlePalette) ──
+  // Every pair below is checked by test/accessibility/contrast_test.dart.
+  static const lightElevated = Color(0xFFF1F5F9);
+  static const lightInset = Color(0xFFE2E8F0);
+  /// Secondary text on light surfaces: 6.9:1 on [lightElevated].
+  static const textSecondaryOnLight = Color(0xFF475569);
+  /// Tertiary text on light surfaces: 4.6:1 on [lightElevated].
+  static const textTertiaryOnLight = Color(0xFF5B6B7F);
+  static const successOnLight = Color(0xFF15803D);
+  static const goldOnLight = Color(0xFF8A5300);
+  static const coralOnLight = Color(0xFFC2410C);
+  static const infoOnLight = Color(0xFF1D4ED8);
+  static const errorOnLight = Color(0xFFB91C1C);
+  static const hintOnLight = Color(0xFF6D28D9);
+  static const glassFillLight = Color(0xCCFFFFFF);
+  static const glassBorderLight = Color(0x260F172A);
+  static const glassTextLight = Color(0xFF334155);
+
+  /// Light puzzle board: inset cells, walls and the amber line darkened so it
+  /// keeps 3:1 on the pale cells (the dark ramp is 1.6:1 there).
+  static const lightCellBackground = Color(0xFFE2E8F0);
+  static const lightCellHighlight = Color(0xFFFFFFFF);
+  static const lightCellShadow = Color(0xFFCBD5E1);
+  static const lightCellBorder = Color(0xFF94A3B8);
+  static const lightWallFill = Color(0xFF64748B);
+  static const lightWallBorder = Color(0xFF475569);
+  static const lightWallCross = Color(0xFFF1F5F9);
+  static const lightPathGradientColors = [
+    Color(0xFF9A3412),
+    Color(0xFFC2410C),
+    Color(0xFFB45309),
+    Color(0xFFA16207),
+    Color(0xFFA16207),
+  ];
+  static const lightFilledCellStart = Color(0xFFFFF7D6);
+  static const lightFilledCellEnd = Color(0xFFFDE68A);
+  /// Waypoint discs on the light board: dark slate with white numerals.
+  static const lightWaypointFill = Color(0xFF1E293B);
+  static const lightWaypointBorder = Color(0xFF0F172A);
+  static const lightWaypointText = Color(0xFFFFFFFF);
+  static const lightWaypointStartBorder = Color(0xFF16A34A);
+
+  /// Light animated background: pale mesh tints over [lightBackground].
+  static const lightMeshColors = [
+    Color(0xFFE0E7FF),
+    Color(0xFFF3E8FF),
+    Color(0xFFDBEAFE),
+    Color(0xFFFCE7F3),
+  ];
+
   // ─── Colorblind Palettes ─────────────────────────────────────────
   // Okabe–Ito based. Each mode pairs a path hue with a contrasting
   // waypoint hue that stays distinguishable under that deficiency; pattern
