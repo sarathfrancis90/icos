@@ -273,18 +273,24 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
   - App access: all functionality available without special access (guest mode) — provide a test account anyway
   - Content rating questionnaire (IARC): Game > Puzzle; no violence/gambling/user-generated *media*; expect *Everyone*
   - Target audience: 13+ (do not target children)
-  - **Data safety** — must match the privacy policy and `PrivacyInfo.xcprivacy`:
+  - **Data safety** — must match the privacy policy and `PrivacyInfo.xcprivacy`. The AAB includes Firebase Analytics, Crashlytics and Messaging (optional, active only when `FIREBASE_*` values are configured), so declare the Firebase rows. Nothing is sold or shared with third parties; Supabase, Firebase, Google and Apple sign-in act as processors/service providers (Google excludes these from "sharing"):
     | Data type | Collected | Shared | Required | Purpose |
     |---|---|---|---|---|
-    | Personal info > Email address | Yes (optional, on sign-up) | No | Optional | Account management |
+    | Personal info > Email address | Yes (only with an account) | No | Optional | Account management |
     | Personal info > Name (display name) | Yes | No | Optional | App functionality, Account management |
-    | Personal info > User IDs | Yes | No | Required | App functionality, Account management |
-    | App activity > In-app actions / Other user-generated content (solve records, group names) | Yes | No | Required | App functionality |
-    | App info & performance > Crash logs, Diagnostics | Yes | No | Required | Analytics |
-    | Device or other IDs (Firebase instance id) | Yes | No | Required | Analytics |
-    Encrypted in transit: **Yes**. Deletion mechanism: **Yes** (in-app, Profile > Delete account). Security practices: independent review **No**
+    | Personal info > User IDs | Yes | No | Required | App functionality, Account management, Analytics |
+    | App activity > App interactions (in-app actions, analytics events) | Yes | No | Required | Analytics, App functionality |
+    | App activity > Other user-generated content (group names) and solve records | Yes | No | Required | App functionality |
+    | App info & performance > Crash logs | Yes | No | Required | Analytics |
+    | App info & performance > Diagnostics | Yes | No | Required | Analytics |
+    | Device or other IDs (Firebase installation ID, FCM token) | Yes, only when Firebase is configured | No | Required | App functionality, Analytics |
+    Encrypted in transit: **Yes**. Deletion mechanism: **Yes** (in-app Profile > Delete account, plus `https://icos.sarathfrancis.work/delete-account.html`). Security practices: independent review **No**. Advertising ID: not collected. Tracking: none (no ads, nothing sold). Not collected: location, contacts, photos, financial, health, messages, audio.
   - News app: No; COVID: No; Government app: No; Financial features: No; Health: No
   - Advertising ID: **No** — not used. The `AD_ID`, `ACCESS_ADSERVICES_AD_ID` and `ACCESS_ADSERVICES_ATTRIBUTION` permissions are removed in `android/app/src/main/AndroidManifest.xml` (`tools:node="remove"`) and Firebase's `google_analytics_adid_collection_enabled` is `false`; re-check the merged manifest after adding SDKs.
+  - **Console questionnaire answers**
+    - Apple age rating (expect 4+): Parental controls No; Age assurance No; User-Generated Content **Yes** (display names, group names, automatic activity entries; report and block exist); Messaging and chat No; Social Media **No**; Advertising No; Unrestricted web access No; all content descriptors None.
+    - Play content rating (IARC): category Game > Puzzle; violence, sexual, language, controlled substances, gambling none; "Users can interact or exchange content" **Yes**; shares location No; digital purchases No. Expected: **Everyone** with the "Users Interact" notice.
+    - App access: all functionality available without special access (optionally give the demo account for Groups). Ads: **No**. Target audience: **13+** (not designed for children, not in Families). News / Government / Health / Financial features: **No**.
 - [ ] **(once)** Grow > Store presence > Main store listing: short/full description (`release/google-play/store_listing.txt`),
       icon `release/google-play/hi_res_icon.png` (512x512), feature graphic `release/google-play/feature_graphic.png` (1024x500), phone screenshots (`release/google-play/screenshots/`)
 - [ ] **(once)** Testing > Closed testing > create track *beta* with an email list of >= 12 testers; share the opt-in link; wait 14 days; then *Apply for production access* (Dashboard)

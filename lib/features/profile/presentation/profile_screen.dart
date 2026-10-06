@@ -3,17 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/app_urls.dart';
 import '../../../core/services/app_config_provider.dart';
-import '../../../core/services/app_logger.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
+import '../../../core/utils/external_links.dart';
 import '../../../core/utils/result.dart';
 import '../../../core/utils/share_utils.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -467,16 +466,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
 
   Future<void> _openUrl(BuildContext context, String url) async {
-    final uri = Uri.parse(url);
-    try {
-      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!ok && context.mounted) {
-        _snack(context, 'Could not open $url');
-      }
-    } catch (e) {
-      AppLogger.warn('launchUrl failed', error: e, data: {'url': url});
-      if (context.mounted) _snack(context, 'Could not open $url');
-    }
+    final ok = await openExternalUrl(url);
+    if (!ok && context.mounted) _snack(context, 'Could not open $url');
   }
 
   void _snack(BuildContext context, String message) {
