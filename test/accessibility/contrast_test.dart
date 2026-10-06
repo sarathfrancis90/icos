@@ -9,6 +9,7 @@ import 'package:icos/core/constants/app_strings.dart';
 import 'package:icos/core/theme/app_palette.dart';
 import 'package:icos/features/groups/domain/models/blocked_user.dart';
 import 'package:icos/features/groups/presentation/groups_screen.dart';
+import 'package:icos/features/groups/presentation/widgets/leaderboard_row.dart';
 import 'package:icos/features/groups/providers/blocked_users_provider.dart';
 import 'package:icos/features/groups/providers/groups_provider.dart';
 import 'package:icos/features/home/presentation/home_screen.dart';
@@ -600,6 +601,9 @@ void main() {
       expect(d.textSecondary, AppColors.textSecondaryDark);
       expect(d.accent, AppColors.purpleLight);
       expect(GridPalette.forMode(ColorblindMode.none), same(GridPalette.standard));
+      for (final mode in ColorblindMode.values) {
+        expect(GridPalette.forMode(mode).wrongCellMark, Colors.white);
+      }
     });
 
     for (final mode in ColorblindMode.values) {
@@ -634,6 +638,24 @@ void main() {
           contrastRatio(g.wallFill, g.cellBackground),
           greaterThanOrEqualTo(3),
         );
+        // Wrong-cell cross (the non-colour cue): >= 3:1 on the wrong-cell
+        // wash (35% fill, with and without the up-to-45% pulse under it)
+        // over every cell it can sit on.
+        for (final cell in boardCells) {
+          final fill = compositeOver(g.wrongCell.withValues(alpha: 0.35), cell);
+          final pulsed = compositeOver(
+            g.wrongCell.withValues(alpha: 0.35),
+            compositeOver(g.wrongCell.withValues(alpha: 0.45), cell),
+          );
+          for (final bgc in [fill, pulsed]) {
+            expect(
+              // Drawn at 90% opacity.
+              contrastRatio(g.wrongCellMark.withValues(alpha: 0.9), bgc),
+              greaterThanOrEqualTo(3),
+              reason: 'wrong-cell mark ${g.wrongCellMark} on $bgc',
+            );
+          }
+        }
         // The start ring marks waypoint 1 against its own disc.
         expect(g.waypointStartBorderAlpha, 1);
         expect(
@@ -718,6 +740,31 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(grid().palette, same(GridPalette.standardLight));
     expect(scaffoldBg(), AppColors.lightBackground);
+  });
+
+  group('leaderboard medals', () {
+    test('dark medals are the shipped colours', () {
+      expect(medalColor(1), AppColors.streakGold);
+      expect(medalColor(2), const Color(0xFFC0C0C0));
+      expect(medalColor(3), const Color(0xFFCD7F32));
+      expect(medalColor(4), isNull);
+    });
+
+    test('light medals keep 3:1 on their tint over the row surface', () {
+      for (final rank in [1, 2, 3]) {
+        final c = medalColor(rank, brightness: Brightness.light)!;
+        final badge = compositeOver(
+          c.withValues(alpha: 0.18),
+          AppPalette.light.card,
+        );
+        expect(contrastRatio(c, badge), greaterThanOrEqualTo(3), reason: '$rank');
+        expect(
+          contrastRatio(c, AppPalette.light.card),
+          greaterThanOrEqualTo(3),
+          reason: '$rank on the row',
+        );
+      }
+    });
   });
 
   group('system bars', () {

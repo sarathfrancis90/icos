@@ -1112,7 +1112,7 @@ class _GridPainter extends CustomPainter {
 
     final inset = cellSize * 0.32;
     final crossPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.9)
+      ..color = palette.wrongCellMark.withValues(alpha: 0.9)
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(

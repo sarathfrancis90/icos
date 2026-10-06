@@ -40,6 +40,7 @@ class GridPalette {
     this.burst = AppColors.streakGold,
     this.dimUnvisitedWaypoints = true,
     this.waypointStartBorderAlpha = 0.5,
+    this.wrongCellMark = Colors.white,
   });
 
   final ColorblindMode mode;
@@ -101,6 +102,10 @@ class GridPalette {
   /// Opacity of the start ring; the light board draws it solid so it reads
   /// against the dark disc.
   final double waypointStartBorderAlpha;
+
+  /// Cross drawn on the wrong-cell hint (the cue that does not rely on
+  /// colour): white on the dark board, dark on the light one.
+  final Color wrongCellMark;
 
   /// Draw hatching on filled cells, rings on waypoints and ticks along the line.
   bool get patterns => mode.isActive;
@@ -219,6 +224,7 @@ class GridPalette {
     burst: AppColors.goldOnLight,
     dimUnvisitedWaypoints: false,
     waypointStartBorderAlpha: 1,
+    wrongCellMark: Color(0xFF0F172A),
   );
 
   static const GridPalette deuteranopiaLight = GridPalette(
@@ -260,6 +266,7 @@ class GridPalette {
     burst: Color(0xFF8A5300),
     dimUnvisitedWaypoints: false,
     waypointStartBorderAlpha: 1,
+    wrongCellMark: Color(0xFF0F172A),
   );
 
   static const GridPalette protanopiaLight = GridPalette(
@@ -301,6 +308,7 @@ class GridPalette {
     burst: Color(0xFF6B5E00),
     dimUnvisitedWaypoints: false,
     waypointStartBorderAlpha: 1,
+    wrongCellMark: Color(0xFF0F172A),
   );
 
   static const GridPalette tritanopiaLight = GridPalette(
@@ -342,6 +350,7 @@ class GridPalette {
     burst: Color(0xFF006B4E),
     dimUnvisitedWaypoints: false,
     waypointStartBorderAlpha: 1,
+    wrongCellMark: Color(0xFF0F172A),
   );
 
   /// The palette for [mode] on a board drawn in [brightness].

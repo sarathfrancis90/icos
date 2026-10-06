@@ -7,17 +7,25 @@ import '../../../../core/utils/date_utils.dart';
 import '../../domain/models/group.dart';
 import 'group_ui.dart';
 
-/// Medal colours for the podium.
+/// Medal colours for the podium (dark theme).
 const _gold = AppColors.streakGold;
 const _silver = Color(0xFFC0C0C0);
 const _bronze = Color(0xFFCD7F32);
 
-Color? medalColor(int rank) => switch (rank) {
-      1 => _gold,
-      2 => _silver,
-      3 => _bronze,
-      _ => null,
-    };
+/// The same metals, deep enough for 3:1 on the light row and its tint.
+const _goldLight = AppColors.goldOnLight;
+const _silverLight = Color(0xFF64748B);
+const _bronzeLight = Color(0xFF9A4A1A);
+
+Color? medalColor(int rank, {Brightness brightness = Brightness.dark}) {
+  final dark = brightness == Brightness.dark;
+  return switch (rank) {
+    1 => dark ? _gold : _goldLight,
+    2 => dark ? _silver : _silverLight,
+    3 => dark ? _bronze : _bronzeLight,
+    _ => null,
+  };
+}
 
 /// Rank badge: a medal icon for the top three, otherwise the number.
 class RankBadge extends StatelessWidget {
@@ -28,7 +36,7 @@ class RankBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final medal = medalColor(rank);
+    final medal = medalColor(rank, brightness: theme.brightness);
     final color = medal ?? theme.colorScheme.onSurface.withValues(alpha: 0.5);
 
     return Semantics(
