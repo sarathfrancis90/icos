@@ -126,9 +126,7 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 - [ ] `docs/.nojekyll` exists (it does) so the `.well-known/` directory is published
 - [ ] After Apple + Google setup below, fill the placeholders:
   - `docs/.well-known/apple-app-site-association`: DONE (Team ID `H845PX7Q62`)
-  - `docs/.well-known/assetlinks.json`: replace `REPLACE_WITH_PLAY_APP_SIGNING_SHA256` with the
-    **Play App Signing** certificate SHA-256 (Play Console > Setup > App signing > *App signing key certificate*),
-    not the upload key. Add the upload-key fingerprint as a second array entry if you side-load release builds.
+  - `docs/.well-known/assetlinks.json`: DONE 2026-10-06 — holds the Play App Signing SHA-256 (`C8:DF:…:DA:11`) and the upload-key SHA-256 (`7F:8E:…:BA:B4`) so both Play-signed and side-loaded release builds verify.
 - [ ] Verify after deploy:
   ```bash
   curl -sI https://icos.sarathfrancis.work/.well-known/apple-app-site-association | grep -i content-type   # must be JSON, no redirect
