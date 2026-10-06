@@ -26,8 +26,21 @@ appId: com.icos.game
 - waitForAnimationToEnd
 - takeScreenshot: 11_oauth/after_google_tap
 
-# Dismiss any dialog
-- back
+# Dismiss the in-app sign-in sheet/tab. Android: back closes the Custom Tab.
+# iOS: the ASWebAuthenticationSession sheet has a Cancel/Close button (Maestro
+# `back` is a no-op there).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "(?i)(cancel|close)"
+          optional: true
 - waitForAnimationToEnd
 
 # -- Tap Apple to see what happens --
@@ -37,7 +50,18 @@ appId: com.icos.game
 - waitForAnimationToEnd
 - takeScreenshot: 11_oauth/after_apple_tap
 
-# Dismiss
-- back
+# Dismiss (same as above)
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "(?i)(cancel|close)"
+          optional: true
 - waitForAnimationToEnd
 - takeScreenshot: 11_oauth/auth_screen_final
