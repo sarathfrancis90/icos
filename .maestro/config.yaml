@@ -27,3 +27,11 @@ executionOrder:
     - 17_error_empty_states
     - 18_profile_edit
     - 19_accessibility_check
+    - 20_rc5_fresh_home
+    - 27_rc5_ipad_tour
+    - 26_rc5_dynamic_type_tour
+    - 22_rc5_forgot_password
+    - 21_rc5_email_signup_link
+    - 24_rc5_group_create
+    - 23_rc5_email_signin
+    - 25_rc5_join_via_link_signup

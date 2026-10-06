@@ -14,6 +14,11 @@ appId: com.icos.game
       visible: "Next"
     commands:
       - tapOn: "Next"
+      - waitForAnimationToEnd
       - tapOn: "Next"
+      - waitForAnimationToEnd
+      - extendedWaitUntil:
+          visible: "Get Started"
+          timeout: 10000
       - tapOn: "Get Started"
 - waitForAnimationToEnd

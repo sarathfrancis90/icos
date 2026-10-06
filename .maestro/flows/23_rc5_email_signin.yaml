@@ -2,6 +2,22 @@
 appId: com.icos.game
 ---
 - launchApp
+# An earlier flow may have left an email account signed in; sign out first.
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- runFlow:
+    when:
+      notVisible: "Create account"
+    commands:
+      - scrollUntilVisible:
+          element: "Sign out"
+      - tapOn: "Sign out"
+      - tapOn:
+          text: "Sign out"
+          index: 1
+      - waitForAnimationToEnd
+      - tapOn:
+          text: "Profile\nTab 4 of 4"
 - runFlow: ../subflows/open_auth_from_profile.yaml
 - tapOn: "Sign up with Email"
 - tapOn: "Sign In"
@@ -10,18 +26,8 @@ appId: com.icos.game
 - tapOn: "Password"
 - inputText: ${PW}
 - takeScreenshot: ${SHOTS}/d6a_signin_filled
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn:
-          text: "Sign In\nSign In"
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      # Android exposes the button as plain "Sign In" (the title is "Welcome Back").
-      - tapOn: "Sign In"
+# Android exposes the button as plain "Sign In" (the title is "Welcome Back").
+- tapOn: "Sign In"
 - waitForAnimationToEnd:
     timeout: 8000
 - takeScreenshot: ${SHOTS}/d6_after_signin

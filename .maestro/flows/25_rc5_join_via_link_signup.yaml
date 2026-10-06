@@ -1,7 +1,15 @@
 # From the "Account Required" join screen (guest opened an invite link): create an account and see where we land.
-# Pass -e EMAIL -e PW -e SHOTS.
+# Pass -e EMAIL -e PW -e SHOTS -e CODE (an invite code).
+# Android emulators do not verify app links, so first run once:
+#   adb shell pm set-app-links-user-selection --user 0 --package com.icos.game true icos.sarathfrancis.work
+# otherwise the link opens in Chrome instead of the app.
 appId: com.icos.game
 ---
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/ensure_home.yaml
+- openLink: https://icos.sarathfrancis.work/join/${CODE}
+- waitForAnimationToEnd
 - tapOn: "Create an account"
 - tapOn: "Sign up with Email"
 - tapOn: "Email"
@@ -10,20 +18,10 @@ appId: com.icos.game
 - inputText: ${PW}
 - tapOn: "Confirm Password"
 - inputText: ${PW}
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn:
-          text: "Create Account\nCreate Account"
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      # Android exposes the button as plain "Create Account"; index 0 is the screen title.
-      - tapOn:
-          text: "Create Account"
-          index: 1
+# Pick the button, not the screen title, by position.
+- tapOn:
+    text: "Create Account"
+    below: "Confirm Password"
 - waitForAnimationToEnd:
     timeout: 10000
 - takeScreenshot: ${SHOTS}/i7_after_signup_from_join
