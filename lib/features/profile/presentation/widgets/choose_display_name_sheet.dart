@@ -9,24 +9,15 @@ import '../../../../core/services/storage_service.dart';
 import '../../../../core/utils/app_error.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/utils/text_sanitizer.dart';
-import '../../domain/display_name_placeholder.dart';
+import '../../domain/display_name_suggestion.dart';
 import '../../providers/profile_provider.dart';
 
-/// The name the identity provider gave us, if any (Apple omits it after the
-/// first authorisation, and Hide My Email gives none at all).
-String providerNameOf(User user) {
-  final meta = user.userMetadata;
-  for (final key in const ['full_name', 'name']) {
-    final value = meta?[key];
-    if (value is String && value.trim().isNotEmpty) return value.trim();
-  }
-  return '';
-}
-
-/// After a sign-in or link completes: if the account still has a placeholder
-/// name ("Player 1234"), asks the player to choose one. Shown at most once per
-/// account on this device. Never throws; a failure here must not get in the way
-/// of the sign-in flow it follows.
+/// After the first sign-in or link completes for an account: asks the player
+/// to choose a display name, prefilled with a sensible default (the current
+/// name if they already chose one, else the provider's name, else the tidied
+/// email local part). Shown at most once per account on this device. Never
+/// throws; a failure here must not get in the way of the sign-in flow it
+/// follows.
 Future<void> maybePromptForDisplayName(
   BuildContext context,
   WidgetRef ref,
@@ -38,22 +29,27 @@ Future<void> maybePromptForDisplayName(
     final result = await ref
         .read(profileRepositoryProvider)
         .getProfile(user.id);
-    final profile = switch (result) {
-      Success(data: final p) => p,
+    final currentName = switch (result) {
+      Success(data: final p) => p.displayName,
       _ => null,
     };
-    if (profile == null || !isPlaceholderDisplayName(profile.displayName)) {
-      return;
-    }
     if (!context.mounted) return;
     // Marked before showing, so a dismissal by any route never repeats it.
     await StorageService.setDisplayNamePromptShown(user.id);
     if (!context.mounted) return;
+    final initial = initialDisplayName(
+      currentName: currentName,
+      meta: user.userMetadata,
+      email: user.email,
+    );
     await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => ChooseDisplayNameSheet(initialName: providerNameOf(user)),
+      builder: (_) => ChooseDisplayNameSheet(
+        initialName: initial,
+        hint: initial.isEmpty ? currentName : null,
+      ),
     );
   } catch (e, st) {
     AppLogger.warn('Display name prompt failed', error: e, st: st);
@@ -61,9 +57,12 @@ Future<void> maybePromptForDisplayName(
 }
 
 class ChooseDisplayNameSheet extends ConsumerStatefulWidget {
-  const ChooseDisplayNameSheet({super.key, this.initialName = ''});
+  const ChooseDisplayNameSheet({super.key, this.initialName = '', this.hint});
 
   final String initialName;
+
+  /// Shown in the empty field (the current placeholder name).
+  final String? hint;
 
   @override
   ConsumerState<ChooseDisplayNameSheet> createState() =>
@@ -149,8 +148,9 @@ class _ChooseDisplayNameSheetState
                 textCapitalization: TextCapitalization.words,
                 autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: (v) => validateName(v ?? ''),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: AppStrings.chooseNameField,
+                  hintText: widget.hint,
                   counterText: '',
                 ),
                 onFieldSubmitted: (_) => _save(),

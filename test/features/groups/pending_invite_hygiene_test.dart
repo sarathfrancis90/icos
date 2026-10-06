@@ -69,6 +69,7 @@ void main() {
   late Directory dir;
   setUp(() async {
     dir = await initTestStorage();
+    await StorageService.setDisplayNamePromptShown('u');
     _RecordingGroups.joined.clear();
   });
   tearDown(() async => dir.delete(recursive: true));

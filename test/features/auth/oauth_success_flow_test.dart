@@ -9,6 +9,7 @@ import 'package:icos/features/auth/domain/auth_strategy.dart';
 import 'package:icos/features/auth/presentation/widgets/auth_outcome_handler.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:icos/features/groups/domain/pending_invite.dart';
+import 'package:icos/core/services/storage_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../helpers/storage_test_helpers.dart';
@@ -87,6 +88,9 @@ void main() {
   late Directory dir;
   setUp(() async {
     dir = await initTestStorage();
+    // These tests are about the continuation, not the name prompt.
+    await StorageService.setDisplayNamePromptShown('g');
+    await StorageService.setDisplayNamePromptShown('u');
     _completed = 0;
     OAuthWebGateway.current = _Gateway();
     AuthNotifier.platformOverride = AuthPlatform.ios;

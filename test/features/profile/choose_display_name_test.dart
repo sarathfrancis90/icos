@@ -46,8 +46,9 @@ class _Repo extends ProfileRepository {
   }
 }
 
-User _user({Map<String, dynamic> meta = const {}}) => User(
+User _user({Map<String, dynamic> meta = const {}, String? email}) => User(
   id: 'u1',
+  email: email,
   appMetadata: const {},
   userMetadata: meta,
   aud: 'authenticated',
@@ -140,31 +141,55 @@ void main() {
     expect(find.text(AppStrings.chooseNameTitle), findsNothing);
   });
 
-  testWidgets('not shown for a real name', (tester) async {
+  testWidgets('shown once even for an already chosen name, prefilled', (
+    tester,
+  ) async {
     final (router, _) = await run(tester, name: 'Ada Lovelace');
     await finish(tester);
-    expect(find.text(AppStrings.chooseNameTitle), findsNothing);
+    expect(find.text(AppStrings.chooseNameTitle), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Ada Lovelace'), findsOneWidget);
+    expect(StorageService.displayNamePromptShown('u1'), isTrue);
+    await tester.tap(find.text(AppStrings.notNow));
+    await tester.pumpAndSettle();
     expect(_at(router), '/');
-    expect(StorageService.displayNamePromptShown('u1'), isFalse);
   });
 
-  testWidgets('field is prefilled with the provider name, else empty', (
+  testWidgets('Google-style metadata prefills the provider name', (
     tester,
   ) async {
     await run(
       tester,
       name: 'Player 1234',
-      user: _user(meta: {'full_name': 'Grace Hopper'}),
+      user: _user(meta: {'full_name': 'Grace Hopper'}, email: 'gh@example.com'),
     );
     await finish(tester);
     expect(find.widgetWithText(TextFormField, 'Grace Hopper'), findsOneWidget);
   });
 
-  testWidgets('empty field when the provider gave no name', (tester) async {
-    await run(tester, name: 'Player 1234');
+  testWidgets('plain email account prefills the tidied local part', (
+    tester,
+  ) async {
+    await run(
+      tester,
+      name: 'Player 1234',
+      user: _user(email: 'ada.lovelace@example.com'),
+    );
+    await finish(tester);
+    expect(find.widgetWithText(TextFormField, 'Ada Lovelace'), findsOneWidget);
+  });
+
+  testWidgets('relay email with no name: empty field with placeholder hint', (
+    tester,
+  ) async {
+    await run(
+      tester,
+      name: 'Player 1234',
+      user: _user(email: 'k3x9q2@privaterelay.appleid.com'),
+    );
     await finish(tester);
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.controller!.text, isEmpty);
+    expect(field.decoration!.hintText, 'Player 1234');
   });
 
   testWidgets('Save validates, persists through the profile path', (

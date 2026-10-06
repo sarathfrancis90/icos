@@ -37,7 +37,11 @@ void main() {
   setUpTestEnvironment();
 
   late Directory dir;
-  setUp(() async => dir = await initTestStorage());
+  setUp(() async {
+    dir = await initTestStorage();
+    // These tests are about the continuation, not the name prompt.
+    await StorageService.setDisplayNamePromptShown('u');
+  });
   tearDown(() async => dir.delete(recursive: true));
 
   group('pending join survives account creation', () {
