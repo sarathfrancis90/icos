@@ -114,6 +114,13 @@ Connect accepts the upload and then fails the asset with `MOV_RESAVE_STEREO`.
 
 ---
 
+### Rejection history
+
+- **2026-09-24, Guideline 4 (Design), build 1.0.0 (4), iPad Air 11-inch M3.** Apple: "We noticed that the user is taken to the default web browser to sign in or register for an account, which provides a poor user experience. ... please revise the app to enable users to sign in or register for an account in the app. You may also choose to implement the Safari View Controller API to display web content within the app."
+  - Cause: `lib/features/auth/providers/auth_provider.dart` launched the web OAuth flows (`linkIdentity` for guests, `signInWithOAuth`) with `LaunchMode.externalApplication`, i.e. Safari.
+  - Fix: every web OAuth page now opens with `LaunchMode.inAppBrowserView` (SFSafariViewController on iOS, Chrome Custom Tab on Android) through `lib/features/auth/data/oauth_web_gateway.dart`; the callback deep link dismisses it (`closeInAppWebView`), and the busy state clears when the app resumes after the sheet was closed. Reviewer notes updated in `ios/fastlane/metadata/review_information/notes.txt`. Android `MainActivity` is now `singleTask` so the callback reuses the app instead of stacking a second instance above the Custom Tab.
+  - Ships in: 1.0.0+5.
+
 ## 1. Domain: `icos.sarathfrancis.work` (needed before universal links / app links verify)
 
 The `docs/` folder is a static site (landing page, privacy policy, terms, `.well-known`).
