@@ -117,6 +117,9 @@ List<String> contrastFailures(
     final text = element.widget as Text;
     final label = text.data ?? text.textSpan?.toPlainText() ?? '';
     if (label.trim().isEmpty) continue;
+    // Gradient titles paint through a ShaderMask: the Text colour is only a
+    // mask. Their gradient stops are checked against the palette instead.
+    if (element.findAncestorWidgetOfExactType<ShaderMask>() != null) continue;
     final style = _effectiveStyle(element, text);
     final fg = style.color ?? const Color(0xFF000000);
     final bg = backgroundBehind(element, fallback: fallbackBackground);

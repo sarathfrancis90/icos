@@ -40,6 +40,23 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500)); // settle
     }
 
+    testWidgets('trophy finishes its bounce at full size', (tester) async {
+      await tester.pumpWidget(buildCelebrationOverlay());
+      // Small steps so frames land mid-bounce, as on a device.
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      final transform = tester.widget<Transform>(
+        find
+            .ancestor(
+              of: find.byIcon(Icons.emoji_events_rounded),
+              matching: find.byType(Transform),
+            )
+            .first,
+      );
+      expect(transform.transform.getMaxScaleOnAxis(), closeTo(1.0, 0.01));
+    });
+
     group('Under par message', () {
       testWidgets('shows "Crushed It!" when time <= par time', (tester) async {
         await tester.pumpWidget(buildCelebrationOverlay(
