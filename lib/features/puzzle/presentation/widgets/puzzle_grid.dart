@@ -24,6 +24,7 @@ class PuzzleGrid extends StatefulWidget {
     this.palette = GridPalette.standard,
     this.wrongCell,
     this.readOnly = false,
+    this.showStartCue = false,
     super.key,
   });
 
@@ -46,6 +47,10 @@ class PuzzleGrid extends StatefulWidget {
 
   /// Replay of a finished puzzle: input is ignored.
   final bool readOnly;
+
+  /// First-time cue: a ring on waypoint 1 that pulses (static when motion is
+  /// reduced). The owner turns it off after the first move.
+  final bool showStartCue;
 
   @override
   State<PuzzleGrid> createState() => _PuzzleGridState();
@@ -118,6 +123,12 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _reduceMotion = MotionUtils.shouldReduceMotion(context);
+    if (widget.showStartCue && _hintPulseController == null) {
+      _startHintPulse();
+    } else if (_reduceMotion) {
+      // Reduced motion arrived while a pulse was running: freeze it.
+      _stopHintPulse();
+    }
     // Under reduced motion the glow is a constant, so leaving the controller
     // stopped also stops the grid repainting every frame.
     if (_reduceMotion) {
@@ -188,7 +199,12 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     final hasHint = widget.gameState.hintCell != null || widget.wrongCell != null;
     if (hasHint && !hadHint) {
       _startHintPulse();
-    } else if (!hasHint && hadHint) {
+    } else if (!hasHint && hadHint && !widget.showStartCue) {
+      _stopHintPulse();
+    }
+    if (widget.showStartCue && !oldWidget.showStartCue) {
+      if (_hintPulseController == null) _startHintPulse();
+    } else if (!widget.showStartCue && oldWidget.showStartCue && !hasHint) {
       _stopHintPulse();
     }
 
@@ -479,6 +495,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
                 cellSize: cellSize,
                 palette: widget.palette,
                 wrongCell: widget.wrongCell,
+                showStartCue: widget.showStartCue,
                 segmentProgressGetter: _getSegmentProgress,
                 glowBreathValueGetter: _getGlowBreathValue,
                 cellEntryScaleGetter: _getCellEntryScale,
@@ -638,6 +655,7 @@ class _GridPainter extends CustomPainter {
     required this.cellSize,
     required this.palette,
     this.wrongCell,
+    this.showStartCue = false,
     required this.segmentProgressGetter,
     required this.glowBreathValueGetter,
     required this.cellEntryScaleGetter,
@@ -655,6 +673,7 @@ class _GridPainter extends CustomPainter {
   final double cellSize;
   final GridPalette palette;
   final GridPosition? wrongCell;
+  final bool showStartCue;
   final double Function(int index) segmentProgressGetter;
   /// Animated values are read through closures rather than captured as
   /// numbers. The painter is only rebuilt when the widget rebuilds, but
@@ -706,6 +725,8 @@ class _GridPainter extends CustomPainter {
         }
       }
     }
+
+    if (showStartCue) _drawStartCue(canvas);
 
     // Draw waypoint burst effect (Phase 4)
     if (waypointBurstProgress >= 0 && waypointBurstGridPos != null) {
@@ -1046,6 +1067,25 @@ class _GridPainter extends CustomPainter {
     );
   }
 
+  /// First-play ring around waypoint 1. Shares the hint pulse value, which is
+  /// zero under reduced motion: the ring is then solid and full strength.
+  void _drawStartCue(Canvas canvas) {
+    for (final wp in gameState.puzzle.waypoints) {
+      if (wp.order != 1) continue;
+      final center = Offset(
+        wp.col * cellSize + cellSize / 2,
+        wp.row * cellSize + cellSize / 2,
+      );
+      final t = hintPulseValue;
+      final radius = cellSize * (0.34 + 0.05 * t) + 3;
+      final paint = Paint()
+        ..color = palette.hint.withValues(alpha: 1.0 - 0.35 * t)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3;
+      canvas.drawCircle(center, radius, paint);
+    }
+  }
+
   /// Draws the hint cell highlight with Phase 3 pulsing.
   void _drawHintCell(Canvas canvas) {
     final hint = gameState.hintCell;
@@ -1192,6 +1232,7 @@ class _GridPainter extends CustomPainter {
     // the widget rebuilt for.
     return oldDelegate.gameState != gameState ||
         oldDelegate.palette != palette ||
+        oldDelegate.showStartCue != showStartCue ||
         oldDelegate.wrongCell != wrongCell ||
         oldDelegate.cellSize != cellSize ||
         oldDelegate.invalidCell != invalidCell ||

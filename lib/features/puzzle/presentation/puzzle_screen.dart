@@ -15,6 +15,7 @@ import '../../../core/services/storage_service.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/haptics.dart';
+import '../../../core/utils/motion.dart';
 import '../../../shared/widgets/animated_background.dart';
 import '../../../shared/widgets/content_width.dart';
 import '../../../shared/widgets/particle_field.dart';
@@ -30,6 +31,7 @@ import '../providers/game_provider.dart';
 import '../providers/puzzle_result_provider.dart';
 import '../providers/score_submission_provider.dart';
 import 'widgets/celebration_overlay.dart';
+import 'widgets/first_play_tooltip.dart';
 import 'widgets/game_controls.dart';
 import 'widgets/notification_prompt.dart';
 import 'widgets/offline_puzzle_notice.dart';
@@ -76,6 +78,42 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
   Puzzle? _pinnedPuzzle;
 
   late final ProviderContainer _container;
+
+  /// First-time affordances (ring on waypoint 1 + drag tooltip). `null` until
+  /// the first board is on screen, then fixed for this screen's lifetime:
+  /// `true` reserves the tooltip slot (so the board never shifts under the
+  /// player's finger), [_firstPlayActive] says whether it is still showing.
+  bool? _firstPlayEligible;
+  bool _firstPlayActive = false;
+
+  /// Decides once, from the first board shown. A board that already has a path
+  /// was restored mid-solve, so the player has clearly started before.
+  void _decideFirstPlay(GameState state, {required bool replay}) {
+    if (_firstPlayEligible != null) return;
+    if (StorageService.hasSeenFirstPlayHint) {
+      _firstPlayEligible = false;
+      return;
+    }
+    final fresh =
+        !replay &&
+        state.status != GameStatus.completed &&
+        state.path.isEmpty;
+    _firstPlayEligible = fresh;
+    _firstPlayActive = fresh;
+    if (!fresh) _persistFirstPlaySeen();
+  }
+
+  void _persistFirstPlaySeen() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(StorageService.setHasSeenFirstPlayHint(true));
+    });
+  }
+
+  void _dismissFirstPlay() {
+    if (!_firstPlayActive) return;
+    unawaited(StorageService.setHasSeenFirstPlayHint(true));
+    if (mounted) setState(() => _firstPlayActive = false);
+  }
 
   /// Fires once at the next UTC midnight while a not-yet-released date is
   /// showing, so a screen left open across the rollover becomes playable.
@@ -364,6 +402,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
           final notifier = ref.read(gameNotifierProvider(source).notifier);
           final isReplay = notifier.isReplay;
           final completed = gameState.status == GameStatus.completed;
+          _decideFirstPlay(gameState, replay: isReplay);
 
           return Stack(
             children: [
@@ -437,6 +476,29 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
                           ),
                         ),
                       ),
+                    if (_firstPlayEligible ?? false)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          start: AppSizes.md,
+                          end: AppSizes.md,
+                          top: AppSizes.sm,
+                        ),
+                        child: IgnorePointer(
+                          ignoring: !_firstPlayActive,
+                          child: ExcludeSemantics(
+                            excluding: !_firstPlayActive,
+                            child: AnimatedOpacity(
+                              opacity: _firstPlayActive ? 1 : 0,
+                              duration: MotionUtils.shouldReduceMotion(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 200),
+                              child: FirstPlayTooltip(
+                                onDismiss: _dismissFirstPlay,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: AppSizes.md),
                     Expanded(
                       child: Center(
@@ -445,12 +507,25 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen>
                           palette: palette,
                           wrongCell: hintUi.wrongCell,
                           readOnly: isReplay || completed,
+                          showStartCue: _firstPlayActive,
                           // The grid owns move feedback: only it knows whether
                           // a touch extends the line, retracts it or is
                           // rejected.
-                          onCellTap: notifier.handleCellTap,
+                          onCellTap: (row, col) {
+                            notifier.handleCellTap(row, col);
+                            if (ref
+                                    .read(gameNotifierProvider(source))
+                                    ?.path
+                                    .isNotEmpty ??
+                                false) {
+                              _dismissFirstPlay();
+                            }
+                          },
                           onCellDrag: notifier.handleCellDrag,
-                          onDragStart: notifier.beginDrag,
+                          onDragStart: () {
+                            notifier.beginDrag();
+                            _dismissFirstPlay();
+                          },
                           onDragEnd: notifier.endDrag,
                         ),
                       ),

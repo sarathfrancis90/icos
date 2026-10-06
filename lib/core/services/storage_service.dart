@@ -198,6 +198,13 @@ abstract final class StorageService {
     return _prefs.setInt(key, (_prefs.getInt(key) ?? 0) + 1);
   }
 
+  /// Device-level (never per account): the first puzzle ever opened on this
+  /// device shows the start ring and drag tooltip once.
+  static bool get hasSeenFirstPlayHint =>
+      _prefs.getBool('has_seen_first_play_hint') ?? false;
+  static Future<bool> setHasSeenFirstPlayHint(bool value) =>
+      _prefs.setBool('has_seen_first_play_hint', value);
+
   static bool get hasSeenOnboarding =>
       _prefs.getBool('has_seen_onboarding') ?? false;
   static Future<bool> setHasSeenOnboarding(bool value) =>

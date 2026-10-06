@@ -16,6 +16,7 @@ abstract final class AppStrings {
   static const puzzleReset = 'Reset';
   static const puzzleTimer = 'Time';
   static const puzzlePar = 'Par';
+  static const firstPlayTooltip = 'Drag to draw your path \u2014 start at 1';
   static const offlinePuzzleNotice =
       "Offline puzzle. This one is just for practice and won't count toward "
       'your streak.';
