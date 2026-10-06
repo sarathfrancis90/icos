@@ -38,7 +38,8 @@ class HomeScreen extends ConsumerWidget {
       // Server streak; if the server could not be reached, the last saved
       // stats; while still loading, unknown.
       final streakState = ref.read(streakProvider);
-      final streak = today.value?.streak?.currentStreak ??
+      final streak =
+          today.value?.streak?.currentStreak ??
           streakState.valueOrNull?.currentStreak ??
           (streakState.hasError
               ? cachedCurrentStreak(ref.read(authSessionProvider).userId)
@@ -149,29 +150,7 @@ class HomeScreen extends ConsumerWidget {
                       constraints: const BoxConstraints(
                         maxWidth: AppSizes.contentMaxWidth,
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _EntryCard(
-                              key: const Key('home-practice'),
-                              icon: Icons.fitness_center_rounded,
-                              title: 'Practice',
-                              subtitle: 'Unlimited puzzles',
-                              onTap: () => context.push('/practice'),
-                            ),
-                          ),
-                          const SizedBox(width: AppSizes.sm),
-                          Expanded(
-                            child: _EntryCard(
-                              key: const Key('home-archive'),
-                              icon: Icons.history_rounded,
-                              title: 'Archive',
-                              subtitle: 'Last 30 days',
-                              onTap: () => context.push('/archive'),
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: const _EntryCards(),
                     ),
                   ),
                 ],
@@ -332,21 +311,21 @@ class _PuzzleCard extends StatelessWidget {
                   const SizedBox(height: AppSizes.sm),
 
                   // Stats row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: AppSizes.sm,
+                    runSpacing: AppSizes.sm,
                     children: [
                       _InfoTag(
                         icon: Icons.grid_view_rounded,
                         label: '${gridSize}x$gridSize',
                       ),
-                      const SizedBox(width: AppSizes.sm),
                       _InfoTag(
                         icon: Icons.speed_rounded,
                         label:
                             difficulty[0].toUpperCase() +
                             difficulty.substring(1),
                       ),
-                      const SizedBox(width: AppSizes.sm),
                       _InfoTag(
                         icon: Icons.timer_outlined,
                         label: AppDateUtils.formatTimeHuman(parTime),
@@ -553,6 +532,89 @@ class _OutlinedAction extends StatelessWidget {
   }
 }
 
+/// Practice and Archive: side by side, or stacked full width when the longest
+/// word of a label would not fit in half the row at the current text scale
+/// (Flutter would otherwise break it mid-word).
+class _EntryCards extends StatelessWidget {
+  const _EntryCards();
+
+  static const _titleStyle = _EntryCard.titleStyle;
+  static const _subtitleStyle = _EntryCard.subtitleStyle;
+  static const _labels = <(String, String)>[
+    ('Practice', 'Unlimited puzzles'),
+    ('Archive', 'Last 30 days'),
+  ];
+
+  /// Card width taken by everything except the text: padding, border, icon
+  /// and the gap beside it.
+  static const _cardChrome =
+      AppSizes.md * 2 + 2 + _EntryCard.iconSize + AppSizes.sm + 4;
+
+  static double _longestWord(BuildContext context, TextScaler scaler) {
+    final base = DefaultTextStyle.of(context).style;
+    var longest = 0.0;
+    void measure(String text, TextStyle style) {
+      for (final word in text.split(' ')) {
+        final painter = TextPainter(
+          text: TextSpan(text: word, style: base.merge(style)),
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+        )..layout();
+        if (painter.width > longest) longest = painter.width;
+        painter.dispose();
+      }
+    }
+
+    for (final (title, subtitle) in _labels) {
+      measure(title, _titleStyle);
+      measure(subtitle, _subtitleStyle);
+    }
+    return longest;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scaler = MediaQuery.textScalerOf(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final perCard = (constraints.maxWidth - AppSizes.sm) / 2;
+        final stack = perCard - _cardChrome < _longestWord(context, scaler);
+        final practice = _EntryCard(
+          key: const Key('home-practice'),
+          icon: Icons.fitness_center_rounded,
+          title: _labels[0].$1,
+          subtitle: _labels[0].$2,
+          onTap: () => context.push('/practice'),
+        );
+        final archive = _EntryCard(
+          key: const Key('home-archive'),
+          icon: Icons.history_rounded,
+          title: _labels[1].$1,
+          subtitle: _labels[1].$2,
+          onTap: () => context.push('/archive'),
+        );
+        if (stack) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              practice,
+              const SizedBox(height: AppSizes.sm),
+              archive,
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: practice),
+            const SizedBox(width: AppSizes.sm),
+            Expanded(child: archive),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _EntryCard extends StatelessWidget {
   const _EntryCard({
     required this.icon,
@@ -561,6 +623,17 @@ class _EntryCard extends StatelessWidget {
     required this.onTap,
     super.key,
   });
+
+  static const double iconSize = 26;
+  static const titleStyle = TextStyle(
+    color: AppColors.textPrimaryDark,
+    fontWeight: FontWeight.w700,
+    fontSize: 15,
+  );
+  static const subtitleStyle = TextStyle(
+    color: AppColors.textSecondaryDark,
+    fontSize: 12,
+  );
 
   final IconData icon;
   final String title;
@@ -585,27 +658,14 @@ class _EntryCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(icon, color: AppColors.purpleLight, size: 26),
+              Icon(icon, color: AppColors.purpleLight, size: iconSize),
               const SizedBox(width: AppSizes.sm + 4),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AppColors.textPrimaryDark,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: AppColors.textSecondaryDark,
-                        fontSize: 12,
-                      ),
-                    ),
+                    Text(title, style: titleStyle),
+                    Text(subtitle, style: subtitleStyle),
                   ],
                 ),
               ),
