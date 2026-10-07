@@ -5,6 +5,9 @@ abstract final class AppDateUtils {
   @visibleForTesting
   static DateTime Function() clock = DateTime.now;
 
+  /// The current time in UTC, from [clock].
+  static DateTime nowUtc() => clock().toUtc();
+
   static String todayUtc() {
     final now = clock().toUtc();
     return formatDate(now);
@@ -16,6 +19,15 @@ abstract final class AppDateUtils {
     final now = clock().toUtc();
     final next = DateTime.utc(now.year, now.month, now.day + 1);
     return next.difference(now);
+  }
+
+  /// Time left until the next 00:00:01 UTC: one second past the rollover, so
+  /// a check then is safely on the new day. A full day at exactly 00:00:01.
+  static Duration untilNextRollover({DateTime? now}) {
+    final n = (now ?? clock()).toUtc();
+    var next = DateTime.utc(n.year, n.month, n.day, 0, 0, 1);
+    if (!next.isAfter(n)) next = next.add(const Duration(days: 1));
+    return next.difference(n);
   }
 
   static String formatDate(DateTime date) {

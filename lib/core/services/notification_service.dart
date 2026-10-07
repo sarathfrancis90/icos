@@ -18,8 +18,8 @@ import 'streak_reminder_schedule.dart';
 /// - Daily reminder: repeating local notification at a user-chosen local
 ///   time (default 09:00). Persisted in SharedPreferences.
 /// - Streak-at-risk: one-shot local notification 4 hours before the next
-///   00:00 UTC (see [streakReminderFireTime]), scheduled only while today's
-///   puzzle is unsolved and the player has a streak; cancelled once solved.
+///   00:00 UTC (see [streakReminderFireTime]) while the player has a streak:
+///   today's when today's puzzle is unsolved, tomorrow's once it is solved.
 /// - Every scheduling path goes through [_mayNotify]: the in-app setting and
 ///   the OS permission must both be on, otherwise pending notifications of
 ///   that kind are cancelled instead.
@@ -88,6 +88,17 @@ abstract final class NotificationService {
   /// Optional callback invoked when the user taps a notification. Payload is
   /// `daily` or `streak`; the router can navigate to `/`.
   static void Function(String? payload)? onNotificationTap;
+
+  /// If the app was cold-started by tapping one of its notifications, passes
+  /// that notification's payload to [onNotificationTap]. Never throws.
+  static Future<void> handleLaunchFromNotification() async {
+    try {
+      final payload = await _backend.launchPayloadFromNotification();
+      if (payload != null) onNotificationTap?.call(payload);
+    } catch (e) {
+      AppLogger.debug('Reading notification launch details failed', error: e);
+    }
+  }
 
   /// Initialise timezone db, the local notifications plugin and (optionally)
   /// FCM. Safe to call once from `main()`; never throws.
@@ -307,18 +318,20 @@ abstract final class NotificationService {
 
   /// Brings the streak reminder in line with the current state.
   ///
-  /// Schedules it only when reminders are allowed (see [_mayNotify]), today's
-  /// UTC puzzle is unsolved ([solvedToday] false), the player has a streak of
-  /// at least 1 and the fire time ([streakReminderFireTime]) is still ahead.
-  /// In every other case any pending streak reminder is cancelled. A null
-  /// [currentStreak] means the streak is not known yet: nothing is scheduled,
-  /// but an opt-out still cancels.
+  /// Schedules it only when reminders are allowed (see [_mayNotify]) and the
+  /// player has a streak of at least 1. While today's UTC puzzle is unsolved
+  /// it targets today's fire time ([streakReminderFireTime]) if still ahead;
+  /// once solved ([solvedToday]) it targets tomorrow's, so a player who does
+  /// not open the app tomorrow is still warned. In every other case any
+  /// pending streak reminder is cancelled. A null [currentStreak] means the
+  /// streak is not known yet: nothing is scheduled, but an opt-out still
+  /// cancels.
   static Future<void> refreshStreakReminder({
     required bool solvedToday,
     required int? currentStreak,
     DateTime? nowUtc,
   }) async {
-    if (!await _mayNotify() || solvedToday) {
+    if (!await _mayNotify()) {
       await _cancelPending(streakReminderId);
       return;
     }
@@ -330,12 +343,14 @@ abstract final class NotificationService {
 
     await _ensureTimezone();
     final now = (nowUtc ?? clockOverride?.call() ?? DateTime.now()).toUtc();
-    final at = streakReminderFireTime(nowUtc: now, location: _location);
+    // Solved today: aim at tomorrow's UTC day, as seen from its first moment.
+    final dayStart = solvedToday ? streakDeadlineUtc(now) : now;
+    final at = streakReminderFireTime(nowUtc: dayStart, location: _location);
     if (at == null) {
       await _cancelPending(streakReminderId);
       return;
     }
-    final hours = streakReminderHoursLeft(at, streakDeadlineUtc(now));
+    final hours = streakReminderHoursLeft(at, streakDeadlineUtc(dayStart));
 
     try {
       await _backend.cancel(streakReminderId);
@@ -393,6 +408,10 @@ abstract interface class NotificationBackend {
   });
 
   Future<void> cancel(int id);
+
+  /// Payload of the notification whose tap launched the app, or `null` when
+  /// the app was not launched from a notification.
+  Future<String?> launchPayloadFromNotification();
 }
 
 class _PluginBackend implements NotificationBackend {
@@ -446,4 +465,11 @@ class _PluginBackend implements NotificationBackend {
 
   @override
   Future<void> cancel(int id) => _plugin.cancel(id: id);
+
+  @override
+  Future<String?> launchPayloadFromNotification() async {
+    final details = await _plugin.getNotificationAppLaunchDetails();
+    if (details == null || !details.didNotificationLaunchApp) return null;
+    return details.notificationResponse?.payload;
+  }
 }

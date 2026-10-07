@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icos/core/services/storage_service.dart';
 import 'package:icos/core/utils/app_error.dart';
+import 'package:icos/core/utils/date_utils.dart';
 import 'package:icos/core/utils/result.dart';
 import 'package:icos/features/stats/data/stats_repository.dart';
 import 'package:icos/features/stats/domain/models/streak.dart';
@@ -15,8 +16,10 @@ import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
 
 class _FakeRepo extends StatsRepository {
-  _FakeRepo({this.fail = false});
+  _FakeRepo({this.fail = false, String? lastSolveDate})
+    : lastSolveDate = lastSolveDate ?? AppDateUtils.todayUtc();
   bool fail;
+  String lastSolveDate;
 
   @override
   Future<Result<Streak, AppError>> getStreak(String userId) async => fail
@@ -27,6 +30,7 @@ class _FakeRepo extends StatsRepository {
             currentStreak: 40,
             longestStreak: 41,
             freezeCount: 0,
+            lastSolveDate: lastSolveDate,
           ),
         );
 
@@ -85,6 +89,47 @@ void main() {
       expect(o.currentStreak, 40);
       expect(o.totalSolved, 55);
       expect(o.fromCache, isTrue);
+    });
+
+    test('a streak whose last solve is two days ago shows 0', () async {
+      final o = await loadStatsOverview(
+        _FakeRepo(lastSolveDate: AppDateUtils.dateNDaysAgo(2)),
+        'test-user',
+      );
+      expect(o.currentStreak, 0);
+      expect(o.longestStreak, 41);
+    });
+
+    test('a cached streak that has gone stale is served as 0', () async {
+      await loadStatsOverview(_FakeRepo(), 'test-user');
+      final realClock = AppDateUtils.clock;
+      addTearDown(() => AppDateUtils.clock = realClock);
+      AppDateUtils.clock = () => DateTime.now().add(const Duration(days: 2));
+      final o = await loadStatsOverview(_FakeRepo(fail: true), 'test-user');
+      expect(o.fromCache, isTrue);
+      expect(o.currentStreak, 0);
+      expect(cachedCurrentStreak('test-user'), 0);
+    });
+
+    test('cachedCurrentStreak returns the live cached streak', () async {
+      await loadStatsOverview(_FakeRepo(), 'test-user');
+      expect(cachedCurrentStreak('test-user'), 40);
+    });
+
+    test('a cache without the last solve date is treated as unknown', () async {
+      await StorageService.saveStatsCache('overview', const {
+        'currentStreak': 9,
+        'longestStreak': 9,
+        'totalSolved': 20,
+        'averageTimeSeconds': 60,
+        'freezeCount': 1,
+        'lastFreezeUsedAt': null,
+      }, userId: 'test-user');
+      expect(cachedCurrentStreak('test-user'), isNull);
+      await expectLater(
+        loadStatsOverview(_FakeRepo(fail: true), 'test-user'),
+        throwsA(isA<NetworkError>()),
+      );
     });
 
     test('failure without a cache throws instead of showing zeros', () async {

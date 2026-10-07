@@ -16,6 +16,7 @@ import '../../../shared/widgets/spring_button.dart';
 import '../../puzzle/data/submission_result.dart';
 import '../../puzzle/providers/daily_puzzle_provider.dart';
 import '../../puzzle/providers/puzzle_result_provider.dart';
+import '../../stats/domain/models/streak.dart';
 import '../../stats/providers/stats_provider.dart';
 import 'widgets/home_share.dart';
 
@@ -36,12 +37,15 @@ class HomeScreen extends ConsumerWidget {
       final today = ref.read(todayResultProvider);
       if (today is! AsyncData<SubmissionResult?>) return;
       final solved = today.value != null;
-      // Server streak; if the server could not be reached, the last saved
-      // stats; while still loading, unknown.
+      // Today's fresh result streak; else the server streak (0 once it has
+      // lapsed); if the server could not be reached, the last saved stats;
+      // while still loading, unknown.
       final streakState = ref.read(streakProvider);
       final streak =
           today.value?.streak?.currentStreak ??
-          streakState.valueOrNull?.currentStreak ??
+          streakState.valueOrNull?.effectiveCurrentStreak(
+            todayUtc: AppDateUtils.nowUtc(),
+          ) ??
           (streakState.hasError
               ? cachedCurrentStreak(ref.read(authSessionProvider).userId)
               : null);
@@ -57,8 +61,14 @@ class HomeScreen extends ConsumerWidget {
     ref.listen(streakProvider, (_, _) => syncStreakReminder());
 
     final result = resultAsync.valueOrNull;
+    // A just-solved result carries the current streak; the stored one may
+    // have lapsed since the last solve (the server only recomputes on a solve
+    // or freeze), so it is checked against today.
     final streak =
-        result?.streak?.currentStreak ?? streakAsync.valueOrNull?.currentStreak;
+        result?.streak?.currentStreak ??
+        streakAsync.valueOrNull?.effectiveCurrentStreak(
+          todayUtc: AppDateUtils.nowUtc(),
+        );
 
     return SafeArea(
       child: Padding(

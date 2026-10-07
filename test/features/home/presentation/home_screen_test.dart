@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icos/core/constants/app_strings.dart';
 import 'package:icos/core/theme/app_theme.dart';
+import 'package:icos/core/utils/date_utils.dart';
 import 'package:icos/features/home/presentation/home_screen.dart';
 import 'package:icos/features/puzzle/data/submission_result.dart';
 import 'package:icos/features/puzzle/domain/models/puzzle.dart';
@@ -46,6 +47,7 @@ void main() {
       SubmissionResult? result,
       bool resultPending = false,
       int streak = 0,
+      String? lastSolveDate,
       ThemeData? theme,
       bool inScaffold = false,
     }) {
@@ -69,6 +71,7 @@ void main() {
               currentStreak: streak,
               longestStreak: streak,
               freezeCount: 1,
+              lastSolveDate: lastSolveDate ?? AppDateUtils.todayUtc(),
             ),
           ),
         ],
@@ -205,6 +208,37 @@ void main() {
           find.byIcon(Icons.local_fire_department_rounded),
           findsOneWidget,
         );
+      });
+    });
+
+    group('Lapsed streak', () {
+      testWidgets('a stored streak last solved two days ago shows no badge', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          buildHomeScreen(
+            streak: 6,
+            lastSolveDate: AppDateUtils.dateNDaysAgo(2),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('6'), findsNothing);
+        expect(find.byIcon(Icons.local_fire_department_rounded), findsNothing);
+      });
+
+      testWidgets('a streak last solved yesterday still shows', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          buildHomeScreen(
+            streak: 6,
+            lastSolveDate: AppDateUtils.dateNDaysAgo(1),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('6'), findsOneWidget);
       });
     });
 

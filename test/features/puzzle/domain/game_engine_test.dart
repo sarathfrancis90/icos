@@ -452,12 +452,26 @@ void main() {
       expect(resetState.hintsUsed, 3);
     });
 
-    test('preserves undosUsed', () {
+    test('counts as one undo when there was a path', () {
       var state = engine.addToPath(initialState, 0, 0);
+      state = engine.addToPath(state, 0, 1);
       state = state.copyWith(undosUsed: 5);
 
       final resetState = engine.reset(state);
-      expect(resetState.undosUsed, 5);
+      expect(resetState.undosUsed, 6);
+    });
+
+    test('does not count when there is nothing to reset', () {
+      final resetState = engine.reset(initialState.copyWith(undosUsed: 2));
+      expect(resetState.undosUsed, 2);
+    });
+
+    test('a second reset right after the first does not count again', () {
+      final state = engine.addToPath(initialState, 0, 0);
+      final once = engine.reset(state);
+      final twice = engine.reset(once);
+      expect(once.undosUsed, 1);
+      expect(twice.undosUsed, 1);
     });
 
     test('sets status to playing', () {

@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
+import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/result.dart';
 import '../data/stats_repository.dart';
 import '../domain/models/streak.dart';
@@ -63,14 +64,17 @@ Future<StatsOverview> statsOverview(Ref ref) async {
   return loadStatsOverview(ref.read(statsRepositoryProvider), userId);
 }
 
-/// Streak from the last saved stats overview of [userId], or `null` when
-/// there is none (or storage is unavailable). Used when the server cannot be
-/// reached, e.g. to decide on the streak reminder.
+/// Streak from the last saved stats overview of [userId] as it stands today
+/// (0 once it has lapsed), or `null` when there is no usable copy (or storage
+/// is unavailable). Used when the server cannot be reached, e.g. to decide on
+/// the streak reminder.
 int? cachedCurrentStreak(String? userId) {
   if (userId == null) return null;
   try {
     final cached = StorageService.getStatsCache('overview', userId: userId);
-    return cached == null ? null : StatsOverview.tryFromJson(cached)?.currentStreak;
+    return cached == null
+        ? null
+        : StatsOverview.tryFromJson(cached)?.withLiveStreak().currentStreak;
   } catch (_) {
     return null;
   }
@@ -94,12 +98,15 @@ Future<StatsOverview> loadStatsOverview(
     if (totalResult case Success(data: final total)) {
       if (avgResult case Success(data: final avg)) {
         final fresh = StatsOverview(
-          currentStreak: streak.currentStreak,
+          currentStreak: streak.effectiveCurrentStreak(
+            todayUtc: AppDateUtils.nowUtc(),
+          ),
           longestStreak: streak.longestStreak,
           totalSolved: total,
           averageTimeSeconds: avg,
           freezeCount: streak.freezeCount,
           lastFreezeUsedAt: streak.lastFreezeUsedAt,
+          lastSolveDate: streak.lastSolveDate,
         );
         await StorageService.saveStatsCache(
           'overview',
@@ -114,7 +121,7 @@ Future<StatsOverview> loadStatsOverview(
   final cached = StorageService.getStatsCache('overview', userId: userId);
   if (cached != null) {
     final overview = StatsOverview.tryFromJson(cached);
-    if (overview != null) return overview.copyAsCached();
+    if (overview != null) return overview.withLiveStreak().copyAsCached();
   }
   final error = switch ((streakResult, totalResult, avgResult)) {
     (Failure(:final error), _, _) => error,
@@ -164,20 +171,35 @@ class StatsOverview {
     required this.averageTimeSeconds,
     required this.freezeCount,
     required this.lastFreezeUsedAt,
+    this.lastSolveDate,
     this.fromCache = false,
   });
 
   /// True when the backend was unreachable and this is the last saved copy.
   final bool fromCache;
 
-  StatsOverview copyAsCached() => StatsOverview(
-    currentStreak: currentStreak,
+  StatsOverview copyAsCached() => _copy(fromCache: true);
+
+  /// This overview with [currentStreak] as it stands at the current UTC day:
+  /// 0 once neither a solve nor a freeze covers yesterday.
+  StatsOverview withLiveStreak() => _copy(
+    currentStreak: effectiveStreakValue(
+      currentStreak: currentStreak,
+      lastSolveDate: lastSolveDate,
+      lastFreezeUsedAt: lastFreezeUsedAt,
+      todayUtc: AppDateUtils.nowUtc(),
+    ),
+  );
+
+  StatsOverview _copy({int? currentStreak, bool? fromCache}) => StatsOverview(
+    currentStreak: currentStreak ?? this.currentStreak,
     longestStreak: longestStreak,
     totalSolved: totalSolved,
     averageTimeSeconds: averageTimeSeconds,
     freezeCount: freezeCount,
     lastFreezeUsedAt: lastFreezeUsedAt,
-    fromCache: true,
+    lastSolveDate: lastSolveDate,
+    fromCache: fromCache ?? this.fromCache,
   );
 
   Map<String, dynamic> toJson() => {
@@ -187,9 +209,14 @@ class StatsOverview {
     'averageTimeSeconds': averageTimeSeconds,
     'freezeCount': freezeCount,
     'lastFreezeUsedAt': lastFreezeUsedAt,
+    'lastSolveDate': lastSolveDate,
   };
 
+  /// The saved overview, or `null` when it is unreadable. A copy saved
+  /// before `lastSolveDate` was stored cannot be checked for a lapsed streak
+  /// and counts as unreadable.
   static StatsOverview? tryFromJson(Map<String, dynamic> json) {
+    if (!json.containsKey('lastSolveDate')) return null;
     try {
       return StatsOverview(
         currentStreak: json['currentStreak'] as int,
@@ -198,6 +225,7 @@ class StatsOverview {
         averageTimeSeconds: json['averageTimeSeconds'] as int,
         freezeCount: json['freezeCount'] as int,
         lastFreezeUsedAt: json['lastFreezeUsedAt'] as String?,
+        lastSolveDate: json['lastSolveDate'] as String?,
       );
     } catch (_) {
       return null;
@@ -210,4 +238,7 @@ class StatsOverview {
   final int averageTimeSeconds;
   final int freezeCount;
   final String? lastFreezeUsedAt;
+
+  /// Last solved puzzle date (ISO, UTC), used to tell a lapsed streak.
+  final String? lastSolveDate;
 }

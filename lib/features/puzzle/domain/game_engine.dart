@@ -171,12 +171,14 @@ class GameEngine {
     );
   }
 
-  /// Reset the entire path.
+  /// Reset the entire path. Clearing a non-empty path counts as one undo
+  /// (otherwise a reset would be a free undo on the leaderboard tiebreak);
+  /// with nothing to clear the count is unchanged.
   GameState reset(GameState state) {
     return createInitialState().copyWith(
       elapsedSeconds: state.elapsedSeconds,
       hintsUsed: state.hintsUsed,
-      undosUsed: state.undosUsed,
+      undosUsed: state.undosUsed + (state.path.isEmpty ? 0 : 1),
       status: GameStatus.playing,
     );
   }

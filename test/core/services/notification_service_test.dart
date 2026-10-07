@@ -29,6 +29,11 @@ class FakeNotificationBackend implements NotificationBackend {
 
   @override
   Future<void> cancel(int id) async => cancelled.add(id);
+
+  String? launchPayload;
+
+  @override
+  Future<String?> launchPayloadFromNotification() async => launchPayload;
 }
 
 void main() {
@@ -102,8 +107,45 @@ void main() {
       expect(backend.cancelled, contains(NotificationService.streakReminderId));
     });
 
-    test('solved today cancels', () async {
+    test('solved today with a streak schedules for tomorrow', () async {
       await setEnabled(true);
+      await NotificationService.refreshStreakReminder(
+        solvedToday: true,
+        currentStreak: 5,
+        nowUtc: now,
+      );
+      expect(backend.scheduled, hasLength(1));
+      final s = backend.scheduled.single;
+      expect(s['id'], NotificationService.streakReminderId);
+      expect(s['body'], "Today's puzzle closes in 4 hours.");
+      final at = s['at']! as tz.TZDateTime;
+      expect(at.toUtc(), DateTime.utc(2026, 1, 16, 20));
+    });
+
+    test('solved today late in the UTC day still schedules tomorrow', () async {
+      await setEnabled(true);
+      await NotificationService.refreshStreakReminder(
+        solvedToday: true,
+        currentStreak: 1,
+        nowUtc: DateTime.utc(2026, 1, 15, 23, 30),
+      );
+      final at = backend.scheduled.single['at']! as tz.TZDateTime;
+      expect(at.toUtc(), DateTime.utc(2026, 1, 16, 20));
+    });
+
+    test('solved today with streak 0 cancels', () async {
+      await setEnabled(true);
+      await NotificationService.refreshStreakReminder(
+        solvedToday: true,
+        currentStreak: 0,
+        nowUtc: now,
+      );
+      expect(backend.scheduled, isEmpty);
+      expect(backend.cancelled, contains(NotificationService.streakReminderId));
+    });
+
+    test('solved today with reminders off cancels', () async {
+      await setEnabled(false);
       await NotificationService.refreshStreakReminder(
         solvedToday: true,
         currentStreak: 5,
@@ -212,6 +254,25 @@ void main() {
       await setEnabled(true);
       await NotificationService.cancelPendingIfNotAllowed();
       expect(backend.cancelled, isEmpty);
+    });
+  });
+
+  group('handleLaunchFromNotification', () {
+    tearDown(() => NotificationService.onNotificationTap = null);
+
+    test('forwards the launch payload to onNotificationTap', () async {
+      backend.launchPayload = 'streak';
+      String? tapped;
+      NotificationService.onNotificationTap = (p) => tapped = p;
+      await NotificationService.handleLaunchFromNotification();
+      expect(tapped, 'streak');
+    });
+
+    test('does nothing when the app was not launched by a tap', () async {
+      var calls = 0;
+      NotificationService.onNotificationTap = (_) => calls++;
+      await NotificationService.handleLaunchFromNotification();
+      expect(calls, 0);
     });
   });
 }

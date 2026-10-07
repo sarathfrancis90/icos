@@ -30,3 +30,46 @@ abstract class SolveHistory with _$SolveHistory {
   factory SolveHistory.fromJson(Map<String, dynamic> json) =>
       _$SolveHistoryFromJson(json);
 }
+
+/// Liveness of a stored streak.
+///
+/// The server recomputes `streaks.current_streak` only when the player solves
+/// or a freeze is applied, so a stored value can outlive a missed day. These
+/// helpers give the streak as it stands at [todayUtc].
+extension StreakLiveness on Streak {
+  /// [currentStreak] if the streak is still alive at [todayUtc], else 0.
+  int effectiveCurrentStreak({required DateTime todayUtc}) =>
+      effectiveStreakValue(
+        currentStreak: currentStreak,
+        lastSolveDate: lastSolveDate,
+        lastFreezeUsedAt: lastFreezeUsedAt,
+        todayUtc: todayUtc,
+      );
+}
+
+/// [currentStreak] when the later of [lastSolveDate] and [lastFreezeUsedAt]
+/// (ISO dates; a timestamp is read by its date) is yesterday (UTC) or later,
+/// i.e. today's puzzle can still extend it; otherwise 0.
+int effectiveStreakValue({
+  required int currentStreak,
+  required String? lastSolveDate,
+  required String? lastFreezeUsedAt,
+  required DateTime todayUtc,
+}) {
+  if (currentStreak <= 0) return 0;
+  final now = todayUtc.toUtc();
+  final yesterday = DateTime.utc(now.year, now.month, now.day - 1);
+  final days = [
+    _utcDay(lastSolveDate),
+    _utcDay(lastFreezeUsedAt),
+  ].whereType<DateTime>();
+  final alive = days.any((d) => !d.isBefore(yesterday));
+  return alive ? currentStreak : 0;
+}
+
+DateTime? _utcDay(String? iso) {
+  if (iso == null || iso.length < 10) return null;
+  final parsed = DateTime.tryParse(iso.substring(0, 10));
+  if (parsed == null) return null;
+  return DateTime.utc(parsed.year, parsed.month, parsed.day);
+}

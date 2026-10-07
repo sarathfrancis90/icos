@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:icos/core/services/auth_session_provider.dart';
 import 'package:icos/core/services/notification_service.dart';
 import 'package:icos/core/services/storage_service.dart';
+import 'package:icos/core/utils/date_utils.dart';
 import 'package:icos/features/home/presentation/home_screen.dart';
 import 'package:icos/features/puzzle/providers/daily_puzzle_provider.dart';
 import 'package:icos/features/puzzle/providers/puzzle_result_provider.dart';
@@ -48,11 +49,12 @@ void main() {
           dailyPuzzleProvider.overrideWith((ref) async => testPuzzle),
           todayResultProvider.overrideWith((ref) async => null),
           streakProvider.overrideWith(
-            (ref) async => const Streak(
+            (ref) async => Streak(
               userId: 'u',
               currentStreak: 7,
               longestStreak: 7,
               freezeCount: 1,
+              lastSolveDate: AppDateUtils.todayUtc(),
             ),
           ),
         ],
@@ -87,13 +89,14 @@ void main() {
       (tester) async {
     await tester.runAsync(() async {
       await initTestStorage(userId: 'u1');
-      await StorageService.saveStatsCache('overview', const {
+      await StorageService.saveStatsCache('overview', {
         'currentStreak': 9,
         'longestStreak': 9,
         'totalSolved': 20,
         'averageTimeSeconds': 60,
         'freezeCount': 1,
         'lastFreezeUsedAt': null,
+        'lastSolveDate': AppDateUtils.dateNDaysAgo(1),
       }, userId: 'u1');
     });
     SharedPreferences.setMockInitialValues({'notif_daily_enabled': true});
@@ -116,5 +119,32 @@ void main() {
       backend.scheduled.every((e) => e['id'] == NotificationService.streakReminderId),
       isTrue,
     );
+  });
+
+  testWidgets('a lapsed stored streak does not arm the reminder', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({'notif_daily_enabled': true});
+    await tester.pumpWidget(
+      buildTestWidget(
+        const HomeScreen(),
+        overrides: [
+          dailyPuzzleProvider.overrideWith((ref) async => testPuzzle),
+          todayResultProvider.overrideWith((ref) async => null),
+          streakProvider.overrideWith(
+            (ref) async => Streak(
+              userId: 'u',
+              currentStreak: 7,
+              longestStreak: 7,
+              freezeCount: 1,
+              lastSolveDate: AppDateUtils.dateNDaysAgo(3),
+            ),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(backend.scheduled, isEmpty);
+    expect(backend.cancelled, contains(NotificationService.streakReminderId));
   });
 }

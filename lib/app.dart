@@ -14,11 +14,14 @@ import 'core/theme/app_palette.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/utils/date_utils.dart';
+import 'core/utils/utc_day_rollover.dart';
+import 'features/archive/providers/archive_provider.dart';
 import 'features/auth/providers/session_keeper.dart';
 import 'features/auth/providers/user_scope_keeper.dart';
 import 'features/puzzle/domain/models/puzzle.dart';
 import 'features/puzzle/providers/daily_puzzle_provider.dart';
 import 'features/puzzle/providers/puzzle_result_provider.dart';
+import 'features/stats/providers/stats_provider.dart';
 import 'shared/widgets/text_scale_limit.dart';
 
 class IcosApp extends ConsumerStatefulWidget {
@@ -30,19 +33,43 @@ class IcosApp extends ConsumerStatefulWidget {
 
 class _IcosAppState extends ConsumerState<IcosApp>
     with WidgetsBindingObserver {
-  String _lastKnownDate = AppDateUtils.todayUtc();
+  // Crossing 00:00 UTC (foreground timer, or noticed on resume): today's
+  // puzzle, result and streak liveness all change.
+  late final UtcDayRollover _rollover = UtcDayRollover(
+    onNewDay: (_) => _onNewUtcDay(),
+  );
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _rollover.start();
+    // A tap on the daily or streak reminder opens Home.
+    NotificationService.onNotificationTap = (_) => _openHome();
     WidgetsBinding.instance.addPostFrameCallback((_) => _onAppStart());
   }
 
   @override
   void dispose() {
+    _rollover.dispose();
+    NotificationService.onNotificationTap = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _openHome() {
+    if (!mounted) return;
+    ref.read(appRouterProvider).go('/');
+  }
+
+  void _onNewUtcDay() {
+    if (!mounted) return;
+    ref.invalidate(dailyPuzzleProvider);
+    ref.invalidate(todayResultProvider);
+    ref.invalidate(streakProvider);
+    ref.invalidate(statsOverviewProvider);
+    ref.invalidate(archiveEntriesProvider);
+    ref.read(puzzleRepositoryProvider).preCacheTomorrowPuzzle();
   }
 
   void _onAppStart() {
@@ -54,6 +81,9 @@ class _IcosAppState extends ConsumerState<IcosApp>
 
     // Resets per-player state when the signed-in user id changes.
     ref.read(userScopeKeeperProvider);
+
+    // Cold start from a notification tap.
+    unawaited(NotificationService.handleLaunchFromNotification());
   }
 
   @override
@@ -75,13 +105,11 @@ class _IcosAppState extends ConsumerState<IcosApp>
       ref.invalidate(puzzleForDateProvider(todayDate));
     }
 
-    // Crossed midnight UTC while backgrounded: today's puzzle changed.
-    final today = AppDateUtils.todayUtc();
-    if (today != _lastKnownDate) {
-      _lastKnownDate = today;
-      ref.invalidate(dailyPuzzleProvider);
-      ref.invalidate(todayResultProvider);
-    }
+    // Crossed midnight UTC while backgrounded: today's puzzle changed. The
+    // foreground timer may have been suspended, so re-arm it too.
+    _rollover
+      ..check()
+      ..start();
   }
 
   @override
