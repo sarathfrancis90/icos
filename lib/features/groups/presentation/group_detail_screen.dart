@@ -19,7 +19,7 @@ import 'widgets/leaderboard_row.dart';
 import 'widgets/member_tile.dart';
 import 'widgets/report_dialog.dart';
 
-enum _GroupMenuAction { share, qr, report, leave, delete }
+enum _GroupMenuAction { share, qr, report, newInviteCode, leave, delete }
 
 class GroupDetailScreen extends ConsumerStatefulWidget {
   const GroupDetailScreen({required this.groupId, super.key});
@@ -129,6 +129,17 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                   title: Text('Report group'),
                 ),
               ),
+              if (isAdmin)
+                const PopupMenuItem(
+                  value: _GroupMenuAction.newInviteCode,
+                  child: ListTile(
+                    dense: true,
+                    minTileHeight: 44,
+                    contentPadding: EdgeInsetsDirectional.zero,
+                    leading: Icon(Icons.key_rounded),
+                    title: Text(AppStrings.newInviteCode),
+                  ),
+                ),
               const PopupMenuDivider(),
               PopupMenuItem(
                 value: _GroupMenuAction.leave,
@@ -207,10 +218,34 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
           targetName: group.name,
         );
         if (sent && mounted) showAppSnackBar(context, 'Report submitted. Thank you.');
+      case _GroupMenuAction.newInviteCode:
+        await _regenerateInviteCode(group);
       case _GroupMenuAction.leave:
         await _leave(group);
       case _GroupMenuAction.delete:
         await _delete(group);
+    }
+  }
+
+  Future<void> _regenerateInviteCode(Group group) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: AppStrings.newInviteCode,
+      message: AppStrings.newInviteCodeConfirm,
+      confirmLabel: AppStrings.newInviteCodeGenerate,
+    );
+    if (!confirmed || !mounted) return;
+    final result =
+        await ref.read(myGroupsProvider.notifier).regenerateInviteCode(group.id);
+    if (!mounted) return;
+    switch (result) {
+      case Success(data: final updated):
+        showAppSnackBar(
+          context,
+          AppStrings.newInviteCodeCreated(updated.inviteCode),
+        );
+      case Failure(error: final error):
+        showAppSnackBar(context, error.userMessage);
     }
   }
 

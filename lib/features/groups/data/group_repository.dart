@@ -152,6 +152,21 @@ class GroupRepository {
     return _guard(() => _rpcVoid('delete_group', {'p_group_id': groupId}));
   }
 
+  /// Admin-only: replaces the invite code via the `regenerate_invite_code`
+  /// RPC. The old code stops working immediately; returns the updated group.
+  Future<Result<Group, AppError>> regenerateInviteCode(String groupId) {
+    return _guard(() async {
+      if (_userId == null) {
+        throw const AppErrorException(AppError.auth('You must be signed in'));
+      }
+      final response = await _client.rpc<dynamic>(
+        'regenerate_invite_code',
+        params: {'p_group_id': groupId},
+      );
+      return GroupParsers.parseGroupRow(response);
+    });
+  }
+
   // ─── Reads ─────────────────────────────────────────────────────────
 
   /// Active groups the current user belongs to, newest first.

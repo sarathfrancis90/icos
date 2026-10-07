@@ -207,4 +207,10 @@ abstract final class AppStrings {
 
   // Groups
   static const blockedPlayerPlaceholder = 'Player';
+  static const newInviteCode = 'New invite code';
+  static const newInviteCodeConfirm =
+      'Generate a new invite code? The old code stops working immediately. '
+      'Members already in the group are not affected.';
+  static const newInviteCodeGenerate = 'Generate';
+  static String newInviteCodeCreated(String code) => 'New invite code: $code';
 }

@@ -104,6 +104,17 @@ class MyGroups extends _$MyGroups {
     return result;
   }
 
+  /// Admin-only: swaps the group's invite code. The updated group replaces
+  /// the cached one, so the detail screen and list refresh in place.
+  Future<Result<Group, AppError>> regenerateInviteCode(String groupId) async {
+    final result =
+        await ref.read(groupRepositoryProvider).regenerateInviteCode(groupId);
+    if (result case Success(data: final group)) {
+      _upsertLocal(group);
+    }
+    return result;
+  }
+
   void _upsertLocal(Group group) {
     final current = state.valueOrNull ?? const <Group>[];
     final others = current.where((g) => g.id != group.id);
