@@ -107,5 +107,75 @@ void main() {
       expect(days, ['2026-10-08']);
       rollover.dispose();
     });
+  
+    testWidgets('onSettled runs once, 11 minutes after the rollover', (
+      tester,
+    ) async {
+      final days = <String>[];
+      var settled = 0;
+      final rollover = UtcDayRollover(
+        onNewDay: days.add,
+        onSettled: () => settled++,
+      )..start();
+
+      now = DateTime.utc(2026, 10, 8, 0, 0, 1);
+      await tester.pump(const Duration(seconds: 61));
+      expect(days, ['2026-10-08']);
+      expect(settled, 0);
+
+      now = DateTime.utc(2026, 10, 8, 0, 10, 59);
+      await tester.pump(const Duration(minutes: 10, seconds: 58));
+      expect(settled, 0);
+      now = DateTime.utc(2026, 10, 8, 0, 11, 1);
+      await tester.pump(const Duration(seconds: 2));
+      expect(settled, 1);
+      rollover.dispose();
+    });
+
+    testWidgets('a day change noticed late (resume) does not wait to settle', (
+      tester,
+    ) async {
+      var settled = 0;
+      final rollover = UtcDayRollover(
+        onNewDay: (_) {},
+        onSettled: () => settled++,
+      );
+      now = DateTime.utc(2026, 10, 8, 9);
+      expect(rollover.check(), isTrue);
+      await tester.pump(const Duration(minutes: 20));
+      expect(settled, 0);
+      rollover.dispose();
+    });
+
+    testWidgets('resume shortly after midnight settles at 00:11 UTC', (
+      tester,
+    ) async {
+      var settled = 0;
+      final rollover = UtcDayRollover(
+        onNewDay: (_) {},
+        onSettled: () => settled++,
+      );
+      now = DateTime.utc(2026, 10, 8, 0, 6);
+      expect(rollover.check(), isTrue);
+      await tester.pump(const Duration(minutes: 4, seconds: 59));
+      expect(settled, 0);
+      await tester.pump(const Duration(seconds: 2));
+      expect(settled, 1);
+      rollover.dispose();
+    });
+
+    testWidgets('dispose cancels a pending settle', (tester) async {
+      var settled = 0;
+      final rollover = UtcDayRollover(
+        onNewDay: (_) {},
+        onSettled: () => settled++,
+      );
+      now = DateTime.utc(2026, 10, 8, 0, 0, 1);
+      rollover
+        ..check()
+        ..dispose();
+      await tester.pump(const Duration(minutes: 15));
+      expect(settled, 0);
+    });
   });
 }

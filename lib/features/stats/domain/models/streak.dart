@@ -43,6 +43,7 @@ extension StreakLiveness on Streak {
         currentStreak: currentStreak,
         lastSolveDate: lastSolveDate,
         lastFreezeUsedAt: lastFreezeUsedAt,
+        freezeCount: freezeCount,
         todayUtc: todayUtc,
       );
 }
@@ -50,10 +51,16 @@ extension StreakLiveness on Streak {
 /// [currentStreak] when the later of [lastSolveDate] and [lastFreezeUsedAt]
 /// (ISO dates; a timestamp is read by its date) is yesterday (UTC) or later,
 /// i.e. today's puzzle can still extend it; otherwise 0.
+///
+/// Also alive when that day is the day before yesterday and a freeze is
+/// available ([freezeCount] > 0): the nightly server job (shortly after
+/// 00:00 UTC) applies the freeze for yesterday, which the stored row may not
+/// reflect yet.
 int effectiveStreakValue({
   required int currentStreak,
   required String? lastSolveDate,
   required String? lastFreezeUsedAt,
+  required int freezeCount,
   required DateTime todayUtc,
 }) {
   if (currentStreak <= 0) return 0;
@@ -63,8 +70,12 @@ int effectiveStreakValue({
     _utcDay(lastSolveDate),
     _utcDay(lastFreezeUsedAt),
   ].whereType<DateTime>();
-  final alive = days.any((d) => !d.isBefore(yesterday));
-  return alive ? currentStreak : 0;
+  if (days.isEmpty) return 0;
+  final latest = days.reduce((a, b) => a.isAfter(b) ? a : b);
+  if (!latest.isBefore(yesterday)) return currentStreak;
+  final dayBeforeYesterday = DateTime.utc(now.year, now.month, now.day - 2);
+  final freezePending = freezeCount > 0 && latest == dayBeforeYesterday;
+  return freezePending ? currentStreak : 0;
 }
 
 DateTime? _utcDay(String? iso) {

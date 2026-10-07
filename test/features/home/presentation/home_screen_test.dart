@@ -48,6 +48,7 @@ void main() {
       bool resultPending = false,
       int streak = 0,
       String? lastSolveDate,
+      int freezeCount = 1,
       ThemeData? theme,
       bool inScaffold = false,
     }) {
@@ -70,7 +71,7 @@ void main() {
               userId: 'u',
               currentStreak: streak,
               longestStreak: streak,
-              freezeCount: 1,
+              freezeCount: freezeCount,
               lastSolveDate: lastSolveDate ?? AppDateUtils.todayUtc(),
             ),
           ),
@@ -212,9 +213,23 @@ void main() {
     });
 
     group('Lapsed streak', () {
-      testWidgets('a stored streak last solved two days ago shows no badge', (
-        tester,
-      ) async {
+      testWidgets('a stored streak last solved two days ago with no freeze '
+          'shows no badge', (tester) async {
+        await tester.pumpWidget(
+          buildHomeScreen(
+            streak: 6,
+            lastSolveDate: AppDateUtils.dateNDaysAgo(2),
+            freezeCount: 0,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('6'), findsNothing);
+        expect(find.byIcon(Icons.local_fire_department_rounded), findsNothing);
+      });
+
+      testWidgets('two days ago with a freeze available still shows (the '
+          'nightly job freezes yesterday)', (tester) async {
         await tester.pumpWidget(
           buildHomeScreen(
             streak: 6,
@@ -223,8 +238,21 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        expect(find.text('6'), findsOneWidget);
+      });
+
+      testWidgets('three days ago with a freeze available shows no badge', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          buildHomeScreen(
+            streak: 6,
+            lastSolveDate: AppDateUtils.dateNDaysAgo(3),
+          ),
+        );
+        await tester.pumpAndSettle();
+
         expect(find.text('6'), findsNothing);
-        expect(find.byIcon(Icons.local_fire_department_rounded), findsNothing);
       });
 
       testWidgets('a streak last solved yesterday still shows', (

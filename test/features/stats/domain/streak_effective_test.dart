@@ -4,11 +4,16 @@ import 'package:icos/features/stats/domain/models/streak.dart';
 void main() {
   final today = DateTime.utc(2026, 10, 7, 15);
 
-  Streak streak({String? solve, String? freeze, int current = 5}) => Streak(
+  Streak streak({
+    String? solve,
+    String? freeze,
+    int current = 5,
+    int freezes = 0,
+  }) => Streak(
     userId: 'u',
     currentStreak: current,
     longestStreak: 9,
-    freezeCount: 1,
+    freezeCount: freezes,
     lastSolveDate: solve,
     lastFreezeUsedAt: freeze,
   );
@@ -94,6 +99,45 @@ void main() {
           current: 0,
         ).effectiveCurrentStreak(todayUtc: today),
         0,
+      );
+    });
+  
+    test('freeze available and last covered day before yesterday is alive '
+        '(the nightly job will freeze yesterday)', () {
+      expect(
+        streak(
+          solve: '2026-10-05',
+          freezes: 1,
+        ).effectiveCurrentStreak(todayUtc: today),
+        5,
+      );
+    });
+
+    test('no freeze and last covered day before yesterday is 0', () {
+      expect(
+        streak(solve: '2026-10-05').effectiveCurrentStreak(todayUtc: today),
+        0,
+      );
+    });
+
+    test('freeze available but last covered three days ago is 0', () {
+      expect(
+        streak(
+          solve: '2026-10-04',
+          freezes: 1,
+        ).effectiveCurrentStreak(todayUtc: today),
+        0,
+      );
+    });
+
+    test('an older freeze day counts as the covered day', () {
+      expect(
+        streak(
+          solve: '2026-10-01',
+          freeze: '2026-10-05',
+          freezes: 2,
+        ).effectiveCurrentStreak(todayUtc: today),
+        5,
       );
     });
   });

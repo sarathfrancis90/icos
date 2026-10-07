@@ -35,8 +35,15 @@ class _IcosAppState extends ConsumerState<IcosApp>
     with WidgetsBindingObserver {
   // Crossing 00:00 UTC (foreground timer, or noticed on resume): today's
   // puzzle, result and streak liveness all change.
+  // A second streak refetch once the server's nightly freeze / stale-streak
+  // jobs (00:05 / 00:10 UTC) have run.
   late final UtcDayRollover _rollover = UtcDayRollover(
     onNewDay: (_) => _onNewUtcDay(),
+    onSettled: () {
+      if (!mounted) return;
+      ref.invalidate(streakProvider);
+      ref.invalidate(statsOverviewProvider);
+    },
   );
 
   @override

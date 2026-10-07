@@ -187,6 +187,7 @@ class StatsOverview {
       currentStreak: currentStreak,
       lastSolveDate: lastSolveDate,
       lastFreezeUsedAt: lastFreezeUsedAt,
+      freezeCount: freezeCount,
       todayUtc: AppDateUtils.nowUtc(),
     ),
   );
