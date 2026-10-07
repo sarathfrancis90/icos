@@ -35,9 +35,12 @@ class AuthScreen extends ConsumerWidget {
     final showApple = AuthStrategy.showAppleButton(platform);
     final next = sanitizeJoinLink(nextLocation);
     Future<void> googleSignIn() async {
-      final outcome = await ref
-          .read(authNotifierProvider.notifier)
-          .signInWithGoogle();
+      final notifier = ref.read(authNotifierProvider.notifier);
+      // Sign-in mode means an account already exists: never link the guest to
+      // the provider identity (that would create a new account).
+      final outcome = signIn
+          ? await notifier.signInToExistingWithOAuth(OAuthKind.google)
+          : await notifier.signInWithGoogle();
       if (context.mounted) {
         await handleAuthOutcome(context, ref, outcome, nextLocation: next);
       }
@@ -45,10 +48,7 @@ class AuthScreen extends ConsumerWidget {
 
     String emailRoute({bool signIn = false}) => Uri(
       path: '/auth/email',
-      queryParameters: {
-        if (signIn) 'mode': 'signin',
-        'from': ?next,
-      },
+      queryParameters: {if (signIn) 'mode': 'signin', 'from': ?next},
     ).toString();
 
     listenForAuthFlowMessages(context, ref);
@@ -77,238 +77,268 @@ class AuthScreen extends ConsumerWidget {
       body: SafeArea(
         // Scrolls when the content outgrows the screen (small phones, large
         // text); otherwise the Spacers keep the original centred layout.
-        child: ContentWidth(child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            padding: const EdgeInsetsDirectional.all(AppSizes.lg),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight - AppSizes.lg * 2,
-              ),
-              child: IntrinsicHeight(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Spacer(),
-                    // Logo with gradient
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.purpleGradientStart,
-                            AppColors.purpleGradientEnd,
+        child: ContentWidth(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              padding: const EdgeInsetsDirectional.all(AppSizes.lg),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - AppSizes.lg * 2,
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Spacer(),
+                      // Logo with gradient
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.purpleGradientStart,
+                              AppColors.purpleGradientEnd,
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.purpleGlow,
+                              blurRadius: 24,
+                              spreadRadius: 4,
+                            ),
                           ],
                         ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.purpleGlow,
-                            blurRadius: 24,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.route_rounded,
-                        size: 50,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: AppSizes.lg),
-                    ShaderMask(
-                      shaderCallback: (bounds) => LinearGradient(
-                        colors: context.palette.titleGradient,
-                      ).createShader(bounds),
-                      child: Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.displayLarge
-                            ?.copyWith(color: Colors.white),
-                      ),
-                    ),
-                    const SizedBox(height: AppSizes.xs),
-                    Text(
-                      subtitle,
-                      textAlign: TextAlign.center,
-                      style: AppTheme.textThemeOf(context).bodyLarge?.copyWith(
-                        color: context.palette.textSecondary,
-                      ),
-                    ),
-                    const Spacer(),
-
-                    if (authState.isLoading)
-                      CircularProgressIndicator(
-                        color: context.palette.accent,
-                      )
-                    else ...[
-                      // Google sign in
-                      // excludeSemantics: the label here replaces the child's
-                      // own text, which would otherwise be read a second time.
-                      Semantics(
-                        button: true,
-                        excludeSemantics: true,
-                        label: AppStrings.signInWithGoogle,
-                        onTap: googleSignIn,
-                        child: GestureDetector(
-                          onTap: googleSignIn,
-                          child: Container(
-                            width: double.infinity,
-                            constraints: const BoxConstraints(minHeight: 52),
-                            decoration: BoxDecoration(
-                              gradient: AppColors.purpleButtonGradient,
-                              borderRadius: BorderRadius.circular(26),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: AppColors.purpleGlow,
-                                  blurRadius: 12,
-                                  offset: Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.g_mobiledata_rounded,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                                SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    AppStrings.signInWithGoogle,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        child: const Icon(
+                          Icons.route_rounded,
+                          size: 50,
+                          color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: AppSizes.sm),
+                      const SizedBox(height: AppSizes.lg),
+                      ShaderMask(
+                        shaderCallback: (bounds) => LinearGradient(
+                          colors: context.palette.titleGradient,
+                        ).createShader(bounds),
+                        child: Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.displayLarge
+                              ?.copyWith(color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(height: AppSizes.xs),
+                      Text(
+                        subtitle,
+                        textAlign: TextAlign.center,
+                        style: AppTheme.textThemeOf(context).bodyLarge
+                            ?.copyWith(color: context.palette.textSecondary),
+                      ),
+                      const Spacer(),
 
-                      // Apple sign in (iOS native, Android via the web flow). Same size
-                      // as Google, directly under it: Apple's branding rules forbid
-                      // making it less prominent.
-                      if (showApple) ...[
-                        // The package fixes the button's height, and its label
-                        // is sized from that height, so it would clip at large
-                        // text sizes. Apple's own button does not follow
-                        // Dynamic Type either; keep the label at its design
-                        // size and let everything around it scale.
-                        MediaQuery.withNoTextScaling(
-                          child: SignInWithAppleButton(
-                            text: AppStrings.signInWithApple,
-                            height: 52,
-                            // Apple HIG: white on dark backgrounds, black on light.
-                            style: context.palette.isDark
-                                ? SignInWithAppleButtonStyle.white
-                                : SignInWithAppleButtonStyle.black,
-                            borderRadius: BorderRadius.circular(26),
-                            onPressed: () async {
-                              final outcome = await ref
-                                  .read(authNotifierProvider.notifier)
-                                  .signInWithApple();
-                              if (context.mounted) {
-                                await handleAuthOutcome(
-                                  context,
-                                  ref,
-                                  outcome,
-                                  nextLocation: next,
-                                );
-                              }
-                            },
+                      if (authState.isLoading)
+                        CircularProgressIndicator(color: context.palette.accent)
+                      else ...[
+                        if (signIn) ...[
+                          Text(
+                            AppStrings.signInGuestNote,
+                            textAlign: TextAlign.center,
+                            style: AppTheme.textThemeOf(context).bodyMedium
+                                ?.copyWith(
+                                  color: context.palette.textSecondary,
+                                ),
+                          ),
+                          const SizedBox(height: AppSizes.sm),
+                        ],
+                        // Google sign in
+                        // excludeSemantics: the label here replaces the child's
+                        // own text, which would otherwise be read a second time.
+                        Semantics(
+                          button: true,
+                          excludeSemantics: true,
+                          label: AppStrings.signInWithGoogle,
+                          onTap: googleSignIn,
+                          child: GestureDetector(
+                            onTap: googleSignIn,
+                            child: Container(
+                              width: double.infinity,
+                              constraints: const BoxConstraints(minHeight: 52),
+                              decoration: BoxDecoration(
+                                gradient: AppColors.purpleButtonGradient,
+                                borderRadius: BorderRadius.circular(26),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: AppColors.purpleGlow,
+                                    blurRadius: 12,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.g_mobiledata_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      AppStrings.signInWithGoogle,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: AppSizes.sm),
-                      ],
 
-                      // Email: creates an account, or signs in to an existing one.
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => context.push(emailRoute(signIn: signIn)),
-                          icon: const Icon(Icons.email_outlined),
-                          label: Text(
-                            signIn
-                                ? AppStrings.signInWithEmail
-                                : AppStrings.signUpWithEmail,
+                        // Apple sign in (iOS native, Android via the web flow). Same size
+                        // as Google, directly under it: Apple's branding rules forbid
+                        // making it less prominent.
+                        if (showApple) ...[
+                          // The package fixes the button's height, and its label
+                          // is sized from that height, so it would clip at large
+                          // text sizes. Apple's own button does not follow
+                          // Dynamic Type either; keep the label at its design
+                          // size and let everything around it scale.
+                          MediaQuery.withNoTextScaling(
+                            child: SignInWithAppleButton(
+                              text: AppStrings.signInWithApple,
+                              height: 52,
+                              // Apple HIG: white on dark backgrounds, black on light.
+                              style: context.palette.isDark
+                                  ? SignInWithAppleButtonStyle.white
+                                  : SignInWithAppleButtonStyle.black,
+                              borderRadius: BorderRadius.circular(26),
+                              onPressed: () async {
+                                final notifier = ref.read(
+                                  authNotifierProvider.notifier,
+                                );
+                                final outcome = signIn
+                                    ? await notifier.signInToExistingWithOAuth(
+                                        OAuthKind.apple,
+                                      )
+                                    : await notifier.signInWithApple();
+                                if (context.mounted) {
+                                  await handleAuthOutcome(
+                                    context,
+                                    ref,
+                                    outcome,
+                                    nextLocation: next,
+                                  );
+                                }
+                              },
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSizes.md),
+                          const SizedBox(height: AppSizes.sm),
+                        ],
 
-                      // Returning players had no way in: every route on this screen
-                      // read as "create an account", and the email form opened in
-                      // sign-up mode.
-                      if (!signIn)
-                      Semantics(
-                        button: true,
-                        excludeSemantics: true,
-                        label: AppStrings.alreadyHaveAccount,
-                        onTap: () => context.push(emailRoute(signIn: true)),
-                        child: TextButton(
-                          onPressed: () =>
-                              context.push(emailRoute(signIn: true)),
-                          child: Text.rich(
-                            TextSpan(
-                              text: 'Already have an account?  ',
-                              style: AppTheme.textThemeOf(context).bodyMedium
-                                  ?.copyWith(
-                                    color: context.palette.textSecondary,
-                                  ),
-                              children: [
-                                TextSpan(
-                                  text: AppStrings.signIn,
-                                  style: AppTheme
-                                      .darkTheme
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: context.palette.accent,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                              ],
+                        // Email: creates an account, or signs in to an existing one.
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () =>
+                                context.push(emailRoute(signIn: signIn)),
+                            icon: const Icon(Icons.email_outlined),
+                            label: Text(
+                              signIn
+                                  ? AppStrings.signInWithEmail
+                                  : AppStrings.signUpWithEmail,
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: AppSizes.sm),
+                        const SizedBox(height: AppSizes.md),
 
-                      TextButton(
-                        onPressed: () async {
-                          if (!hasSession) {
-                            await ref
-                                .read(authNotifierProvider.notifier)
-                                .signInAnonymously();
-                          }
-                          if (context.mounted) context.go('/');
-                        },
-                        child: Text(
-                          hasSession && isGuest
-                              ? 'Not now'
-                              : AppStrings.continueAsGuest,
-                          style: AppTheme.textThemeOf(context).bodyMedium
-                              ?.copyWith(color: context.palette.textSecondary),
+                        // Returning players had no way in: every route on this screen
+                        // read as "create an account", and the email form opened in
+                        // sign-up mode.
+                        if (signIn)
+                          TextButton(
+                            key: const Key('auth_switch_to_create'),
+                            onPressed: () => context.pushReplacement(
+                              Uri(
+                                path: '/auth',
+                                queryParameters: {'from': ?next},
+                              ).toString(),
+                            ),
+                            child: const Text(AppStrings.newHereCreateAccount),
+                          )
+                        else
+                          Semantics(
+                            button: true,
+                            excludeSemantics: true,
+                            label: AppStrings.alreadyHaveAccount,
+                            onTap: () => context.push(emailRoute(signIn: true)),
+                            child: TextButton(
+                              onPressed: () =>
+                                  context.push(emailRoute(signIn: true)),
+                              child: Text.rich(
+                                TextSpan(
+                                  text: 'Already have an account?  ',
+                                  style: AppTheme.textThemeOf(context)
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: context.palette.textSecondary,
+                                      ),
+                                  children: [
+                                    TextSpan(
+                                      text: AppStrings.signIn,
+                                      style: AppTheme
+                                          .darkTheme
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: context.palette.accent,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: AppSizes.sm),
+
+                        TextButton(
+                          onPressed: () async {
+                            if (!hasSession) {
+                              await ref
+                                  .read(authNotifierProvider.notifier)
+                                  .signInAnonymously();
+                            }
+                            if (context.mounted) context.go('/');
+                          },
+                          child: Text(
+                            hasSession && isGuest
+                                ? 'Not now'
+                                : AppStrings.continueAsGuest,
+                            style: AppTheme.textThemeOf(context).bodyMedium
+                                ?.copyWith(
+                                  color: context.palette.textSecondary,
+                                ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSizes.sm),
-                      const LegalConsentText(),
+                        const SizedBox(height: AppSizes.sm),
+                        const LegalConsentText(),
+                      ],
+                      const SizedBox(height: AppSizes.xl),
                     ],
-                    const SizedBox(height: AppSizes.xl),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        )),
+        ),
       ),
     );
   }

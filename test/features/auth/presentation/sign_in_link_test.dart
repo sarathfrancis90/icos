@@ -26,7 +26,7 @@ class _FakeAuth extends AuthNotifier {
   AsyncValue<User?> build() => const AsyncValue.data(null);
 }
 
-const _signInLabel = 'Sign in to an existing account';
+const _signInLabel = AppStrings.signInExistingAccount;
 
 GoRouter _router(Widget home) => GoRouter(
   routes: [
@@ -182,7 +182,7 @@ void main() {
         await tester.tap(find.byKey(const Key('account_required_cta')));
         await tester.pumpAndSettle();
         expect(find.byType(AuthScreen), findsOneWidget);
-    expect(find.text(AppStrings.welcomeBack), findsNothing);
+        expect(find.text(AppStrings.welcomeBack), findsNothing);
         expect(
           GoRouterState.of(
             tester.element(find.byType(Scaffold).last),

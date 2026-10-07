@@ -90,8 +90,12 @@ abstract final class AppStrings {
   static const signIn = 'Sign In';
   static const welcomeBack = 'Welcome back';
   static const signInSubtitle = 'Sign in to continue your streak';
+  static const signInGuestNote =
+      'Signing in to an existing account. Progress from this guest session '
+      'stays on this device.';
+  static const newHereCreateAccount = 'New here? Create account';
   static const signInLink = 'Sign in';
-  static const signInExistingAccount = 'Sign in to an existing account';
+  static const signInExistingAccount = 'Sign in, to an existing account';
   static const signUp = 'Create Account';
   static const signInWithGoogle = 'Continue with Google';
   static const signInWithApple = 'Continue with Apple';
