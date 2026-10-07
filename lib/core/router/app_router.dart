@@ -151,6 +151,7 @@ GoRouter appRouter(Ref ref) {
         path: '/auth',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => AuthScreen(
+          signIn: state.uri.queryParameters['mode'] == 'signin',
           nextLocation: sanitizeJoinLink(state.uri.queryParameters['from']),
         ),
       ),

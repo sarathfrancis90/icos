@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_palette.dart';
+import '../../auth/presentation/widgets/sign_in_link.dart';
 import '../domain/models/group.dart';
 import '../providers/groups_provider.dart';
 import 'widgets/account_required_card.dart';
@@ -112,28 +113,41 @@ class GroupsScreen extends ConsumerWidget {
 
   bool _requireAccount(BuildContext context, WidgetRef ref) {
     if (ref.read(groupsSessionProvider).canUseGroups) return true;
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(AppStrings.accountRequired),
-        content: const Text(AppStrings.linkAccountPrompt),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.push('/auth');
-            },
-            child: const Text(AccountRequiredCard.ctaLabel),
-          ),
-        ],
-      ),
-    );
+    showAccountRequiredDialog(context);
     return false;
   }
+}
+
+/// Offers Create account or Sign in to a guest who tapped a groups action.
+Future<void> showAccountRequiredDialog(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text(AppStrings.accountRequired),
+      content: const Text(AppStrings.linkAccountPrompt),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          key: const Key('account_dialog_sign_in'),
+          onPressed: () {
+            Navigator.of(context).pop();
+            context.push(signInRoute());
+          },
+          child: const Text(AppStrings.signInLink),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            context.push('/auth');
+          },
+          child: const Text(AccountRequiredCard.ctaLabel),
+        ),
+      ],
+    ),
+  );
 }
 
 class _GlassIconButton extends StatelessWidget {

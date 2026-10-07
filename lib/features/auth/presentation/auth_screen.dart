@@ -16,7 +16,11 @@ import '../providers/auth_provider.dart';
 import 'widgets/auth_outcome_handler.dart';
 
 class AuthScreen extends ConsumerWidget {
-  const AuthScreen({super.key, this.nextLocation});
+  const AuthScreen({super.key, this.nextLocation, this.signIn = false});
+
+  /// Opened from a "Sign in" link: returning players, so the copy and the
+  /// email form lean to signing in. Google and Apple work in either mode.
+  final bool signIn;
 
   /// Where to go once signed in, e.g. the invite a guest was joining. Only a
   /// whitelisted deep link is honoured (see [sanitizeJoinLink]).
@@ -49,10 +53,14 @@ class AuthScreen extends ConsumerWidget {
 
     listenForAuthFlowMessages(context, ref);
 
-    final title = hasSession && isGuest
+    final title = signIn
+        ? AppStrings.welcomeBack
+        : hasSession && isGuest
         ? 'Save your progress'
         : AppStrings.appName;
-    final subtitle = hasSession && isGuest
+    final subtitle = signIn
+        ? AppStrings.signInSubtitle
+        : hasSession && isGuest
         ? 'Create an account to keep your streak and join groups, or sign in '
               'to one you already have. Your guest progress comes with you.'
         : AppStrings.appTagline;
@@ -225,9 +233,13 @@ class AuthScreen extends ConsumerWidget {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: () => context.push(emailRoute()),
+                          onPressed: () => context.push(emailRoute(signIn: signIn)),
                           icon: const Icon(Icons.email_outlined),
-                          label: const Text(AppStrings.signUpWithEmail),
+                          label: Text(
+                            signIn
+                                ? AppStrings.signInWithEmail
+                                : AppStrings.signUpWithEmail,
+                          ),
                         ),
                       ),
                       const SizedBox(height: AppSizes.md),
@@ -235,6 +247,7 @@ class AuthScreen extends ConsumerWidget {
                       // Returning players had no way in: every route on this screen
                       // read as "create an account", and the email form opened in
                       // sign-up mode.
+                      if (!signIn)
                       Semantics(
                         button: true,
                         excludeSemantics: true,

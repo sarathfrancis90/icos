@@ -5,7 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icos/core/services/storage_service.dart';
+import 'package:icos/core/constants/app_strings.dart';
+import 'package:icos/features/auth/domain/auth_strategy.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:icos/features/auth/presentation/auth_screen.dart';
 import 'package:icos/features/auth/presentation/email_auth_screen.dart';
+import 'package:icos/features/groups/presentation/groups_screen.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:icos/features/groups/presentation/join_group_screen.dart';
 import 'package:icos/features/groups/presentation/widgets/account_required_card.dart';
@@ -31,7 +36,10 @@ GoRouter _router(Widget home) => GoRouter(
     ),
     GoRoute(
       path: '/auth',
-      builder: (_, _) => const Scaffold(body: Text('AUTH_HOME')),
+      builder: (_, s) => AuthScreen(
+        signIn: s.uri.queryParameters['mode'] == 'signin',
+        nextLocation: s.uri.queryParameters['from'],
+      ),
     ),
     GoRoute(
       path: '/auth/email',
@@ -83,7 +91,22 @@ Future<GoRouter> _pump(
   return router;
 }
 
-void _expectSignInMode(WidgetTester tester) {
+/// The auth screen in sign-in mode offers every provider, and its email
+/// button opens the email form in sign-in state.
+Future<void> _expectSignInMode(WidgetTester tester) async {
+  expect(find.text(AppStrings.welcomeBack), findsOneWidget);
+  expect(find.text(AppStrings.signInWithGoogle), findsOneWidget);
+  expect(
+    find.byType(SignInWithAppleButton),
+    AuthStrategy.showAppleButton(AuthNotifier.platform)
+        ? findsOneWidget
+        : findsNothing,
+  );
+  expect(find.text(AppStrings.signInWithEmail), findsOneWidget);
+  expect(find.text(AppStrings.alreadyHaveAccount), findsNothing);
+  await tester.ensureVisible(find.text(AppStrings.signInWithEmail));
+  await tester.tap(find.text(AppStrings.signInWithEmail));
+  await tester.pumpAndSettle();
   expect(find.byType(EmailAuthScreen), findsOneWidget);
   expect(find.text('Welcome Back'), findsOneWidget);
   expect(find.text('Sign In'), findsWidgets);
@@ -106,7 +129,7 @@ void main() {
         final handle = tester.ensureSemantics();
         await _pump(tester, entry.value.$1);
         expect(find.byKey(const Key('sign_in_link')), findsOneWidget);
-        expect(find.text('Sign in'), findsOneWidget);
+        expect(find.text(AppStrings.signInLink), findsOneWidget);
         expect(find.bySemanticsLabel(_signInLabel), findsOneWidget);
         expect(
           tester.getSize(find.byKey(const Key('sign_in_link'))).height,
@@ -122,7 +145,7 @@ void main() {
         await tester.ensureVisible(find.byKey(const Key('sign_in_link')));
         await tester.tap(find.byKey(const Key('sign_in_link')));
         await tester.pumpAndSettle();
-        _expectSignInMode(tester);
+        await _expectSignInMode(tester);
       });
 
       testWidgets('no overflow at 200% on 320x568', (tester) async {
@@ -143,7 +166,8 @@ void main() {
     await _pump(tester, const GuestAccountCard());
     await tester.tap(find.text('Create account'));
     await tester.pumpAndSettle();
-    expect(find.text('AUTH_HOME'), findsOneWidget);
+    expect(find.byType(AuthScreen), findsOneWidget);
+    expect(find.text(AppStrings.welcomeBack), findsNothing);
   });
 
   group('join screen invite continuation', () {
@@ -157,7 +181,8 @@ void main() {
         );
         await tester.tap(find.byKey(const Key('account_required_cta')));
         await tester.pumpAndSettle();
-        expect(find.text('AUTH_HOME'), findsOneWidget);
+        expect(find.byType(AuthScreen), findsOneWidget);
+    expect(find.text(AppStrings.welcomeBack), findsNothing);
         expect(
           GoRouterState.of(
             tester.element(find.byType(Scaffold).last),
@@ -181,13 +206,54 @@ void main() {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 100)),
       );
-      _expectSignInMode(tester);
+      await _expectSignInMode(tester);
       final uri = GoRouterState.of(
         tester.element(find.byType(Scaffold).last),
       ).uri;
       expect(uri.path, '/auth/email');
       expect(uri.queryParameters, {'mode': 'signin', 'from': '/join/ABC123'});
       expect(StorageService.pendingInviteCode, 'ABC123');
+    });
+  });
+
+  group('account required dialog', () {
+    Widget opener() => Builder(
+      builder: (context) => TextButton(
+        onPressed: () => showAccountRequiredDialog(context),
+        child: const Text('open'),
+      ),
+    );
+
+    testWidgets('offers Create account and Sign in', (tester) async {
+      await _pump(tester, opener());
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text(AccountRequiredCard.ctaLabel), findsOneWidget);
+      expect(find.byKey(const Key('account_dialog_sign_in')), findsOneWidget);
+      expect(find.text(AppStrings.signInLink), findsOneWidget);
+    });
+
+    testWidgets('Sign in opens the auth screen in sign-in mode', (
+      tester,
+    ) async {
+      await _pump(tester, opener());
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('account_dialog_sign_in')));
+      await tester.pumpAndSettle();
+      await _expectSignInMode(tester);
+    });
+
+    testWidgets('Create account still opens the plain auth screen', (
+      tester,
+    ) async {
+      await _pump(tester, opener());
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AccountRequiredCard.ctaLabel));
+      await tester.pumpAndSettle();
+      expect(find.byType(AuthScreen), findsOneWidget);
+      expect(find.text(AppStrings.welcomeBack), findsNothing);
     });
   });
 }

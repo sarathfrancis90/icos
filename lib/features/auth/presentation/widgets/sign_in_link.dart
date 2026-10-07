@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
 
-/// Route to the email form opened in sign-in mode, optionally carrying a
+/// Route to the auth screen in sign-in mode (Google, Apple and email),
+/// optionally carrying a
 /// `/join/<code>` continuation through `from`.
 String signInRoute({String? from}) => Uri(
-  path: '/auth/email',
+  path: '/auth',
   queryParameters: {'mode': 'signin', 'from': ?from},
 ).toString();
 
