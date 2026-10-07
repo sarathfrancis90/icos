@@ -43,7 +43,7 @@ Done automatically via the App Store Connect API (`scripts/asc.py`):
 | Item | Value |
 |---|---|
 | App record | `Icos: Daily Path Puzzle`, bundle `com.icos.game`, SKU `icos-ios`, Apple ID `6810895361` |
-| Builds uploaded | 1.0 (1) through (10). Build **7** is attached to version 1.0 and resubmitted for review on 2026-10-06 after the 2026-09-24 Guideline 4 rejection; builds 8–10 (light theme, display-name prompt, first-play guidance, Tap to draw) are on TestFlight and Play internal/closed as the follow-up |
+| Builds uploaded | 1.0 (1) through (12). Build **7** is attached to version 1.0 and resubmitted for review on 2026-10-06 after the 2026-09-24 Guideline 4 rejection. Builds 8–12 are the follow-up on TestFlight (public link) and Play internal/closed: light theme, display-name prompt, first-play guidance and Tap to draw (8–10), drag no longer cuts the line over filled cells (11), sign-in mode for existing accounts, correct streak after a missed day, midnight-UTC rollover in the foreground, streak reminder armed after a solve, admin New invite code, live member counts, reset counted as an undo, 30-day archive scoring (12) |
 | Category | Games / Puzzle (secondary: Board) |
 | Age rating | All content descriptors "None" (expect 4+) |
 | Name, subtitle, description, keywords, promo text | Uploaded (en-US) |
@@ -84,13 +84,13 @@ submission record already exists; adding the version fails until App Privacy is 
 Also before submitting: replace the placeholder review phone number
 (App Review Information > Contact) with a number Apple can actually reach.
 
-### Google Play: one manual step left
+### Google Play: uploads are scripted
 
-The signed bundle is built and staged, but it cannot be pushed from here — Play
-publishing needs a service-account key and there is none on this machine
-(`android/play-store-credentials.json`, or the `PLAY_STORE_JSON_KEY` env var, both
-absent). Either drop that key in and run `bundle exec fastlane android beta`, or upload
-by hand:
+Version codes 5–12 were uploaded with `scripts/release.sh` (which calls
+`scripts/play_release.py`, Play Edits API, service account in the git-ignored
+`android/play-store-credentials.json`) and released to Internal + Closed (alpha)
+testing. The fastlane Android lanes fail on this machine (system Ruby picks the
+Gemfile's bundler), so use the script. Earlier hand-staged artifacts:
 
 | File | What it is |
 |---|---|
@@ -495,7 +495,7 @@ Capture screenshots with the Maestro flows in `scripts/run_visual_tests.sh` or f
 
 1. `git checkout main && git pull`; bump `version:` in `pubspec.yaml`; update `ios/fastlane/metadata/en-US/release_notes.txt` and `android/fastlane/metadata/android/en-US/changelogs/default.txt`
 2. `supabase db push` / `supabase functions deploy` if backend changed; confirm puzzles exist for the next 14 days (`select puzzle_date from puzzles order by puzzle_date desc limit 14;`)
-3. Commit, `git tag vX.Y.Z`, `git push --tags` -> both deploy workflows run
+3. Commit and push. Local path (used for builds 5–12): `bash scripts/release.sh` builds from a clean tree, uploads the IPA to TestFlight and the AAB to Play Internal + Closed; keep its log outside `build/`. Then attach the processed build to the TestFlight group "Public testers" and submit it for beta review (`scripts/asc.py`). CI path: `git tag vX.Y.Z && git push --tags` -> both deploy workflows run
 4. Android: verify the internal build on a device, then `fastlane promote_to_production` (or console) with a staged rollout
 5. iOS: verify the TestFlight build, then `fastlane release build_number:<N>` or submit from ASC; release manually after approval
 6. Watch Crashlytics / Supabase logs for 24 h; keep the previous AAB/IPA artifacts (90-day retention in Actions) for rollback
