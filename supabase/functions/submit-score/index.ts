@@ -150,7 +150,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return errorResponse(400, "Client clock is ahead of server time", "CLOCK_SKEW", correlationId);
     }
 
-    // ---- rate limit (10 / hour, counted from submission_log) ------------------
+    // ---- rate limit (40 / hour, counted from submission_log) ------------------
     const oneHourAgo = new Date(now.getTime() - 3_600_000).toISOString();
     const { count: recent, error: countError } = await admin
       .from("submission_log")
