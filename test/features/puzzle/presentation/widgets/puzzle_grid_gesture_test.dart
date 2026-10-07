@@ -262,4 +262,200 @@ void main() {
       expect(clicks, 2); // the press itself, then the one move event
     });
   });
+  group('sliding over the existing line (5x5)', () {
+    late Directory dir;
+    setUp(() async => dir = await initTestStorage());
+    tearDown(() async => dir.delete(recursive: true));
+
+    const five = Puzzle(
+      id: 'five',
+      puzzleDate: '2026-10-06',
+      gridSize: 5,
+      waypoints: [
+        Waypoint(order: 1, row: 0, col: 0),
+        Waypoint(order: 2, row: 4, col: 4),
+      ],
+      walls: [],
+      difficulty: 'easy',
+      parTimeSeconds: 60,
+    );
+
+    late GameEngine engine;
+    late GameState state;
+    late int invalid;
+    late int haptics;
+    late int undosCharged;
+    late bool dragCharged;
+
+    List<String> pathOf() =>
+        state.path.map((p) => '${p.row},${p.col}').toList();
+
+    /// A grid fed by a live state, like the real screen: every drag or tap is
+    /// applied through the engine and the grid rebuilds. Undo is charged once
+    /// per gesture, as the provider does.
+    Future<Rect> pumpLive(WidgetTester tester, List<(int, int)> initial) async {
+      engine = GameEngine(five);
+      state = engine.createInitialState();
+      for (final (r, c) in initial) {
+        state = engine.addToPath(state, r, c);
+      }
+      invalid = 0;
+      haptics = 0;
+      undosCharged = 0;
+      dragCharged = false;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') haptics++;
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      late StateSetter set;
+      await tester.pumpWidget(
+        buildTestWidgetInScaffold(
+          StatefulBuilder(
+            builder: (context, setState) {
+              set = setState;
+              return PuzzleGrid(
+                gameState: state,
+                onInvalidMove: (r, c) => invalid++,
+                onCellTap: (r, c) => set(() {
+                  state = engine.handleCellTap(state, r, c);
+                }),
+                onCellDrag: (r, c) => set(() {
+                  final before = state.path.length;
+                  state = engine.handleCellTap(
+                    state,
+                    r,
+                    c,
+                    countUndo: !dragCharged,
+                  );
+                  if (state.path.length < before && !dragCharged) {
+                    dragCharged = true;
+                    undosCharged++;
+                  }
+                }),
+                onDragEnd: () => dragCharged = false,
+              );
+            },
+          ),
+        ),
+      );
+      return tester.getRect(
+        find
+            .descendant(
+              of: find.byType(PuzzleGrid),
+              matching: find.byType(CustomPaint),
+            )
+            .first,
+      );
+    }
+
+    Offset cell(Rect board, int row, int col) {
+      final c = board.width / 5;
+      return board.topLeft + Offset(c * (col + .5), c * (row + .5));
+    }
+
+    // (0,0)(0,1)(0,2)(1,2)(1,1): the head (1,1) sits next to older (0,1).
+    const doubled = [(0, 0), (0, 1), (0, 2), (1, 2), (1, 1)];
+
+    testWidgets('sliding across an older filled cell leaves the line alone', (
+      tester,
+    ) async {
+      final board = await pumpLive(tester, doubled);
+      final before = pathOf();
+      final g = await tester.startGesture(cell(board, 1, 1));
+      final baseHaptics = haptics;
+      await g.moveTo(cell(board, 0, 1)); // older cell, index 1
+      await tester.pump();
+      await g.up();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(pathOf(), before);
+      expect(invalid, 0);
+      expect(haptics, baseHaptics);
+      expect(undosCharged, 0);
+    });
+
+    testWidgets('dragging back onto the cell before the head removes one', (
+      tester,
+    ) async {
+      final board = await pumpLive(tester, doubled);
+      final g = await tester.startGesture(cell(board, 1, 1));
+      await g.moveTo(cell(board, 1, 2));
+      await tester.pump();
+      await g.up();
+      expect(pathOf(), ['0,0', '0,1', '0,2', '1,2']);
+      expect(invalid, 0);
+    });
+
+    testWidgets('a continuous backward sweep peels cells, one undo charged', (
+      tester,
+    ) async {
+      final board = await pumpLive(tester, doubled);
+      final g = await tester.startGesture(cell(board, 1, 1));
+      await g.moveTo(cell(board, 1, 2));
+      await tester.pump();
+      await g.moveTo(cell(board, 0, 2));
+      await tester.pump();
+      await g.moveTo(cell(board, 0, 1));
+      await tester.pump();
+      await g.up();
+      expect(pathOf(), ['0,0', '0,1']);
+      expect(undosCharged, 1);
+    });
+
+    testWidgets('pressing straight on an earlier cell retracts to it', (
+      tester,
+    ) async {
+      final board = await pumpLive(tester, doubled);
+      final g = await tester.startGesture(cell(board, 0, 2));
+      await tester.pump();
+      await g.up();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(pathOf(), ['0,0', '0,1', '0,2']);
+    });
+
+    testWidgets('tapping an earlier cell retracts to it', (tester) async {
+      final board = await pumpLive(tester, doubled);
+      await tester.tapAt(cell(board, 0, 1));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(pathOf(), ['0,0', '0,1']);
+    });
+
+    testWidgets('a flick over an older cell then a far cell does nothing', (
+      tester,
+    ) async {
+      // Head (1,2); (1,1) is older, (1,0) is empty but not adjacent to the head.
+      final board = await pumpLive(tester, const [
+        (0, 0),
+        (0, 1),
+        (1, 1),
+        (2, 1),
+        (2, 2),
+        (1, 2),
+      ]);
+      final before = pathOf();
+      final g = await tester.startGesture(cell(board, 1, 2));
+      await g.moveTo(cell(board, 1, 0));
+      await tester.pump();
+      await g.up();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(pathOf(), before);
+    });
+
+    testWidgets('forward drawing is unchanged', (tester) async {
+      final board = await pumpLive(tester, const [(0, 0)]);
+      final g = await tester.startGesture(cell(board, 0, 0));
+      await g.moveTo(cell(board, 0, 3));
+      await tester.pump();
+      await g.up();
+      expect(pathOf(), ['0,0', '0,1', '0,2', '0,3']);
+    });
+  });
 }

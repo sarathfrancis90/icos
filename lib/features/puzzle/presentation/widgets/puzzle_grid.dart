@@ -646,7 +646,7 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
     if (from != null) {
       final walk = walkGridCells(from / cellSize, to / cellSize, size);
       for (final (row, col) in walk ?? const <(int, int)>[]) {
-        final action = _classify(row, col);
+        final action = _classify(row, col, sliding: true);
         if (action == _GridAction.reject) break;
         if (action == _GridAction.noop) continue;
         apply(row, col, action);
@@ -665,11 +665,18 @@ class _PuzzleGridState extends State<PuzzleGrid> with TickerProviderStateMixin {
   /// already covers bounds, walls, adjacency, revisits, the "first cell must be
   /// waypoint 1" rule and waypoint ordering. Asking it keeps one rulebook
   /// between what the grid accepts and what the engine will actually apply.
-  _GridAction _classify(int row, int col) {
+  ///
+  /// While [sliding] (a finger already down and moving) only the cell right
+  /// before the head retracts, one step at a time; any other cell already on
+  /// the line is ignored, so brushing across the line never cuts it. A press
+  /// or tap ([sliding] false) on any earlier cell still retracts to it.
+  _GridAction _classify(int row, int col, {bool sliding = false}) {
     final path = _state.path;
     final index = path.indexWhere((p) => p.row == row && p.col == col);
     if (index >= 0) {
-      return index == path.length - 1 ? _GridAction.noop : _GridAction.retract;
+      if (index == path.length - 1) return _GridAction.noop;
+      if (sliding && index != path.length - 2) return _GridAction.noop;
+      return _GridAction.retract;
     }
     return _engine.canMoveToCell(_state, row, col)
         ? _GridAction.extend
