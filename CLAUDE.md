@@ -175,7 +175,7 @@ Every feature under `lib/features/{feature}/` follows this structure:
 - WCAG 2.1 AA contrast ratios (4.5:1 body, 3:1 large text)
 - Reduced motion: respect system setting, replace animations with static alternatives
 - Grid sizing formula: `(screen_width - 48px) / grid_columns`
-- Portrait-locked on phones (< 768dp); landscape supported on tablets
+- Portrait-locked on all devices in v1 (`main.dart` sets portrait only); tablet landscape is a follow-up
 - Tablet: grid capped at 500dp width, content max 600dp width
 
 ### Accessibility (Non-Negotiable)
@@ -202,11 +202,11 @@ Every feature under `lib/features/{feature}/` follows this structure:
 ### Security Rules
 
 - All network: HTTPS/TLS 1.2+
-- Tokens: platform-secure credential storage
+- Tokens: supabase_flutter's default session store (SharedPreferences, app-private). Moving to secure storage would sign existing players out unless the session is migrated first
 - Puzzle solutions: NEVER transmitted to client; server re-validates submitted paths
 - Score submissions: rate-limited (40/hour/user), HMAC-signed, clock manipulation detection (5-min tolerance)
 - User input: sanitize against XSS, SQL injection, Unicode abuse (zalgo, invisible chars)
-- Certificate pinning for Supabase API
+- No certificate pinning (Supabase certificates rotate; TLS 1.2+ via the platform trust store)
 - Profanity filter on display names and group names (client + server)
 
 ### Error Handling Pattern
@@ -295,4 +295,4 @@ supabase start  # Local development
 
 ---
 
-Last Updated: 2026-09-09 (see `docs/superpowers/specs/2026-09-09-production-readiness-design.md` and `docs/RELEASE_RUNBOOK.md`)
+Last Updated: 2026-10-07 (see `docs/superpowers/specs/2026-09-09-production-readiness-design.md` and `docs/RELEASE_RUNBOOK.md`)
