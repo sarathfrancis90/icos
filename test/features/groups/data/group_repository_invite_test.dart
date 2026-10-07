@@ -75,6 +75,23 @@ void main() {
       expect((result as Failure).error, isA<ValidationError>());
     });
 
+    test('maps a permission error (42501) to an auth error', () async {
+      final repo = _repo(
+        (_) async => _json({
+          'code': '42501',
+          'message': 'permission denied',
+          'details': null,
+          'hint': null,
+        }, 403),
+      );
+
+      final result = await repo.regenerateInviteCode('g-1');
+
+      final error = (result as Failure).error as AppError;
+      expect(error, isA<AuthError>());
+      expect(error.userMessage, 'You do not have permission to do that');
+    });
+
     test('requires a signed-in user', () async {
       final repo = _repo((_) async => _json({}), userId: null);
 

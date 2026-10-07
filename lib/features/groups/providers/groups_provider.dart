@@ -71,6 +71,21 @@ class MyGroups extends _$MyGroups {
     }
   }
 
+  /// Refetches the list and reports whether [groupId] is still in it:
+  /// `true`/`false`, or `null` when the fetch failed (state is left as is).
+  /// Used by the detail screen to refresh the member count and to notice
+  /// removal by an admin.
+  Future<bool?> refreshMembership(String groupId) async {
+    final result = await ref.read(groupRepositoryProvider).getMyGroups();
+    switch (result) {
+      case Success(data: final groups):
+        state = AsyncValue.data(groups);
+        return groups.any((g) => g.id == groupId);
+      case Failure():
+        return null;
+    }
+  }
+
   Future<Result<Group, AppError>> createGroup({
     required String name,
     required String description,
@@ -117,8 +132,13 @@ class MyGroups extends _$MyGroups {
 
   void _upsertLocal(Group group) {
     final current = state.valueOrNull ?? const <Group>[];
-    final others = current.where((g) => g.id != group.id);
-    state = AsyncValue.data([group, ...others]);
+    final index = current.indexWhere((g) => g.id == group.id);
+    if (index == -1) {
+      state = AsyncValue.data([group, ...current]);
+    } else {
+      // Known group: replace in place so the list order stays stable.
+      state = AsyncValue.data([...current]..[index] = group);
+    }
     // groupDetailProvider watches this list, so it refreshes on its own.
     // Invalidating it from here creates a Riverpod circular dependency.
   }

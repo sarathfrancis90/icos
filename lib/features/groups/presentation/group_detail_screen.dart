@@ -38,6 +38,26 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    // Refresh the cached row (member count) and notice removal by an admin.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkMembership());
+  }
+
+  bool _leaving = false;
+
+  /// Refetches the groups list. If this group is gone from it the user was
+  /// removed: leave the screen and say so.
+  Future<void> _checkMembership() async {
+    if (!mounted || _leaving) return;
+    final stillMember = await ref
+        .read(myGroupsProvider.notifier)
+        .refreshMembership(widget.groupId);
+    if (!mounted || stillMember != false || _leaving) return;
+    _leaving = true;
+    final messenger = ScaffoldMessenger.of(context);
+    leaveScreen(context, '/groups');
+    messenger.showSnackBar(
+      const SnackBar(content: Text(AppStrings.groupNoLongerMember)),
+    );
   }
 
   @override
@@ -48,6 +68,20 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    // A new activity event (join or solve) means the member count may have
+    // changed; a feed error may mean access was revoked. Either way, recheck.
+    ref.listen(groupFeedProvider(widget.groupId), (previous, next) {
+      if (next.hasError) {
+        _checkMembership();
+        return;
+      }
+      final before = previous?.valueOrNull;
+      final after = next.valueOrNull;
+      if (before == null || after == null || after.isEmpty) return;
+      if (before.isEmpty || before.first.id != after.first.id) {
+        _checkMembership();
+      }
+    });
     final groupAsync = ref.watch(groupDetailProvider(widget.groupId));
     final session = ref.watch(groupsSessionProvider);
 
@@ -106,6 +140,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                 value: _GroupMenuAction.share,
                 child: ListTile(
                   dense: true,
+                  minTileHeight: AppSizes.minTouchTarget,
                   contentPadding: EdgeInsetsDirectional.zero,
                   leading: Icon(Icons.share_rounded),
                   title: Text('Share invite'),
@@ -115,6 +150,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                 value: _GroupMenuAction.qr,
                 child: ListTile(
                   dense: true,
+                  minTileHeight: AppSizes.minTouchTarget,
                   contentPadding: EdgeInsetsDirectional.zero,
                   leading: Icon(Icons.qr_code_2_rounded),
                   title: Text('Show QR code'),
@@ -124,6 +160,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                 value: _GroupMenuAction.report,
                 child: ListTile(
                   dense: true,
+                  minTileHeight: AppSizes.minTouchTarget,
                   contentPadding: EdgeInsetsDirectional.zero,
                   leading: Icon(Icons.flag_rounded),
                   title: Text('Report group'),
@@ -134,7 +171,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                   value: _GroupMenuAction.newInviteCode,
                   child: ListTile(
                     dense: true,
-                    minTileHeight: 44,
+                    minTileHeight: AppSizes.minTouchTarget,
                     contentPadding: EdgeInsetsDirectional.zero,
                     leading: Icon(Icons.key_rounded),
                     title: Text(AppStrings.newInviteCode),
@@ -145,6 +182,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                 value: _GroupMenuAction.leave,
                 child: ListTile(
                   dense: true,
+                  minTileHeight: AppSizes.minTouchTarget,
                   contentPadding: EdgeInsetsDirectional.zero,
                   leading: Icon(Icons.logout_rounded, color: theme.colorScheme.error),
                   title: Text(
@@ -158,6 +196,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen>
                   value: _GroupMenuAction.delete,
                   child: ListTile(
                     dense: true,
+                    minTileHeight: AppSizes.minTouchTarget,
                     contentPadding: EdgeInsetsDirectional.zero,
                     leading: Icon(
                       Icons.delete_forever_rounded,

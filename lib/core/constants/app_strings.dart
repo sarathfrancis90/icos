@@ -213,4 +213,6 @@ abstract final class AppStrings {
       'Members already in the group are not affected.';
   static const newInviteCodeGenerate = 'Generate';
   static String newInviteCodeCreated(String code) => 'New invite code: $code';
+  static const groupNoLongerMember =
+      "You're no longer a member of this group.";
 }
