@@ -28,7 +28,7 @@ class AccountRequiredCard extends StatelessWidget {
   /// Defaults to navigating to `/auth`.
   final VoidCallback? onCreateAccount;
 
-  /// Defaults to the email form in sign-in mode.
+  /// Defaults to the auth screen in sign-in mode (`/auth?mode=signin`).
   final VoidCallback? onSignIn;
 
   @override

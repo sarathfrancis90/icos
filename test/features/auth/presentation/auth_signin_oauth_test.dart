@@ -10,6 +10,7 @@ import 'package:icos/core/services/app_config_provider.dart';
 import 'package:icos/core/services/storage_service.dart';
 import 'package:icos/features/profile/providers/profile_provider.dart';
 import 'package:icos/features/auth/domain/auth_outcome.dart';
+import 'package:icos/features/auth/domain/auth_strategy.dart';
 import 'package:icos/features/auth/presentation/auth_screen.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show User;
@@ -80,12 +81,25 @@ void main() {
   testWidgets('sign-in mode: Apple uses the existing-account path', (
     tester,
   ) async {
+    AuthNotifier.platformOverride = AuthPlatform.ios;
+    addTearDown(() => AuthNotifier.platformOverride = null);
     await pump(tester, signIn: true);
     final apple = find.text(AppStrings.signInWithApple);
-    if (apple.evaluate().isEmpty) return; // not offered on this platform
+    expect(apple, findsOneWidget);
     await tester.tap(apple);
     await tester.pumpAndSettle();
     expect(_RecordingAuth.calls, ['existing:apple']);
+  });
+
+  testWidgets('normal mode: Apple still links the guest', (tester) async {
+    AuthNotifier.platformOverride = AuthPlatform.ios;
+    addTearDown(() => AuthNotifier.platformOverride = null);
+    await pump(tester, signIn: false);
+    final apple = find.text(AppStrings.signInWithApple);
+    expect(apple, findsOneWidget);
+    await tester.tap(apple);
+    await tester.pumpAndSettle();
+    expect(_RecordingAuth.calls, ['link:apple']);
   });
 
   testWidgets('normal mode: Google still links the guest, no note', (
@@ -127,6 +141,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('auth_switch_to_create')));
     await tester.pumpAndSettle();
+    final uri = router.state.uri;
+    expect(uri.queryParameters['from'], '/join/ABC123');
+    expect(uri.queryParameters.containsKey('mode'), isFalse);
     expect(find.text(AppStrings.welcomeBack), findsNothing);
     expect(find.text(AppStrings.signUpWithEmail), findsOneWidget);
     expect(find.text(AppStrings.signInGuestNote), findsNothing);

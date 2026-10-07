@@ -56,13 +56,12 @@ class AuthScreen extends ConsumerWidget {
     final title = signIn
         ? AppStrings.welcomeBack
         : hasSession && isGuest
-        ? 'Save your progress'
+        ? AppStrings.saveYourProgress
         : AppStrings.appName;
     final subtitle = signIn
         ? AppStrings.signInSubtitle
         : hasSession && isGuest
-        ? 'Create an account to keep your streak and join groups, or sign in '
-              'to one you already have. Your guest progress comes with you.'
+        ? AppStrings.guestUpgradeSubtitle
         : AppStrings.appTagline;
 
     return Scaffold(
@@ -71,7 +70,7 @@ class AuthScreen extends ConsumerWidget {
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => context.canPop() ? context.pop() : context.go('/'),
-          tooltip: 'Close',
+          tooltip: AppStrings.close,
         ),
       ),
       body: SafeArea(
@@ -284,7 +283,7 @@ class AuthScreen extends ConsumerWidget {
                                   context.push(emailRoute(signIn: true)),
                               child: Text.rich(
                                 TextSpan(
-                                  text: 'Already have an account?  ',
+                                  text: AppStrings.alreadyHaveAccountPrefix,
                                   style: AppTheme.textThemeOf(context)
                                       .bodyMedium
                                       ?.copyWith(
@@ -320,7 +319,7 @@ class AuthScreen extends ConsumerWidget {
                           },
                           child: Text(
                             hasSession && isGuest
-                                ? 'Not now'
+                                ? AppStrings.notNow
                                 : AppStrings.continueAsGuest,
                             style: AppTheme.textThemeOf(context).bodyMedium
                                 ?.copyWith(

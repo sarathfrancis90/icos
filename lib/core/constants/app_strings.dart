@@ -94,6 +94,11 @@ abstract final class AppStrings {
       'Signing in to an existing account. Progress from this guest session '
       'stays on this device.';
   static const newHereCreateAccount = 'New here? Create account';
+  static const saveYourProgress = 'Save your progress';
+  static const guestUpgradeSubtitle =
+      'Create an account to keep your streak and join groups, or sign in '
+      'to one you already have. Your guest progress comes with you.';
+  static const alreadyHaveAccountPrefix = 'Already have an account?  ';
   static const signInLink = 'Sign in';
   static const signInExistingAccount = 'Sign in, to an existing account';
   static const signUp = 'Create Account';
