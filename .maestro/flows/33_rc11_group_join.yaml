@@ -1,0 +1,10 @@
+# Signed-in: Groups tab -> Join with code. Pass -e CODE -e SHOTS.
+appId: com.icos.game
+---
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/j1_groups_empty
+- tapOn: "(?s).*Join.*"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/j2_join_dialog

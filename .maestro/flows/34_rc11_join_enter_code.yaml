@@ -1,0 +1,9 @@
+# With the Join Group dialog open: type the code and join. Pass -e CODE -e SHOTS.
+appId: com.icos.game
+---
+- inputText: ${CODE}
+- takeScreenshot: ${SHOTS}/j3_code_typed
+- tapOn: "Join"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: ${SHOTS}/j4_after_join

@@ -1,0 +1,22 @@
+# Fresh install -> onboarding -> email sign-up from the Profile tab. Pass -e EMAIL -e PW -e SHOTS.
+appId: com.icos.game
+---
+- launchApp:
+    clearState: true
+- runFlow: ../subflows/dismiss_onboarding.yaml
+- takeScreenshot: ${SHOTS}/s1_after_onboarding
+- runFlow: ../subflows/open_auth_from_profile.yaml
+- tapOn: "Sign up with Email"
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PW}
+- tapOn: "Confirm Password"
+- inputText: ${PW}
+- hideKeyboard
+- tapOn:
+    text: "Create Account"
+    below: "Confirm Password"
+- waitForAnimationToEnd:
+    timeout: 10000
+- takeScreenshot: ${SHOTS}/s2_after_signup

@@ -1,0 +1,17 @@
+# Signed-in: Groups tab -> Create Group named "Live Test". Pass -e SHOTS.
+appId: com.icos.game
+---
+- tapOn:
+    text: "Groups\nTab 2 of 4"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/g1_groups_empty
+- tapOn: "(?s).*Create Group.*"
+- waitForAnimationToEnd
+- tapOn:
+    text: "(?s).*roup.*ame.*"
+- inputText: "Live Test"
+- takeScreenshot: ${SHOTS}/g2_create_dialog
+- tapOn: "Create"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: ${SHOTS}/g3_after_create

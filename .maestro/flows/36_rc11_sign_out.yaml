@@ -1,0 +1,13 @@
+# Signed-in: Profile -> scroll -> Sign Out (first step only; screenshots the confirm). Pass -e SHOTS.
+appId: com.icos.game
+---
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      text: "Sign Out"
+- takeScreenshot: ${SHOTS}/o1_signout_visible
+- tapOn: "Sign Out"
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOTS}/o2_signout_confirm

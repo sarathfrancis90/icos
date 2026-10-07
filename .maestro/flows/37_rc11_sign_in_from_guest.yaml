@@ -1,0 +1,18 @@
+# Guest session -> Profile -> Create account -> existing email Sign In. Pass -e EMAIL -e PW -e SHOTS.
+appId: com.icos.game
+---
+- runFlow: ../subflows/open_auth_from_profile.yaml
+- tapOn: "Sign up with Email"
+- tapOn: "Sign In"
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PW}
+- hideKeyboard
+- takeScreenshot: ${SHOTS}/i1_signin_filled
+- tapOn:
+    text: "Sign In"
+    below: "Password"
+- waitForAnimationToEnd:
+    timeout: 10000
+- takeScreenshot: ${SHOTS}/i2_after_signin

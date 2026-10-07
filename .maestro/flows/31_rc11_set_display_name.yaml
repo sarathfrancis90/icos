@@ -1,0 +1,12 @@
+# On the "Choose your display name" sheet: replace the suggested name and save. Pass -e NAME -e SHOTS.
+appId: com.icos.game
+---
+- tapOn:
+    text: "Display name"
+- eraseText: 40
+- inputText: ${NAME}
+- takeScreenshot: ${SHOTS}/s3_name_typed
+- tapOn: "Save"
+- waitForAnimationToEnd:
+    timeout: 6000
+- takeScreenshot: ${SHOTS}/s4_after_name_saved
