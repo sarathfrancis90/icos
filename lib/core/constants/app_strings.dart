@@ -88,6 +88,8 @@ abstract final class AppStrings {
 
   // Auth
   static const signIn = 'Sign In';
+  static const signInLink = 'Sign in';
+  static const signInExistingAccount = 'Sign in to an existing account';
   static const signUp = 'Create Account';
   static const signInWithGoogle = 'Continue with Google';
   static const signInWithApple = 'Continue with Apple';

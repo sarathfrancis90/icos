@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/theme/app_palette.dart';
+import '../../../auth/presentation/widgets/sign_in_link.dart';
 
 /// Profile card nudging a guest to create an account.
 class GuestAccountCard extends StatelessWidget {
@@ -59,6 +60,7 @@ class GuestAccountCard extends StatelessWidget {
               child: const Text('Create account'),
             ),
           ),
+          SignInLink(onPressed: () => context.push(signInRoute())),
         ],
       ),
     );

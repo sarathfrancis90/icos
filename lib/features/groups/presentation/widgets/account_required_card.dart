@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_palette.dart';
+import '../../../auth/presentation/widgets/sign_in_link.dart';
 import 'group_ui.dart';
 
 /// Gate shown to anonymous users on social features. The primary CTA routes
@@ -16,6 +17,7 @@ class AccountRequiredCard extends StatelessWidget {
         'Create a free account to create or join groups — your streak and '
         'stats come with you.',
     this.onCreateAccount,
+    this.onSignIn,
     super.key,
   });
 
@@ -25,6 +27,9 @@ class AccountRequiredCard extends StatelessWidget {
 
   /// Defaults to navigating to `/auth`.
   final VoidCallback? onCreateAccount;
+
+  /// Defaults to the email form in sign-in mode.
+  final VoidCallback? onSignIn;
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +91,9 @@ class AccountRequiredCard extends StatelessWidget {
                     label: const Text(ctaLabel),
                   ),
                 ),
+              ),
+              SignInLink(
+                onPressed: onSignIn ?? () => context.push(signInRoute()),
               ),
             ],
           ),

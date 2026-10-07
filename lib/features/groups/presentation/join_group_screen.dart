@@ -11,6 +11,7 @@ import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../../../shared/widgets/content_width.dart';
 import '../../../shared/widgets/screen_exit.dart';
+import '../../auth/presentation/widgets/sign_in_link.dart';
 import '../domain/invite_code.dart';
 import '../domain/pending_invite.dart';
 import '../providers/groups_provider.dart';
@@ -102,6 +103,10 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
                           queryParameters: {'from': '/join/$_code'},
                         ).toString(),
                       );
+                    },
+                    onSignIn: () {
+                      unawaited(PendingInvite.save(_code));
+                      context.push(signInRoute(from: '/join/$_code'));
                     },
                     message: 'You were invited to a group with code $_code. '
                         'Create a free account to join it — your streak and '
