@@ -204,7 +204,7 @@ Every feature under `lib/features/{feature}/` follows this structure:
 - All network: HTTPS/TLS 1.2+
 - Tokens: platform-secure credential storage
 - Puzzle solutions: NEVER transmitted to client; server re-validates submitted paths
-- Score submissions: rate-limited (10/hour/user), HMAC-signed, clock manipulation detection (5-min tolerance)
+- Score submissions: rate-limited (40/hour/user), HMAC-signed, clock manipulation detection (5-min tolerance)
 - User input: sanitize against XSS, SQL injection, Unicode abuse (zalgo, invisible chars)
 - Certificate pinning for Supabase API
 - Profanity filter on display names and group names (client + server)

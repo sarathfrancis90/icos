@@ -308,6 +308,19 @@ export function compareDates(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/**
+ * How many days back a puzzle stays playable (and scorable) from the archive.
+ * Shared by start-puzzle and submit-score so the two can never disagree; the
+ * store listing promises "the last 30 days".
+ */
+export const ARCHIVE_WINDOW_DAYS = 30;
+
+/** True when `date` is between `today - ARCHIVE_WINDOW_DAYS` and `today`, inclusive. */
+export function isWithinArchiveWindow(date: string, today: string): boolean {
+  return compareDates(date, today) <= 0 &&
+    compareDates(date, addDays(today, -ARCHIVE_WINDOW_DAYS)) >= 0;
+}
+
 // ---------------------------------------------------------------------------
 // Crypto
 // ---------------------------------------------------------------------------

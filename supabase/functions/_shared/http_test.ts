@@ -2,7 +2,7 @@
  * Tests for isServiceRoleRequest in http.ts. Run with:
  *   deno test -A supabase/functions/_shared/
  */
-import { isServiceRoleRequest } from "./http.ts";
+import { ARCHIVE_WINDOW_DAYS, isServiceRoleRequest, isWithinArchiveWindow } from "./http.ts";
 
 // Minimal assertion helpers (no external deps)
 function assert(cond: boolean, msg: string): void {
@@ -112,4 +112,24 @@ Deno.test("probe throws -> false", async () => {
     const ok = await isServiceRoleRequest(reqWith(fakeJwt("service_role")), probe);
     assert(ok === false, "expected false");
   });
+});
+
+// ---------------------------------------------------------------------------
+// Archive window (shared by start-puzzle and submit-score)
+// ---------------------------------------------------------------------------
+Deno.test("archive window: 30 days, inclusive at both ends", () => {
+  const today = "2026-10-07";
+  assert(ARCHIVE_WINDOW_DAYS === 30, "window is 30 days");
+  assert(isWithinArchiveWindow(today, today), "today accepted");
+  assert(isWithinArchiveWindow("2026-09-30", today), "day 7 accepted");
+  assert(isWithinArchiveWindow("2026-09-29", today), "day 8 accepted");
+  assert(isWithinArchiveWindow("2026-09-07", today), "day 30 accepted");
+  assert(!isWithinArchiveWindow("2026-09-06", today), "day 31 rejected");
+  assert(!isWithinArchiveWindow("2026-10-08", today), "tomorrow rejected");
+});
+
+Deno.test("archive window: crosses month and year boundaries", () => {
+  assert(isWithinArchiveWindow("2026-12-02", "2027-01-01"), "day 30 across a year accepted");
+  assert(!isWithinArchiveWindow("2026-12-01", "2027-01-01"), "day 31 across a year rejected");
+  assert(isWithinArchiveWindow("2028-01-30", "2028-02-29"), "day 30 into a leap day accepted");
 });

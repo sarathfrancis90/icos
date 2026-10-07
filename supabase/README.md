@@ -86,6 +86,7 @@ curl -X POST "$PROJECT_URL/functions/v1/daily-puzzle" \
 |-----|----------|----------|
 | reset-weekly-freezes | `0 0 * * 1` | `reset_weekly_freezes()` — every streak gets 1 freeze |
 | apply-streak-freezes | `5 0 * * *` | `apply_streak_freezes()` — spend a freeze for users who missed yesterday |
+| expire-stale-streaks | `10 0 * * *` | `expire_stale_streaks()` — recompute streaks whose last solve/freeze is before yesterday (resets missed streaks to 0); returns the count |
 | generate-daily-puzzle | `15 0 * * *` | `trigger_daily_puzzle_generation()` — POSTs `{date}` for D+1 and D+2 |
 | purge-deleted-accounts | `0 1 * * *` | `purge_deleted_accounts()` — 30-day grace → anonymize |
 | purge-inactive-anonymous | `30 1 * * *` | `purge_inactive_anonymous()` — delete guests idle 90 days |
@@ -123,7 +124,7 @@ Body:
 `signature` = HMAC-SHA256 hex, key = session `nonce`, message
 `${puzzle_date}|${time_seconds}|${hints_used}|${undos_used}|${sha256hex(JSON.stringify(path))}`
 (path serialised as compact JSON, e.g. `[[0,0],[0,1]]`). Optional; without it the attempt is stored `verified=false`.
-Rules: date window today-7…today; rate limit 10/hour (`submission_log`); path validated with `validatePath`;
+Rules: date window today-30…today (`ARCHIVE_WINDOW_DAYS` in `_shared/http.ts`, shared with `start-puzzle`); rate limit 40/hour (`submission_log`); path validated with `validatePath`;
 if a session exists: `time_seconds ≤ server_elapsed + 300` and signature (when given) must match;
 `queued_at` may not be > now+300s; `is_archive` = finished after the puzzle's UTC day.
 200 `{completed:true, verified, is_archive, streak:{current_streak,longest_streak,freeze_count,last_solve_date}, rank_hint?}`
@@ -149,6 +150,7 @@ Errors: 400 `INVALID_JSON|INVALID_INVITE_CODE`, 404 `GROUP_NOT_FOUND`, 409 `GROU
 | `remove_group_member` | `p_group_id, p_user_id` | `groups` row |
 | `transfer_group_admin` | `p_group_id, p_new_admin_id` | `groups` row |
 | `delete_group` | `p_group_id` | `groups` row (soft: `is_active=false`) |
+| `regenerate_invite_code` | `p_group_id` | `groups` row with a new `invite_code` (admin only, `42501`/`NOT_ADMIN` otherwise; the old code stops working) |
 | `leave_group` | `p_group_id` | void (admin leaving → oldest member promoted, or group deactivated) |
 | `decrement_group_member_count` | `p_group_id` | void (compat shim: resyncs the trigger-maintained count) |
 | `get_group_daily_leaderboard` | `p_group_id, p_puzzle_date` | `rank, user_id, display_name, avatar_url, time_seconds, hints_used, undos_used, completed, verified` |
@@ -164,6 +166,12 @@ Blocking (`user_blocks`, RPC-only writes, SELECT policy for the blocker): the da
 leaderboard RPCs drop rows for users the caller has blocked (ranks follow the filtered set) and the
 `group_feed` member SELECT policy hides entries authored by them. The blocked user is not told and
 still sees the blocker; group member lists are not filtered, so an admin can still remove the member.
+
+Deleted accounts (FR105): when `purge_deleted_accounts()` anonymizes a profile it records the user's groups in
+`group_purged_members` (service-only table) before removing their `group_members` rows. Both leaderboard RPCs
+count those rows as members and render purged profiles as `Deleted User` with no avatar, and members can read
+a purged former co-member's profile so feed entries resolve to `Deleted User`. Member lists and `member_count`
+do not include them.
 
 Errors raised by RPCs carry a machine-readable `HINT` (`NOT_ADMIN`, `NOT_A_MEMBER`,
 `PROFANITY`, `INVALID_LENGTH`, `ANONYMOUS_USER`, `GROUP_FULL`, …) and SQLSTATE

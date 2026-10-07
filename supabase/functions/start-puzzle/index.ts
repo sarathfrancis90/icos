@@ -12,10 +12,8 @@
 // The nonce is the HMAC key the client uses to sign its score submission.
 
 import {
-  addDays,
   adminClient,
   banCheck,
-  compareDates,
   correlationIdFrom,
   CORRELATION_HEADER,
   errorFields,
@@ -23,6 +21,7 @@ import {
   getUser,
   handleCommon,
   isIsoDate,
+  isWithinArchiveWindow,
   json,
   Logger,
   randomNonce,
@@ -31,7 +30,6 @@ import {
 } from "../_shared/http.ts";
 
 const FN = "start-puzzle";
-const ARCHIVE_WINDOW_DAYS = 30;
 
 Deno.serve(async (req: Request): Promise<Response> => {
   const common = handleCommon(req, FN);
@@ -64,7 +62,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return errorResponse(400, "puzzle_date must be YYYY-MM-DD", "INVALID_DATE", correlationId);
     }
     const today = utcToday();
-    if (compareDates(puzzleDate, today) > 0 || compareDates(puzzleDate, addDays(today, -ARCHIVE_WINDOW_DAYS)) < 0) {
+    if (!isWithinArchiveWindow(puzzleDate, today)) {
       return errorResponse(400, "puzzle_date is outside the playable window", "DATE_OUT_OF_RANGE", correlationId);
     }
 

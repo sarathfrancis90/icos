@@ -11,6 +11,10 @@
 //   queued_at?: ISO-8601 (when the solve was recorded offline)
 // }
 // Auth: user JWT.
+// Window: puzzle_date in today-ARCHIVE_WINDOW_DAYS (30) .. today, the same window
+// start-puzzle serves. Rate limit: RATE_LIMIT_PER_HOUR (40) submissions per user
+// per rolling hour; the HMAC signature and server-side path validation are the
+// real defence. Clock tolerance: 5 minutes.
 //
 // 200 { completed: true,  verified, is_archive, streak: {...}, rank_hint? }
 // 200 { completed: false, verified: false, reason, streak: null }
@@ -21,10 +25,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  addDays,
   adminClient,
+  ARCHIVE_WINDOW_DAYS,
   banCheck,
-  compareDates,
   correlationIdFrom,
   CORRELATION_HEADER,
   errorFields,
@@ -34,6 +37,7 @@ import {
   hmacSha256Hex,
   isInt,
   isIsoDate,
+  isWithinArchiveWindow,
   json,
   Logger,
   readJson,
@@ -45,8 +49,7 @@ import {
 import { validatePath } from "../_shared/puzzle_core.ts";
 
 const FN = "submit-score";
-const RATE_LIMIT_PER_HOUR = 10;
-const DATE_WINDOW_DAYS = 7;
+const RATE_LIMIT_PER_HOUR = 40;
 const CLOCK_TOLERANCE_SECONDS = 300;
 const MAX_PATH_CELLS = 64; // 8x8
 
@@ -131,9 +134,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const today = utcToday();
 
     // ---- date window ---------------------------------------------------------
-    if (compareDates(puzzleDate, today) > 0 || compareDates(puzzleDate, addDays(today, -DATE_WINDOW_DAYS)) < 0) {
+    if (!isWithinArchiveWindow(puzzleDate, today)) {
       lg.warn("date out of range");
-      return errorResponse(400, "puzzle_date must be within the last 7 days", "DATE_OUT_OF_RANGE", correlationId);
+      return errorResponse(
+        400,
+        `puzzle_date must be within the last ${ARCHIVE_WINDOW_DAYS} days`,
+        "DATE_OUT_OF_RANGE",
+        correlationId,
+      );
     }
 
     // ---- clock plausibility (client clock vs server clock) --------------------
