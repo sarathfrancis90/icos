@@ -10,7 +10,8 @@
     "test": "tsx --test test/**/*.test.ts",
     "typecheck": "tsc --noEmit",
     "migrate": "tsx scripts/migrate.ts",
-    "generate": "tsx scripts/generate.ts"
+    "generate": "tsx scripts/generate.ts",
+    "auth:generate": "npx auth@1.7.18 generate --config scripts/auth_cli.ts --output .better-auth.generated.sql -y"
   },
   "keywords": [],
   "author": "",
@@ -18,11 +19,13 @@
   "type": "module",
   "private": "true",
   "dependencies": {
+    "@better-auth/expo": "^1.7.18",
     "@neon/config": "^1.13.0",
     "@neon/functions": "^0.11.0",
     "better-auth": "^1.7.18",
     "hono": "^4.13.17",
     "jose": "^6.2.15",
+    "kysely": "^0.29.8",
     "pg": "^8.23.1"
   },
   "devDependencies": {

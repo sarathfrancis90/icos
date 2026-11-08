@@ -1,17 +1,20 @@
 // Icos API — the single Neon Function hosting auth (/auth/*), the former
 // edge functions (/api/*) and scheduled jobs (/cron/*).
-//
-// Task 1 ships only the health check and a placeholder JWKS so the Data API
-// can be registered against this host; later tasks mount the real routers.
 import { Hono } from "hono";
+import { getAuth, type Auth } from "./auth.js";
 
-const app = new Hono();
+/** Builds the app; tests pass their own Better Auth instance. */
+export function createApp(auth: () => Auth = getAuth): Hono {
+  const app = new Hono();
 
-app.get("/health", (c) =>
-  c.json({ status: "ok", fn: "api", ts: new Date().toISOString() }),
-);
+  app.get("/health", (c) =>
+    c.json({ status: "ok", fn: "api", ts: new Date().toISOString() }),
+  );
 
-// Replaced by Better Auth's JWT plugin in Task 5.
-app.get("/auth/jwks", (c) => c.json({ keys: [] }));
+  // Better Auth: sign-in/up, sessions, /auth/token, /auth/jwks, OAuth callbacks.
+  app.on(["GET", "POST"], "/auth/*", (c) => auth().handler(c.req.raw));
 
-export default app;
+  return app;
+}
+
+export default createApp();
