@@ -58,5 +58,4 @@ open(path, 'w').write('\n'.join(out) + '\n')
 PY
 
 echo "wrote $ENV_FILE (previous copy at $ENV_FILE.bak)"
-echo
-python3 scripts/check_signin.py "$ENV_FILE"
+echo "Verify Google sign-in on a device (the backend checks the client IDs at sign-in)."

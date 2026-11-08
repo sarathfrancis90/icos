@@ -5,6 +5,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/storage_test_helpers.dart';
 
+/// Reads work; every write throws, like a full or read-only store.
+class _ThrowingPrefs implements SharedPreferences {
+  _ThrowingPrefs(this._inner);
+  final SharedPreferences _inner;
+
+  @override
+  bool? getBool(String key) => _inner.getBool(key);
+  @override
+  Set<String> getKeys() => _inner.getKeys();
+  @override
+  Future<bool> remove(String key) => throw StateError('disk full');
+  @override
+  Future<bool> setBool(String key, bool value) =>
+      throw StateError('disk full');
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 Future<SharedPreferences> _prefs(Map<String, Object> values) async {
   SharedPreferences.setMockInitialValues(values);
   return SharedPreferences.getInstance();
@@ -127,6 +145,14 @@ void main() {
       expect(result, isTrue);
       expect(prefs.containsKey('sb-x-auth-token'), isFalse);
       expect(await LegacyCleanup.runIfNeeded(prefs), isFalse);
+    });
+
+    test('a failing prefs write returns false instead of throwing', () async {
+      final prefs = _ThrowingPrefs(await _prefs({'sb-x-auth-token': 't'}));
+
+      final result = await LegacyCleanup.runIfNeeded(prefs);
+
+      expect(result, isFalse);
     });
 
     test('with StorageService: clears queue, cache and player records, '

@@ -25,10 +25,7 @@ class FreshStartDialog extends StatelessWidget {
         AppSizes.lg,
         AppSizes.sm,
       ),
-      title: Semantics(
-        header: true,
-        child: const Text(AppStrings.freshStartTitle),
-      ),
+      title: const Text(AppStrings.freshStartTitle),
       content: const SingleChildScrollView(
         child: Text(AppStrings.freshStartBody),
       ),

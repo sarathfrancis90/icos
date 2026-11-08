@@ -32,12 +32,26 @@ abstract final class LegacyCleanup {
   /// Fresh installs and every later launch return `false`.
   ///
   /// [clearCaches] wipes the puzzle cache, sync queue and per-user results;
-  /// a failure there does not stop the cleanup.
+  /// a failure there does not stop the cleanup. Any SharedPreferences
+  /// failure returns `false` (no notice) instead of throwing.
   static Future<bool> runIfNeeded(
     SharedPreferences prefs, {
     Future<void> Function()? clearCaches,
     bool Function()? hasLegacyHiveData,
   }) async {
+    try {
+      return await _run(prefs, clearCaches, hasLegacyHiveData);
+    } catch (_) {
+      // A storage failure must never stop startup; no notice this launch.
+      return false;
+    }
+  }
+
+  static Future<bool> _run(
+    SharedPreferences prefs,
+    Future<void> Function()? clearCaches,
+    bool Function()? hasLegacyHiveData,
+  ) async {
     if ((prefs.getBool(checkedKey) ?? false) ||
         (prefs.getBool(noticeShownKey) ?? false)) {
       return false;
