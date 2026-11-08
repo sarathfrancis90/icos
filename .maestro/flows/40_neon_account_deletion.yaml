@@ -1,0 +1,15 @@
+# Neon dev: signed-in Profile -> Delete Account -> confirm must not show the generic
+# error (regression for no-arg RPCs sending a JSON null body). Pass -e SHOTS.
+appId: com.icos.game
+---
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- scrollUntilVisible:
+    element:
+      text: "Delete Account"
+- tapOn: "Delete Account"
+- tapOn:
+    text: "Delete Account"
+    index: 1
+- takeScreenshot: ${SHOTS}/d1_after_request
+- assertNotVisible: "Something went wrong.*"

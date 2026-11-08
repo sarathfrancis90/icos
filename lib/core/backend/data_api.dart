@@ -36,7 +36,12 @@ class DataApi {
     String fn, {
     Map<String, dynamic>? params,
     bool get = false,
-  }) => client.rpc<T>(fn, params: params, get: get);
+  }) => client.rpc<T>(
+    fn,
+    // PostgREST rejects a JSON `null` body (PGRST102); no params means `{}`.
+    params: params ?? const <String, dynamic>{},
+    get: get,
+  );
 
   Future<void> dispose() async {
     await client.dispose();
@@ -128,6 +133,7 @@ class JwtHttpClient extends http.BaseClient {
         source.headers['content-type'] ?? source.headers['Content-Type'];
     if (type != null) copy.headers['content-type'] = type;
     _normalizePrefer(copy);
+    _normalizeRpcBody(copy);
     _authorize(copy, jwt);
     return copy;
   }
@@ -149,6 +155,16 @@ class JwtHttpClient extends http.BaseClient {
         .join(',');
     keys.forEach(request.headers.remove);
     if (value.isNotEmpty) request.headers['Prefer'] = value;
+  }
+
+  /// A no-argument `rpc()` through [PostgrestClient] posts a JSON `null`
+  /// body, which PostgREST rejects (PGRST102). Send `{}` instead.
+  static void _normalizeRpcBody(http.Request request) {
+    if (request.method == 'POST' &&
+        request.url.path.contains('/rpc/') &&
+        request.body.trim() == 'null') {
+      request.body = '{}';
+    }
   }
 
   static http.StreamedResponse _restream(

@@ -259,4 +259,27 @@ void main() {
       expect(prefer, contains('return=representation'));
     });
   });
+
+  group('no-argument rpc', () {
+    test('DataApi.rpc sends {} rather than null', () async {
+      store
+        ..sessionToken = 's'
+        ..jwt = 'cached-jwt'
+        ..expiry = now.add(const Duration(minutes: 10));
+      final db = api((req, _) async => rows());
+      await db.rpc<dynamic>('list_blocked_users');
+      expect(dataRequests.single.method, 'POST');
+      expect(dataRequests.single.body, '{}');
+    });
+
+    test('PostgrestClient.rpc used directly also sends {}', () async {
+      store
+        ..sessionToken = 's'
+        ..jwt = 'cached-jwt'
+        ..expiry = now.add(const Duration(minutes: 10));
+      final db = api((req, _) async => rows());
+      await db.client.rpc<dynamic>('request_account_deletion');
+      expect(dataRequests.single.body, '{}');
+    });
+  });
 }
