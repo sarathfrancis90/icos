@@ -40,7 +40,7 @@
 <div class="container">
 
 <h1>Privacy Policy</h1>
-<p class="effective">Effective Date: March 4, 2026 &middot; Last Updated: October 5, 2026</p>
+<p class="effective">Effective Date: March 4, 2026 &middot; Last Updated: November 8, 2026</p>
 
 <p>Icos ("we", "our", or "us") operates the Icos mobile application (the "App"), a daily puzzle game available on iOS and Android. This Privacy Policy explains how we collect, use, and protect your information when you use the App.</p>
 
@@ -105,9 +105,10 @@
 <div class="highlight">
     <p><strong>We do not sell, rent, or share your personal data with third parties for advertising or marketing purposes.</strong></p>
 </div>
-<p>We use the following service provider to operate the App:</p>
+<p>We use the following service providers to operate the App:</p>
 <ul>
-    <li><strong>Supabase</strong> (database, authentication, real-time features) &mdash; <a href="https://supabase.com/privacy" target="_blank">Supabase Privacy Policy</a></li>
+    <li><strong>Neon (Databricks, Inc.)</strong> &mdash; database and serverless functions hosted in the United States (AWS us-east-1), including account sign-in &mdash; <a href="https://neon.com/privacy-policy" target="_blank">Neon Privacy Policy</a></li>
+    <li><strong>Resend, Inc.</strong> &mdash; transactional email delivery (account confirmation and password reset emails) &mdash; <a href="https://resend.com/legal/privacy-policy" target="_blank">Resend Privacy Policy</a></li>
 <li><strong>Google Firebase</strong> (analytics, crash reporting and, where configured, the daily notification topic) &mdash; <a href="https://firebase.google.com/support/privacy" target="_blank">Firebase Privacy Information</a></li>
 </ul>
 <p>If you sign in with Google or Apple, those providers process your authentication according to their own privacy policies:</p>
@@ -121,7 +122,7 @@
 <p>We implement industry-standard security measures:</p>
 <ul>
     <li>All data transmitted over HTTPS/TLS encryption</li>
-    <li>Passwords are hashed using bcrypt (we never store plaintext passwords)</li>
+    <li>Passwords are hashed using scrypt (we never store plaintext passwords)</li>
     <li>Database access controlled by row-level security policies</li>
     <li>Score submissions are rate-limited and integrity-checked</li>
 </ul>

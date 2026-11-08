@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Icos - Email confirmed</title>
+    <meta name="description" content="Your Icos email address is confirmed.">
+    <link rel="icon" type="image/png" href="app_icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --deep-black: #0A0E14;
+            --card-surface: #1A2232;
+            --purple-light: #B388FF;
+            --text-primary: #F1F5F9;
+            --text-secondary: #8899AA;
+            --success: #22C55E;
+            --cell-border: #2A3548;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--deep-black);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+        }
+        .card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card-surface);
+            border: 1px solid var(--cell-border);
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+        }
+        .brand img { width: 56px; height: 56px; border-radius: 14px; margin-bottom: 16px; }
+        h1 { font-size: 24px; font-weight: 800; margin-bottom: 8px; color: var(--success); }
+        p { color: var(--text-secondary); }
+        a { color: var(--purple-light); }
+    </style>
+</head>
+<body>
+<main class="card">
+    <a class="brand" href="./"><img src="app_icon.png" alt="Icos"></a>
+    <h1>Email confirmed</h1>
+    <p>Email confirmed — you can close this page and return to Icos.</p>
+</main>
+</body>
+</html>

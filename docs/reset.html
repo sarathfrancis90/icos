@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex">
+    <title>Icos - Set a new password</title>
+    <meta name="description" content="Choose a new password for your Icos account.">
+    <link rel="icon" type="image/png" href="app_icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --deep-black: #0A0E14;
+            --card-surface: #1A2232;
+            --elevated: #1F2A3C;
+            --purple-light: #B388FF;
+            --purple-primary: #9C27B0;
+            --orange: #FF6D00;
+            --text-primary: #F1F5F9;
+            --text-secondary: #8899AA;
+            --success: #22C55E;
+            --error: #F87171;
+            --cell-border: #2A3548;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--deep-black);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+        }
+        .card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card-surface);
+            border: 1px solid var(--cell-border);
+            border-radius: 16px;
+            padding: 32px 24px;
+        }
+        .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; color: var(--text-primary); text-decoration: none; font-weight: 800; font-size: 20px; }
+        .brand img { width: 36px; height: 36px; border-radius: 9px; }
+        h1 { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+        p { color: var(--text-secondary); }
+        form { margin-top: 24px; display: flex; flex-direction: column; gap: 16px; }
+        label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600; }
+        input {
+            font: inherit;
+            color: var(--text-primary);
+            background: var(--elevated);
+            border: 1px solid var(--cell-border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            min-height: 44px;
+        }
+        input:focus-visible, button:focus-visible { outline: 2px solid var(--purple-light); outline-offset: 2px; }
+        button {
+            font: inherit;
+            font-weight: 700;
+            color: #fff;
+            background: var(--purple-primary);
+            border: 0;
+            border-radius: 10px;
+            padding: 12px 16px;
+            min-height: 48px;
+            cursor: pointer;
+        }
+        button:disabled { opacity: 0.6; cursor: default; }
+        .hint { font-size: 13px; color: var(--text-secondary); font-weight: 400; }
+        .message { margin-top: 16px; font-weight: 600; }
+        .message.error { color: var(--error); }
+        .message.success { color: var(--success); }
+        .footer { margin-top: 24px; font-size: 13px; }
+        .footer a { color: var(--purple-light); }
+        [hidden] { display: none !important; }
+    </style>
+</head>
+<body>
+<main class="card">
+    <a class="brand" href="./"><img src="app_icon.png" alt="">Icos</a>
+    <h1>Set a new password</h1>
+    <p>Choose a new password for your Icos account.</p>
+
+    <form id="reset-form" novalidate>
+        <label>New password
+            <input id="password" type="password" autocomplete="new-password" minlength="6" required>
+            <span class="hint">At least 6 characters</span>
+        </label>
+        <label>Confirm password
+            <input id="confirm" type="password" autocomplete="new-password" minlength="6" required>
+        </label>
+        <button id="submit" type="submit">Save password</button>
+    </form>
+
+    <p id="message" class="message" role="status" aria-live="polite" hidden></p>
+
+    <p class="footer">Need help? Email <a href="mailto:sarathfrancis90@gmail.com">sarathfrancis90@gmail.com</a>.</p>
+</main>
+<script>
+(function () {
+    'use strict';
+    // Production Function URL, used when ./config.json cannot be read.
+    var FALLBACK_API = 'https://br-crimson-bird-bbpbnst1-api.compute.c-15.us-east-1.aws.neon.tech/';
+
+    var form = document.getElementById('reset-form');
+    var password = document.getElementById('password');
+    var confirmField = document.getElementById('confirm');
+    var submit = document.getElementById('submit');
+    var message = document.getElementById('message');
+
+    var token = new URLSearchParams(window.location.search).get('token') || '';
+    // Keep the token out of the address bar and browser history.
+    if (token && window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname);
+    }
+
+    function show(text, kind) {
+        message.textContent = text;
+        message.className = 'message ' + kind;
+        message.hidden = false;
+    }
+
+    if (!token) {
+        form.hidden = true;
+        show('This reset link is incomplete. Request a new one from the Icos app (Sign in > Forgot password).', 'error');
+        return;
+    }
+
+    function apiBase() {
+        return fetch('./config.json', { cache: 'no-store' })
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (cfg) {
+                var url = cfg && typeof cfg.api_base_url === 'string' ? cfg.api_base_url : '';
+                return /^https:\/\//.test(url) ? url : FALLBACK_API;
+            })
+            .catch(function () { return FALLBACK_API; });
+    }
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        message.hidden = true;
+        var pw = password.value;
+        if (pw.length < 6) {
+            show('Password must be at least 6 characters.', 'error');
+            password.focus();
+            return;
+        }
+        if (pw !== confirmField.value) {
+            show('Passwords do not match.', 'error');
+            confirmField.focus();
+            return;
+        }
+        submit.disabled = true;
+        submit.textContent = 'Saving…';
+        apiBase()
+            .then(function (base) {
+                if (base.charAt(base.length - 1) !== '/') base += '/';
+                return fetch(base + 'auth/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ newPassword: pw, token: token })
+                });
+            })
+            .then(function (res) {
+                return res.json().catch(function () { return {}; }).then(function (body) {
+                    if (res.ok) {
+                        form.hidden = true;
+                        show('Password updated. Open Icos and sign in with your new password.', 'success');
+                        return;
+                    }
+                    var text = body && typeof body.message === 'string' && body.message
+                        ? body.message
+                        : 'Something went wrong (' + res.status + '). Please try again.';
+                    show(text, 'error');
+                    submit.disabled = false;
+                    submit.textContent = 'Save password';
+                });
+            })
+            .catch(function () {
+                show('Could not reach Icos. Check your connection and try again.', 'error');
+                submit.disabled = false;
+                submit.textContent = 'Save password';
+            });
+    });
+})();
+</script>
+</body>
+</html>
