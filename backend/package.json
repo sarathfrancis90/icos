@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "migrate": "tsx scripts/migrate.ts",
     "generate": "tsx scripts/generate.ts",
-    "auth:generate": "npx auth@1.7.18 generate --config scripts/auth_cli.ts --output .better-auth.generated.sql -y"
+    "auth:generate": "npx auth@1.7.18 generate --config scripts/auth_cli.ts --output .better-auth.generated.sql -y",
+    "seed:puzzles": "tsx scripts/seed_puzzles.ts",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "keywords": [],
   "author": "",
