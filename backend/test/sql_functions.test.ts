@@ -70,12 +70,6 @@ describe("0002_functions / 0003_seed", { skip: TEST_DATABASE_URL ? false : "NEON
     await applyMigrations(url);
     db = new pg.Client(clientConfig(url));
     await db.connect();
-    // Load pg_session_jwt in this backend before any test sets claims: when the
-    // library is first loaded inside app.uid() (a function with its own
-    // search_path), a transaction-local request.jwt.claims set earlier is lost
-    // and app.uid() returns NULL for that transaction. The Data API always
-    // calls auth.jwt_session_init first, so real clients are unaffected.
-    await db.query(`SELECT auth.user_id()`);
   });
 
   after(async () => {
@@ -249,6 +243,46 @@ describe("0002_functions / 0003_seed", { skip: TEST_DATABASE_URL ? false : "NEON
 
       await asUser(member);
       await rejectsWith(`SELECT public.regenerate_invite_code($1)`, [groupId], (e: PgError) => e.code === "42501" && e.hint === "NOT_ADMIN");
+    });
+  });
+
+  test("remove_group_member: 42501 NOT_ADMIN for a member, 22023 CANNOT_REMOVE_SELF for the admin", async () => {
+    await inTx(async () => {
+      const [admin, member, other] = await makeUsers(3);
+      const groupId = await makeGroup(admin, [member, other]);
+
+      await asUser(member);
+      await rejectsWith(
+        `SELECT public.remove_group_member($1, $2)`,
+        [groupId, other],
+        (e: PgError) => e.code === "42501" && e.hint === "NOT_ADMIN",
+      );
+
+      await asUser(admin);
+      await rejectsWith(
+        `SELECT public.remove_group_member($1, $2)`,
+        [groupId, admin],
+        (e: PgError) => e.code === "22023" && e.hint === "CANNOT_REMOVE_SELF",
+      );
+
+      const { rows } = await db.query<{ member_count: number }>(
+        `SELECT member_count FROM public.remove_group_member($1, $2)`,
+        [groupId, other],
+      );
+      assert.equal(rows[0].member_count, 2);
+    });
+  });
+
+  test("transfer_group_admin to a non-member raises P0002 NOT_A_MEMBER", async () => {
+    await inTx(async () => {
+      const [admin, outsider] = await makeUsers(2);
+      const groupId = await makeGroup(admin);
+      await asUser(admin);
+      await rejectsWith(
+        `SELECT public.transfer_group_admin($1, $2)`,
+        [groupId, outsider],
+        (e: PgError) => e.code === "P0002" && e.hint === "NOT_A_MEMBER",
+      );
     });
   });
 
@@ -590,6 +624,11 @@ describe("0002_functions / 0003_seed", { skip: TEST_DATABASE_URL ? false : "NEON
                 public.validate_name('  Grid Gang ', 'Group name') AS name`,
       );
       assert.deepEqual(rows, [{ clean: "ab c", rude: true, place: false, name: "Grid Gang" }]);
+      const unicode = await db.query(
+        `SELECT public.sanitize_text(E'evil\\u202Eman') AS bidi,
+                public.sanitize_text(E'zx\\u0301q\\u0301') AS combining`,
+      );
+      assert.deepEqual(unicode.rows, [{ bidi: "evilman", combining: "zxq" }]);
     });
   });
 
@@ -641,7 +680,7 @@ describe("0002_functions / 0003_seed", { skip: TEST_DATABASE_URL ? false : "NEON
       `SELECT proname FROM pg_proc
         WHERE pronamespace IN ('public'::regnamespace, 'app'::regnamespace)
           AND prosrc ~ '(auth\\.(uid|role|users|identities|sessions|refresh_tokens|mfa_factors)|vault\\.|net\\.http|cron\\.)'
-          AND proname <> 'uid'`,
+`,
     );
     assert.deepEqual(authRefs.rows, []);
   });

@@ -42,10 +42,10 @@ AS $$
         regexp_replace(
           normalize(p_input, NFKC),
           -- zero-width, bidi controls, soft hyphen, BOM, word joiner, hangul fillers, variation selectors
-          '[­͏؜ᅟᅠ឴឵᠎​-‏‪-‮⁠-⁯ㅤ︀-️﻿ﾠ￰-￿]',
+          '[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180E\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF0-\uFFFF]',
           '', 'g'),
         -- C0/C1 control characters + combining marks (zalgo)
-        '[\x01-\x1F\x7F-\x9F̀-ͯ᪰-᫿᷀-᷿⃐-⃿︠-︯]',
+        '[\x01-\x1F\x7F-\x9F\u0300-\u036F\u1AB0-\u1AFF\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]',
         '', 'g'),
       '\s+', ' ', 'g')
   );
