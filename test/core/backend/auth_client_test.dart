@@ -5,10 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:icos/core/backend/app_user.dart';
 import 'package:icos/core/backend/auth_client.dart';
 import 'package:icos/core/backend/auth_event.dart';
 import 'package:icos/core/backend/backend_config.dart';
 import 'package:icos/core/backend/token_store.dart';
+import 'package:icos/core/constants/app_strings.dart';
 import 'package:icos/core/utils/app_error.dart';
 import 'package:icos/core/utils/result.dart';
 
@@ -218,16 +220,57 @@ void main() {
       expect(session.headers['authorization'], 'Bearer abc.def=');
     });
 
-    test('link uses link-social', () async {
+    test('link: a bare callback re-fetches the stored session and succeeds '
+        'for a linked user', () async {
       store.sessionToken = 'guest-token';
       final auth = client(
         server,
-        web: (_, _) async =>
-            'io.icos://oauth-callback?cookie=better-auth.session_token%3Dxyz',
+        web: (_, _) async => 'io.icos://oauth-callback',
       );
-      await auth.webOAuth('apple', link: true);
+      final result = await auth.webOAuth('apple', link: true);
       expect(requests.first.url.path, '/auth/link-social');
-      expect(store.sessionToken, 'xyz');
+      expect((result as Success<AppUser, AppError>).data.id, 'u9');
+      expect(result.data.isAnonymous, isFalse);
+      expect(result.data.providers, contains('apple'));
+      expect(store.sessionToken, 'guest-token');
+      final session = requests.firstWhere(
+        (r) => r.url.path == '/auth/get-session',
+      );
+      expect(session.headers['authorization'], 'Bearer guest-token');
+      expect(auth.currentUser?.id, 'u9');
+    });
+
+    test(
+      'link: a bare callback whose session is still a guest is a failure',
+      () async {
+        store.sessionToken = 'guest-token';
+        final auth = client(
+          (req) async => req.url.path == '/auth/get-session'
+              ? _json({
+                  'session': <String, Object?>{},
+                  'user': userJson(id: 'g1', anonymous: true),
+                })
+              : server(req),
+          web: (_, _) async => 'io.icos://oauth-callback',
+        );
+        final result = await auth.webOAuth('apple', link: true);
+        expect(
+          (result as Failure).error,
+          const AppError.auth(AppStrings.backendSignInFailed),
+        );
+        expect(store.sessionToken, 'guest-token');
+      },
+    );
+
+    test('link: an error callback is still an auth failure', () async {
+      store.sessionToken = 'guest-token';
+      final auth = client(
+        server,
+        web: (_, _) async => 'io.icos://oauth-callback?error=access_denied',
+      );
+      final result = await auth.webOAuth('apple', link: true);
+      expect((result as Failure).error, const AppError.auth('access_denied'));
+      expect(requests.where((r) => r.url.path == '/auth/get-session'), isEmpty);
     });
 
     test('error callback is an auth failure', () async {
@@ -283,7 +326,10 @@ void main() {
         server,
         web: (_, _) async => throw PlatformException(code: 'CANCELED'),
       );
-      await cancelled.webOAuth('apple', onBrowserClosed: () => log.add('closed'));
+      await cancelled.webOAuth(
+        'apple',
+        onBrowserClosed: () => log.add('closed'),
+      );
       expect(log, ['closed']);
 
       log.clear();

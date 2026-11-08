@@ -227,6 +227,13 @@ class AuthClient {
       onBrowserClosed?.call();
     }
 
+    // Better Auth's link branch redirects to the bare callback URL without a
+    // session cookie: the account is linked to the stored session, so
+    // re-fetch it and require that the user is no longer a guest.
+    if (link && _isBareCallback(callback)) {
+      return _refreshAfterLink(provider, requireLinked: true);
+    }
+
     final parsed = parseOAuthCallback(callback);
     switch (parsed) {
       case Failure(:final error):
@@ -258,6 +265,20 @@ class AuthClient {
             return Result.success(merged);
         }
     }
+  }
+
+  /// True for a callback without an `error` and without a session cookie.
+  static bool _isBareCallback(String callbackUrl) {
+    final uri = Uri.tryParse(callbackUrl);
+    if (uri == null) return false;
+    final Map<String, String> params;
+    try {
+      params = uri.queryParameters;
+    } on Object {
+      return false;
+    }
+    if (params.containsKey('error')) return false;
+    return parseOAuthCallback(callbackUrl) is Failure;
   }
 
   /// Parses `io.icos://oauth-callback?cookie=<Set-Cookie>` into the session
@@ -552,6 +573,16 @@ class AuthClient {
     String provider,
   ) async {
     await _captureRotatedToken(r);
+    return _refreshAfterLink(provider);
+  }
+
+  /// Re-fetches the stored session after the server attached [provider] to
+  /// it. With [requireLinked] a session that is still a guest is a failure
+  /// (the stored guest session is kept).
+  Future<Result<AppUser, AppError>> _refreshAfterLink(
+    String provider, {
+    bool requireLinked = false,
+  }) async {
     await _resetJwt();
     final token = await _store.readSessionToken();
     if (token == null) {
@@ -565,6 +596,11 @@ class AuthClient {
         await _clearLocal(emit: true);
         return const Result.failure(
           AppError.auth(AppStrings.backendNotSignedIn),
+        );
+      case Success(data: final AppUser user)
+          when requireLinked && user.isAnonymous:
+        return const Result.failure(
+          AppError.auth(AppStrings.backendSignInFailed),
         );
       case Success(data: final AppUser user):
         final merged = user.copyWith(
