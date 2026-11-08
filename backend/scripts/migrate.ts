@@ -5,6 +5,7 @@
 //   npm run migrate -- --url <unpooled connection string>
 //
 // Logs file names only: never the connection string.
+// Migration files must not contain their own BEGIN/COMMIT: the runner wraps each one.
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -61,7 +62,11 @@ export async function applyMigrations(url: string, dir: string = DEFAULT_DIR): P
         await client.query("INSERT INTO public.schema_migrations (version) VALUES ($1)", [version]);
         await client.query("COMMIT");
       } catch (err) {
-        await client.query("ROLLBACK");
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          // Connection already broken; the original error is what matters.
+        }
         throw new Error(`${file}: ${(err as Error).message}`);
       }
       applied.push(file);

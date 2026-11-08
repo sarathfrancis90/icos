@@ -50,7 +50,7 @@ const PRIVILEGES = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFEREN
 
 // What the client role may do; RLS narrows the rows further.
 const AUTHENTICATED_GRANTS: Record<string, string[]> = {
-  profiles: ["SELECT", "INSERT", "UPDATE"],
+  profiles: ["SELECT", "UPDATE"],
   puzzles: ["SELECT"],
   puzzle_attempts: ["SELECT"],
   streaks: ["SELECT"],
@@ -58,7 +58,7 @@ const AUTHENTICATED_GRANTS: Record<string, string[]> = {
   groups: ["SELECT"],
   group_members: ["SELECT"],
   group_feed: ["SELECT"],
-  reports: ["SELECT", "INSERT"],
+  reports: ["SELECT"], // INSERT is column-level, checked separately
   app_config: ["SELECT"],
   user_blocks: ["SELECT"],
 };
@@ -255,6 +255,62 @@ describe("0001_schema", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATABASE_
 
       const blocked = await db.query(`UPDATE public.profiles SET theme_mode = 'light' WHERE id = $1`, [other]);
       assert.equal(blocked.rowCount, 0, "a client cannot update someone else's profile");
+
+      // The bypass flag is ignored for client roles.
+      await db.query(`SELECT set_config('icos.profile_guard_bypass', 'on', true)`);
+      const bypass = await db.query<{ is_banned: boolean; email_verified: boolean }>(
+        `UPDATE public.profiles SET is_banned = true, email_verified = true RETURNING is_banned, email_verified`,
+      );
+      assert.deepEqual(bypass.rows, [{ is_banned: false, email_verified: false }]);
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+
+  test("clients cannot insert profiles", async () => {
+    await db.query("BEGIN");
+    try {
+      const id = randomUUID();
+      await db.query(`SELECT set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: id })]);
+      await db.query("SET LOCAL ROLE authenticated");
+      await assert.rejects(
+        db.query(`INSERT INTO public.profiles (id) VALUES ($1)`, [id]),
+        (err: { code?: string }) => err.code === "42501",
+      );
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+
+  test("reports: column-level INSERT for authenticated only", async () => {
+    const { rows } = await db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.column_privileges
+        WHERE table_schema = 'public' AND table_name = 'reports'
+          AND grantee = 'authenticated' AND privilege_type = 'INSERT'
+        ORDER BY column_name`,
+    );
+    assert.deepEqual(
+      rows.map((r) => r.column_name),
+      ["details", "reason", "reported_group_id", "reported_user_id", "reporter_id"],
+    );
+    const anon = await db.query<{ ok: boolean }>(
+      `SELECT has_any_column_privilege('anonymous', 'public.reports', 'INSERT') AS ok`,
+    );
+    assert.equal(anon.rows[0].ok, false);
+  });
+
+  test("objects created later by the owner start with no client privileges", async () => {
+    await db.query("BEGIN");
+    try {
+      await db.query(`CREATE FUNCTION public.zz_probe() RETURNS int LANGUAGE sql AS 'SELECT 1'`);
+      await db.query(`CREATE TABLE public.zz_probe_t (id bigint GENERATED ALWAYS AS IDENTITY)`);
+      const { rows } = await db.query<Record<string, boolean>>(
+        `SELECT has_function_privilege('authenticated', 'public.zz_probe()', 'EXECUTE') AS fa,
+                has_function_privilege('anonymous', 'public.zz_probe()', 'EXECUTE') AS fn,
+                has_table_privilege('authenticated', 'public.zz_probe_t', 'SELECT,INSERT,UPDATE,DELETE') AS ta,
+                has_sequence_privilege('authenticated', 'public.zz_probe_t_id_seq', 'USAGE') AS sa`,
+      );
+      assert.deepEqual(rows, [{ fa: false, fn: false, ta: false, sa: false }]);
     } finally {
       await db.query("ROLLBACK");
     }

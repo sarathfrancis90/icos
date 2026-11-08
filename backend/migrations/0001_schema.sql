@@ -83,19 +83,17 @@ BEGIN
 END;
 $$;
 
--- Clients may not change moderation, lifecycle or identity columns; every
--- client update bumps last_active_at. SECURITY DEFINER RPCs that must write the
--- guarded columns on the caller's behalf set icos.profile_guard_bypass = 'on'
--- (transaction-local).
+-- Clients (the Data API roles) may never change moderation, lifecycle or
+-- identity columns, and every client update bumps last_active_at. Other roles
+-- (the owner / Function and SECURITY DEFINER RPCs, which run as the owner) are
+-- not pinned, so they need no bypass flag: icos.profile_guard_bypass, which
+-- the Supabase-era RPCs set, has no effect here, in particular not for clients.
 CREATE OR REPLACE FUNCTION public.protect_profile_columns()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
-  IF current_setting('icos.profile_guard_bypass', true) = 'on' THEN
-    RETURN NEW;
-  END IF;
   IF current_user IN ('authenticated', 'anonymous') THEN
     NEW.is_banned      := OLD.is_banned;
     NEW.deleted_at     := OLD.deleted_at;
@@ -464,6 +462,11 @@ ALTER TABLE public.banned_words         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_config           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_blocks          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cron_runs            ENABLE ROW LEVEL SECURITY;
+-- Normally created by scripts/migrate.ts before this file runs.
+CREATE TABLE IF NOT EXISTS public.schema_migrations (
+  version    text PRIMARY KEY,
+  applied_at timestamptz NOT NULL DEFAULT now()
+);
 ALTER TABLE public.schema_migrations    ENABLE ROW LEVEL SECURITY;
 
 -- profiles
@@ -475,10 +478,6 @@ CREATE POLICY "Users can update their own profile"
   ON public.profiles FOR UPDATE
   TO authenticated
   USING ((select app.uid()) = id)
-  WITH CHECK ((select app.uid()) = id);
-CREATE POLICY "Users can insert their own profile"
-  ON public.profiles FOR INSERT
-  TO authenticated
   WITH CHECK ((select app.uid()) = id);
 CREATE POLICY "Co-members can view profiles"
   ON public.profiles FOR SELECT
@@ -581,5 +580,16 @@ GRANT SELECT ON
   public.app_config,
   public.user_blocks
 TO authenticated;
-GRANT INSERT, UPDATE ON public.profiles TO authenticated;
-GRANT INSERT ON public.reports TO authenticated;
+-- Profiles are created by the Function's auth hooks (as the owner), never by clients.
+GRANT UPDATE ON public.profiles TO authenticated;
+GRANT INSERT (reporter_id, reported_user_id, reported_group_id, reason, details)
+  ON public.reports TO authenticated;
+
+-- Objects created by later migrations (run as this same owner role) start
+-- locked down; every client grant must be explicit.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM authenticated, anonymous;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM authenticated, anonymous;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, authenticated, anonymous;
+-- PUBLIC's EXECUTE on new functions is a built-in, database-wide default that a
+-- per-schema entry cannot remove; revoke it for this role in every schema.
+ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
