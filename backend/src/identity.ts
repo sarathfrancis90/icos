@@ -123,6 +123,42 @@ export async function isFreshAccount(userId: string, db: Queryable = pool): Prom
   return !rows[0].has_data;
 }
 
+/**
+ * Re-points the rows of the account being replaced that are not "progress"
+ * (blocks, reports, streak freezes) at the guest's profile, so the final
+ * UPDATE … SET id carries them back to the account via ON UPDATE CASCADE
+ * instead of the profile DELETE cascading them away. Blocks that would
+ * duplicate a guest block or become a self-block are dropped; a freeze date
+ * both sides have is kept once.
+ */
+async function adoptTargetRows(c: Queryable, guestId: string, targetId: string): Promise<void> {
+  await c.query(
+    `DELETE FROM public.user_blocks b
+      WHERE b.blocker_id = $2
+        AND (b.blocked_id = $1
+             OR EXISTS (SELECT 1 FROM public.user_blocks x WHERE x.blocker_id = $1 AND x.blocked_id = b.blocked_id))`,
+    [guestId, targetId],
+  );
+  await c.query("UPDATE public.user_blocks SET blocker_id = $1 WHERE blocker_id = $2", [guestId, targetId]);
+  await c.query(
+    `DELETE FROM public.user_blocks b
+      WHERE b.blocked_id = $2
+        AND (b.blocker_id = $1
+             OR EXISTS (SELECT 1 FROM public.user_blocks x WHERE x.blocked_id = $1 AND x.blocker_id = b.blocker_id))`,
+    [guestId, targetId],
+  );
+  await c.query("UPDATE public.user_blocks SET blocked_id = $1 WHERE blocked_id = $2", [guestId, targetId]);
+  await c.query("UPDATE public.reports SET reporter_id = $1 WHERE reporter_id = $2", [guestId, targetId]);
+  await c.query("UPDATE public.reports SET reported_user_id = $1 WHERE reported_user_id = $2", [guestId, targetId]);
+  await c.query(
+    `DELETE FROM public.streak_freezes f
+      WHERE f.user_id = $2
+        AND EXISTS (SELECT 1 FROM public.streak_freezes g WHERE g.user_id = $1 AND g.frozen_date = f.frozen_date)`,
+    [guestId, targetId],
+  );
+  await c.query("UPDATE public.streak_freezes SET user_id = $1 WHERE user_id = $2", [guestId, targetId]);
+}
+
 export interface RekeyOptions {
   /** Test seam: runs inside the transaction just before COMMIT. */
   beforeCommit?: (c: Queryable) => Promise<void>;
@@ -131,8 +167,9 @@ export interface RekeyOptions {
 /**
  * Moves the guest's profile (and through ON UPDATE CASCADE all of its app data)
  * onto `newUser.id`, replacing that user's profile row, when `newUser` owns no
- * progress (isFreshAccount, checked under the guest row's lock). Keeps the
- * replaced row's providers, ban and pending deletion.
+ * progress (isFreshAccount, checked with both profile rows locked). Keeps the
+ * replaced row's providers, ban, pending deletion, blocks, reports and
+ * streak freezes (adoptTargetRows).
  * Returns "rekeyed", "has-progress" (nothing changed: the caller discards the
  * guest) or "gone" (guest profile already moved or deleted: idempotent).
  */
@@ -145,7 +182,9 @@ export async function rekeyGuest(
   return tx(async (c) => {
     const guest = await c.query("SELECT 1 FROM public.profiles WHERE id = $1 AND is_anonymous FOR UPDATE", [guestId]);
     if (guest.rowCount === 0) return "gone";
+    await c.query("SELECT 1 FROM public.profiles WHERE id = $1 FOR UPDATE", [newUser.id]);
     if (!(await isFreshAccount(newUser.id, c))) return "has-progress";
+    await adoptTargetRows(c, guestId, newUser.id);
     const replaced = await c.query<{ providers: string[]; is_banned: boolean; deleted_at: Date | null }>(
       "DELETE FROM public.profiles WHERE id = $1 RETURNING providers, is_banned, deleted_at",
       [newUser.id],
@@ -234,10 +273,15 @@ export async function recordLinkedAccount(
   const claimVerified = claims.email_verified === true || claims.email_verified === "true";
   const claimName = typeof claims.name === "string" ? claims.name : null;
   return tx(async (c) => {
-    const who = await c.query<{ isAnonymous: boolean | null }>(
-      `SELECT "isAnonymous" FROM ba."user" WHERE id = $1 FOR UPDATE`,
-      [account.userId],
-    );
+    // If even this fails we cannot tell whether the user is a guest, so fail
+    // the request rather than risk leaving a real account flagged as one.
+    const who = await c
+      .query<{ isAnonymous: boolean | null }>(`SELECT "isAnonymous" FROM ba."user" WHERE id = $1 FOR UPDATE`, [
+        account.userId,
+      ])
+      .catch((err: unknown) => {
+        throw new GuestLinkError(err);
+      });
     await c.query(
       `UPDATE public.profiles
           SET providers = CASE WHEN $2 = ANY(providers) THEN providers ELSE array_append(providers, $2) END,

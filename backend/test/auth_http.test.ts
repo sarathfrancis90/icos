@@ -433,4 +433,61 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
     );
     assert.deepEqual({ ...row }, { authenticated: false, anonymous: false });
   });
+
+  test("re-keying onto a never-played account keeps its blocks, reports and freezes", async () => {
+    const other = await call("POST", "/auth/sign-up/email", { name: "Xan Other", email: uniqueEmail("x"), password: "abcdef" });
+    const otherId = String(other.json?.user.id);
+    const email = uniqueEmail("target");
+    const target = await call("POST", "/auth/sign-up/email", { name: "Tess Target", email, password: "target-pass" });
+    const targetId = String(target.json?.user.id);
+    const guest = await signInGuest();
+    const attemptId = await insertAttempt(guest.id, "2001-01-04");
+
+    await q("INSERT INTO public.user_blocks (blocker_id, blocked_id) VALUES ($1, $2), ($3, $2)", [otherId, targetId, guest.id]);
+    const [report] = await q<{ id: string }>(
+      `INSERT INTO public.reports (reporter_id, reported_user_id, reason) VALUES ($1, $2, 'spam') RETURNING id`,
+      [otherId, targetId],
+    );
+    await q(
+      `INSERT INTO public.streak_freezes (user_id, frozen_date) VALUES ($1, '2001-02-01'), ($1, '2001-02-02'), ($2, '2001-02-01')`,
+      [targetId, guest.id],
+    );
+
+    const signIn = await call("POST", "/auth/sign-in/email", { email, password: "target-pass" }, guest.token);
+    assert.equal(signIn.res.status, 200, JSON.stringify(signIn.json));
+    assert.equal(signIn.json?.user.id, targetId);
+
+    const [moved] = await q<{ user_id: string }>("SELECT user_id FROM public.puzzle_attempts WHERE id = $1", [attemptId]);
+    assert.equal(moved.user_id, targetId, "guest progress re-keyed onto the account");
+    assert.equal(await profile(guest.id), undefined);
+    const blocks = await q<Json>(
+      "SELECT blocker_id, blocked_id FROM public.user_blocks WHERE $1 IN (blocker_id, blocked_id) OR $2 IN (blocker_id, blocked_id)",
+      [targetId, guest.id],
+    );
+    assert.deepEqual(blocks.map((b) => ({ ...b })), [{ blocker_id: otherId, blocked_id: targetId }], "X's block kept, no self-block");
+    const [r] = await q<Json>("SELECT reporter_id, reported_user_id FROM public.reports WHERE id = $1", [report.id]);
+    assert.deepEqual({ ...r }, { reporter_id: otherId, reported_user_id: targetId });
+    const freezes = await q<{ d: string }>(
+      "SELECT frozen_date::text AS d FROM public.streak_freezes WHERE user_id = $1 ORDER BY 1",
+      [targetId],
+    );
+    assert.deepEqual(freezes.map((f) => f.d), ["2001-02-01", "2001-02-02"]);
+  });
+
+  test("mirrorUserUpdate never copies guest placeholders", async () => {
+    const id = randomUUID();
+    await q(`INSERT INTO public.profiles (id, is_anonymous, display_name) VALUES ($1, false, 'Player 1234')`, [id]);
+    await identity.mirrorUserUpdate({
+      id,
+      email: `${id}@anonymous.placeholder.invalid`,
+      emailVerified: true,
+      name: "Anonymous",
+      isAnonymous: false,
+    });
+    const p = await profile(id);
+    assert.equal(p.email, null);
+    assert.equal(p.email_verified, false);
+    assert.equal(p.display_name, "Player 1234");
+    await q("DELETE FROM public.profiles WHERE id = $1", [id]);
+  });
 });
