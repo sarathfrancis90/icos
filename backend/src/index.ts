@@ -7,6 +7,7 @@ import { sendEmail } from "./email.js";
 import { accountRoutes } from "./routes/account.js";
 import type { ApiDeps } from "./routes/common.js";
 import { cronRoutes, type CronOptions } from "./routes/cron.js";
+import { configRoutes } from "./routes/config.js";
 import { groupRoutes } from "./routes/groups.js";
 import { puzzleRoutes } from "./routes/puzzle.js";
 import { scoreRoutes } from "./routes/score.js";
@@ -37,6 +38,7 @@ export function createApp(auth: () => Auth = getAuth, deps: AppDeps = {}): Hono 
   app.route("/api", scoreRoutes(api));
   app.route("/api", groupRoutes(api));
   app.route("/api", accountRoutes(api));
+  app.route("/api", configRoutes(api));
 
   // Neon schedule triggers (neon.ts `triggers`).
   app.route("/cron", cronRoutes(api, deps.cron));

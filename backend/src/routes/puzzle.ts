@@ -1,5 +1,10 @@
 // POST /api/start-puzzle and POST /api/daily-puzzle (ports of the edge
-// functions of the same names), plus generateForDate for the daily cron.
+// functions of the same names), GET /api/puzzle/:date (no auth, so the app can
+// load a puzzle before its guest session exists), plus generateForDate for the
+// daily cron.
+//
+// puzzle/:date -> 200 { puzzle } (public columns, cacheable 5 min)
+//   400 INVALID_DATE / DATE_OUT_OF_RANGE (outside the archive window)  404 PUZZLE_NOT_FOUND
 //
 // start-puzzle  { puzzle_date }  -> 200 { puzzle_date, nonce, started_at, already_completed }
 //   Idempotent: the same nonce and the ORIGINAL started_at on every call, so a
@@ -21,6 +26,7 @@ import {
   utcToday,
 } from "../shared/http.js";
 import { generatePuzzle, seedFor, weekdayDifficulty } from "../shared/puzzle_core.js";
+import { PUBLIC_CACHE } from "./config.js";
 import { activeUser, type ApiDeps, methodNotAllowed, pgError, requestCtx, touchLastActive } from "./common.js";
 
 const NODE_BUDGET = 2_000_000;
@@ -143,6 +149,19 @@ export async function generateForDate(
 
 export function puzzleRoutes(deps: ApiDeps): Hono {
   const app = new Hono();
+
+  app.all("/puzzle/:date", async (c) => {
+    const r = requestCtx(c, deps, "puzzle");
+    if (c.req.method !== "GET") return methodNotAllowed(r);
+    const date = c.req.param("date");
+    if (!isIsoDate(date)) return r.fail(400, "date must be YYYY-MM-DD", "INVALID_DATE");
+    if (!isWithinArchiveWindow(date, utcToday())) {
+      return r.fail(400, "date is outside the playable window", "DATE_OUT_OF_RANGE");
+    }
+    const puzzle = await fetchPublic(date);
+    if (!puzzle) return r.fail(404, "No puzzle for that date", "PUZZLE_NOT_FOUND");
+    return r.ok({ puzzle }, 200, PUBLIC_CACHE);
+  });
 
   app.all("/start-puzzle", async (c) => {
     const r = requestCtx(c, deps, "start-puzzle");
