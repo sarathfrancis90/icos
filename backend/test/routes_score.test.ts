@@ -1,6 +1,10 @@
 // /api/submit-score over HTTP against the Neon `test` branch: a real puzzle
 // generated in-test with the test salt, a session nonce from start-puzzle and
 // an HMAC computed exactly as the app does. Skips without NEON_TEST_DATABASE_URL.
+//
+// Puzzle dates owned by this file (upserted with real grids + solutions):
+//   - today (UTC): the live, verified solve
+//   - the most recent Monday at least 14 days ago (today-14 .. today-20): archive cases
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { setupApi, SKIP, type ApiHarness } from "./helpers/api.js";
@@ -40,6 +44,12 @@ describe("score routes", { skip: SKIP }, () => {
         generated.difficulty,
         generated.parTimeSeconds,
       ],
+    );
+    await h.q(
+      `INSERT INTO public.puzzle_solutions (puzzle_id, path)
+       SELECT id, $2::jsonb FROM public.puzzles WHERE puzzle_date = $1
+       ON CONFLICT (puzzle_id) DO UPDATE SET path = EXCLUDED.path`,
+      [date, JSON.stringify(generated.referencePath)],
     );
   }
 
@@ -155,6 +165,39 @@ describe("score routes", { skip: SKIP }, () => {
       code: "RATE_LIMITED",
       retry_after_seconds: 3600,
     });
+  });
+
+  test("400 IMPLAUSIBLE_TIME when the reported time exceeds the session's elapsed time", async () => {
+    const guest = await started(monday);
+    const body = await signed(monday, guest.nonce, paths[monday], 3600);
+    const { res, json } = await h.call("POST", "/api/submit-score", body, guest.token);
+    assert.equal(res.status, 400);
+    assert.deepEqual(json, { error: "Reported time exceeds elapsed session time", code: "IMPLAUSIBLE_TIME" });
+  });
+
+  test("400 CLOCK_SKEW when queued_at is more than 5 minutes ahead", async () => {
+    const guest = await started(monday);
+    const body = {
+      ...(await signed(monday, guest.nonce, paths[monday])),
+      queued_at: new Date(Date.now() + 3_600_000).toISOString(),
+    };
+    const { res, json } = await h.call("POST", "/api/submit-score", body, guest.token);
+    assert.equal(res.status, 400);
+    assert.deepEqual(json, { error: "Client clock is ahead of server time", code: "CLOCK_SKEW" });
+  });
+
+  test("400 DATE_OUT_OF_RANGE outside the 30-day window", async () => {
+    const guest = await h.signInGuest();
+    for (const date of [addDays(today, 1), addDays(today, -31)]) {
+      const { res, json } = await h.call(
+        "POST",
+        "/api/submit-score",
+        { puzzle_date: date, time_seconds: 10, path: [[0, 0]] },
+        guest.token,
+      );
+      assert.equal(res.status, 400);
+      assert.deepEqual(json, { error: "puzzle_date must be within the last 30 days", code: "DATE_OUT_OF_RANGE" });
+    }
   });
 
   test("400 INVALID_FIELD names the bad field", async () => {

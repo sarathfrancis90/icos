@@ -31,6 +31,8 @@ export interface ApiHarness {
   signUpEmail(tag?: string): Promise<{ id: string; token: string; email: string }>;
   uniqueEmail(tag: string): string;
   q: typeof import("../../src/db.js").q;
+  /** The Better Auth instance behind the app (tests may stub its api methods). */
+  auth: import("../../src/auth.js").Auth;
   close(): Promise<void>;
 }
 
@@ -112,5 +114,5 @@ export async function setupApi(): Promise<ApiHarness> {
     return { id: String(json?.user.id), token, email };
   }
 
-  return { routeEmails, authEmails, call, signInGuest, signUpEmail, uniqueEmail, q, close: closePool };
+  return { routeEmails, authEmails, call, signInGuest, signUpEmail, uniqueEmail, q, auth, close: closePool };
 }

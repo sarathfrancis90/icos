@@ -4,6 +4,7 @@
 import type { Context } from "hono";
 import type { Auth } from "../auth.js";
 import type { EmailMessage, EmailResult } from "../email.js";
+import { q } from "../db.js";
 import { banCheck, requireSession, type ProfileGate, type SessionUser } from "../identity.js";
 import { CORRELATION_HEADER, correlationIdFrom, errorResponse, json, Logger } from "../shared/http.js";
 
@@ -24,15 +25,20 @@ export interface RequestCtx {
   log: Logger;
   ok: (body: unknown, status?: number, headers?: Record<string, string>) => Response;
   fail: (status: number, message: string, code: string, extra?: Record<string, unknown>) => Response;
+  /** 400 INVALID_FIELD naming the field (the edge functions' `bad(field)`). */
+  bad: (field: string) => Response;
 }
 
 export function requestCtx(c: Context, deps: ApiDeps, fn: string): RequestCtx {
   const cid = correlationIdFrom(c.req.raw);
+  const fail: RequestCtx["fail"] = (status, message, code, extra = {}) =>
+    errorResponse(status, message, code, cid, extra);
   return {
     cid,
     log: deps.logger(fn, cid),
     ok: (body, status = 200, headers = {}) => json(body, status, { [CORRELATION_HEADER]: cid, ...headers }),
-    fail: (status, message, code, extra = {}) => errorResponse(status, message, code, cid, extra),
+    fail,
+    bad: (field) => fail(400, `Invalid or missing field: ${field}`, "INVALID_FIELD", { field }),
   };
 }
 
@@ -58,6 +64,11 @@ export async function activeUser(c: Context, deps: ApiDeps, r: RequestCtx): Prom
     return r.fail(gate.status, gate.message, gate.code);
   }
   return { user, profile: gate.profile };
+}
+
+/** Marks the user active now (feeds the 90-day inactive-guest purge). */
+export async function touchLastActive(userId: string): Promise<void> {
+  await q("UPDATE public.profiles SET last_active_at = now() WHERE id = $1", [userId]);
 }
 
 export interface ReportRow {

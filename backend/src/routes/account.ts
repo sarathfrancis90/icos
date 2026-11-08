@@ -10,12 +10,26 @@
 import { Hono } from "hono";
 import { q, tx } from "../db.js";
 import { activeUser, type ApiDeps, methodNotAllowed, pgError, requestCtx } from "./common.js";
-import { markProfileLinked, providerDisplayName, requireSession } from "../identity.js";
+import { markProfileLinked, providerDisplayName, realEmailOf, requireSession } from "../identity.js";
 import { errorFields, readJson } from "../shared/http.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 6;
 const MAX_PASSWORD = 128; // Better Auth's default maximum
+
+/** ba."user" and profile fields captured before an upgrade (restored on failure). */
+interface BeforeUpgrade {
+  email: string;
+  name: string;
+  emailVerified: boolean;
+  isAnonymous: boolean | null;
+  updatedAt: Date;
+  is_anonymous: boolean;
+  profile_email: string | null;
+  email_verified: boolean;
+  display_name: string;
+  providers: string[];
+}
 
 interface ExportProfile {
   email: string | null;
@@ -76,7 +90,8 @@ export function accountRoutes(deps: ApiDeps): Hono {
       exported_at: new Date().toISOString(),
       user: {
         id: user.id,
-        email: profile.email ?? user.email,
+        // A real address only, never a guest's placeholder.
+        email: realEmailOf(profile.email) ?? realEmailOf(user.email),
         is_anonymous: profile.is_anonymous,
         created_at: authUsers[0]?.createdAt ?? null,
         providers: profile.providers ?? [],
@@ -105,7 +120,7 @@ export function accountRoutes(deps: ApiDeps): Hono {
 
     const body = await readJson(c.req.raw);
     if (body === null) return r.fail(400, "Body must be a JSON object", "INVALID_JSON");
-    const bad = (field: string) => r.fail(400, `Invalid or missing field: ${field}`, "INVALID_FIELD", { field });
+    const { bad } = r;
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     if (email.length > 254 || !EMAIL_RE.test(email)) return bad("email");
     const password = body.password;
@@ -118,20 +133,24 @@ export function accountRoutes(deps: ApiDeps): Hono {
     if (taken.length > 0) return r.fail(409, "An account with this email already exists", "EMAIL_EXISTS");
 
     // 1. Flip the guest to an email account (ba."user" + profile) in one
-    //    transaction. setPassword and sendVerificationEmail act on the session
-    //    user, and sendVerificationEmail requires the session's email to match.
+    //    transaction, re-checking under the row lock that it is still a guest
+    //    (a double submit or concurrent request finds it already upgraded).
+    //    setPassword and sendVerificationEmail act on the session user, and
+    //    sendVerificationEmail requires the session's email to match.
     const name = providerDisplayName(null, email);
-    type Before = { email: string; name: string; emailVerified: boolean; display_name: string | null };
-    let before: Before;
+    let before: BeforeUpgrade | "not-anonymous";
     try {
       before = await tx(async (db) => {
-        const { rows } = await db.query<Before>(
-          `SELECT u.email, u.name, u."emailVerified", p.display_name
+        const { rows } = await db.query<BeforeUpgrade>(
+          `SELECT u.email, u.name, u."emailVerified", u."isAnonymous", u."updatedAt",
+                  p.is_anonymous, p.email AS profile_email, p.email_verified, p.display_name, p.providers
              FROM ba."user" u LEFT JOIN public.profiles p ON p.id = u.id
             WHERE u.id = $1 FOR UPDATE OF u`,
           [user.id],
         );
-        if (!rows[0]) throw new Error("auth user not found");
+        const row = rows[0];
+        if (!row) throw new Error("auth user not found");
+        if (!row.isAnonymous) return "not-anonymous" as const;
         await db.query(
           `UPDATE ba."user"
               SET email = $2, "emailVerified" = false, "isAnonymous" = false,
@@ -140,15 +159,18 @@ export function accountRoutes(deps: ApiDeps): Hono {
           [user.id, email, name],
         );
         await markProfileLinked(db, user.id, email, false, name);
-        return rows[0];
+        return row;
       });
     } catch (err) {
       if (pgError(err).code === "23505") return r.fail(409, "An account with this email already exists", "EMAIL_EXISTS");
       throw err;
     }
+    if (before === "not-anonymous") return r.fail(400, "This account already has a sign-in method", "NOT_ANONYMOUS");
+    const saved = before;
 
     // 2. The credential account (its account.create.after hook records the
-    //    provider). On failure, put the guest back as it was.
+    //    provider). On failure, put the user and profile back exactly as they
+    //    were (profiles.updated_at is set by its trigger and cannot be restored).
     const auth = deps.auth();
     const headers = c.req.raw.headers;
     try {
@@ -156,18 +178,18 @@ export function accountRoutes(deps: ApiDeps): Hono {
     } catch (err) {
       lg.error("setPassword failed; reverting the upgrade", errorFields(err));
       await tx(async (db) => {
+        await db.query(`DELETE FROM ba.account WHERE "userId" = $1 AND "providerId" = 'credential'`, [user.id]);
         await db.query(
           `UPDATE ba."user"
-              SET email = $2, name = $3, "emailVerified" = $4, "isAnonymous" = true, "updatedAt" = now()
+              SET email = $2, name = $3, "emailVerified" = $4, "isAnonymous" = $5, "updatedAt" = $6
             WHERE id = $1`,
-          [user.id, before.email, before.name, before.emailVerified],
+          [user.id, saved.email, saved.name, saved.emailVerified, saved.isAnonymous, saved.updatedAt],
         );
         await db.query(
           `UPDATE public.profiles
-              SET is_anonymous = true, email = NULL, email_verified = false,
-                  display_name = coalesce($2, display_name), updated_at = now()
+              SET is_anonymous = $2, email = $3, email_verified = $4, display_name = $5, providers = $6
             WHERE id = $1`,
-          [user.id, before.display_name],
+          [user.id, saved.is_anonymous, saved.profile_email, saved.email_verified, saved.display_name, saved.providers],
         );
       });
       throw err;

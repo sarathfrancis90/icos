@@ -19,6 +19,7 @@ import {
   pgError,
   type ReportRow,
   requestCtx,
+  touchLastActive,
   UUID_RE,
 } from "./common.js";
 
@@ -100,14 +101,19 @@ export function groupRoutes(deps: ApiDeps): Hono {
       throw err;
     }
 
+    // Bookkeeping: neither failure undoes the join (the Deno original ignored both).
     try {
       await q(
         "INSERT INTO public.group_feed (group_id, user_id, puzzle_date, event) VALUES ($1, $2, $3, 'joined')",
         [groupId, user.id, utcToday()],
       );
-      await q("UPDATE public.profiles SET last_active_at = now() WHERE id = $1", [user.id]);
     } catch (err) {
-      lg.warn("post-join bookkeeping failed", { db_error: err instanceof Error ? err.message : String(err) });
+      lg.warn("group_feed insert failed", { db_error: err instanceof Error ? err.message : String(err) });
+    }
+    try {
+      await touchLastActive(user.id);
+    } catch (err) {
+      lg.warn("last_active_at update failed", { db_error: err instanceof Error ? err.message : String(err) });
     }
 
     const [fresh] = await q<Record<string, unknown>>("SELECT * FROM public.groups WHERE id = $1", [groupId]);
@@ -126,7 +132,7 @@ export function groupRoutes(deps: ApiDeps): Hono {
 
     const body = await readJson(c.req.raw);
     if (body === null) return r.fail(400, "Body must be a JSON object", "INVALID_JSON");
-    const bad = (field: string) => r.fail(400, `Invalid or missing field: ${field}`, "INVALID_FIELD", { field });
+    const { bad } = r;
 
     const userTarget = body.reported_user_id ?? null;
     const groupTarget = body.reported_group_id ?? null;
@@ -182,7 +188,7 @@ export function groupRoutes(deps: ApiDeps): Hono {
     const body = await readJson(c.req.raw);
     if (body === null) return r.fail(400, "Body must be a JSON object", "INVALID_JSON");
     const target = targetOf(body);
-    if (target === null) return r.fail(400, "Invalid or missing field: user_id", "INVALID_FIELD", { field: "user_id" });
+    if (target === null) return r.bad("user_id");
     if (target === user.id) {
       return r.fail(400, "You cannot block yourself", "INVALID_FIELD", { field: "user_id" });
     }
@@ -227,7 +233,7 @@ export function groupRoutes(deps: ApiDeps): Hono {
     const body = await readJson(c.req.raw);
     if (body === null) return r.fail(400, "Body must be a JSON object", "INVALID_JSON");
     const target = targetOf(body);
-    if (target === null) return r.fail(400, "Invalid or missing field: user_id", "INVALID_FIELD", { field: "user_id" });
+    if (target === null) return r.bad("user_id");
 
     await q("DELETE FROM public.user_blocks WHERE blocker_id = $1 AND blocked_id = $2", [user.id, target]);
     r.log.info("user unblocked", { user_id: user.id, blocked_id: target });

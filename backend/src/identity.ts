@@ -81,7 +81,7 @@ const ANON_EMAIL_DOMAIN = "@anonymous.placeholder.invalid";
 const PLACEHOLDER_RE = /^Player \d{4}$/;
 
 /** An email worth storing: null for a guest's placeholder address. */
-function realEmailOf(email: string | null | undefined): string | null {
+export function realEmailOf(email: string | null | undefined): string | null {
   return email && !email.toLowerCase().endsWith(ANON_EMAIL_DOMAIN) ? email : null;
 }
 

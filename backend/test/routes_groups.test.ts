@@ -1,5 +1,8 @@
 // /api/join-group, /api/report, /api/block and /api/unblock over HTTP against
 // the Neon `test` branch. Skips without NEON_TEST_DATABASE_URL.
+//
+// Puzzle dates owned by this file: none (join-group's feed row uses today
+// without touching the puzzles table).
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { setupApi, SKIP, type ApiHarness } from "./helpers/api.js";
@@ -16,11 +19,11 @@ describe("group routes", { skip: SKIP }, () => {
     await h?.close();
   });
 
-  async function makeGroup(adminId: string): Promise<{ id: string; invite_code: string }> {
+  async function makeGroup(adminId: string, name = "Puzzlers"): Promise<{ id: string; invite_code: string }> {
     const [row] = await h.q<{ code: string }>("SELECT public.generate_invite_code() AS code");
     const [group] = await h.q<{ id: string; invite_code: string }>(
-      "INSERT INTO public.groups (name, invite_code, admin_id, member_count) VALUES ('Puzzlers', $1, $2, 0) RETURNING id, invite_code",
-      [row.code, adminId],
+      "INSERT INTO public.groups (name, invite_code, admin_id, member_count) VALUES ($3, $1, $2, 0) RETURNING id, invite_code",
+      [row.code, adminId, name],
     );
     await h.q("INSERT INTO public.group_members (group_id, user_id, role) VALUES ($1, $2, 'admin')", [
       group.id,
@@ -93,6 +96,39 @@ describe("group routes", { skip: SKIP }, () => {
       const { res, json } = await h.call("POST", "/api/join-group", { invite_code: group.invite_code }, member.token);
       assert.equal(res.status, 409);
       assert.equal(json?.code, "GROUP_FULL");
+    });
+    test("409 GROUP_INACTIVE when the group is deactivated between lookup and insert", async () => {
+      const admin = await h.signUpEmail("admin");
+      const member = await h.signUpEmail();
+      const name = `Race ${Math.random().toString(36).slice(2, 8)}`;
+      const group = await makeGroup(admin.id, name);
+      // Fires before group_members_before_insert (trigger order is by name) and
+      // only for this group, so concurrent test files are unaffected.
+      const fn = `test_deactivate_${group.id.replace(/-/g, "")}`;
+      await h.q(`CREATE FUNCTION public.${fn}() RETURNS trigger LANGUAGE plpgsql AS $f$
+        BEGIN
+          UPDATE public.groups SET is_active = false WHERE id = NEW.group_id AND id = '${group.id}';
+          RETURN NEW;
+        END $f$`);
+      await h.q(`CREATE TRIGGER aaa_${fn} BEFORE INSERT ON public.group_members FOR EACH ROW EXECUTE FUNCTION public.${fn}()`);
+      try {
+        const { res, json } = await h.call("POST", "/api/join-group", { invite_code: group.invite_code }, member.token);
+        assert.equal(res.status, 409);
+        assert.deepEqual(json, { error: "Group is no longer active", code: "GROUP_INACTIVE" });
+      } finally {
+        await h.q(`DROP TRIGGER aaa_${fn} ON public.group_members`);
+        await h.q(`DROP FUNCTION public.${fn}()`);
+      }
+    });
+
+    test("409 TOO_MANY_GROUPS at 20 memberships", async () => {
+      const member = await h.signUpEmail();
+      for (let i = 0; i < 20; i++) await makeGroup(member.id, `Mine ${i}`);
+      const admin = await h.signUpEmail("admin");
+      const group = await makeGroup(admin.id);
+      const { res, json } = await h.call("POST", "/api/join-group", { invite_code: group.invite_code }, member.token);
+      assert.equal(res.status, 409);
+      assert.deepEqual(json, { error: "You can be in at most 20 groups", code: "TOO_MANY_GROUPS" });
     });
   });
 

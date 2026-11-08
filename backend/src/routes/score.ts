@@ -139,7 +139,7 @@ export function scoreRoutes(deps: ApiDeps): Hono {
     // ---- input validation ---------------------------------------------------
     const body = await readJson(c.req.raw);
     if (body === null) return r.fail(400, "Body must be a JSON object", "INVALID_JSON");
-    const bad = (field: string) => r.fail(400, `Invalid or missing field: ${field}`, "INVALID_FIELD", { field });
+    const { bad } = r;
 
     const puzzleDate = body.puzzle_date;
     if (!isIsoDate(puzzleDate)) return bad("puzzle_date");

@@ -9,7 +9,7 @@
 //   200 { status:"exists", puzzle_date, puzzle }. The reference solution goes
 //   to puzzle_solutions and is never returned.
 import { Hono } from "hono";
-import { pool, q, tx } from "../db.js";
+import { q, tx } from "../db.js";
 import {
   addDays,
   compareDates,
@@ -21,7 +21,7 @@ import {
   utcToday,
 } from "../shared/http.js";
 import { generatePuzzle, seedFor, weekdayDifficulty } from "../shared/puzzle_core.js";
-import { activeUser, type ApiDeps, methodNotAllowed, pgError, requestCtx } from "./common.js";
+import { activeUser, type ApiDeps, methodNotAllowed, pgError, requestCtx, touchLastActive } from "./common.js";
 
 const NODE_BUDGET = 2_000_000;
 const SEED_VERSION = 3;
@@ -165,7 +165,7 @@ export function puzzleRoutes(deps: ApiDeps): Hono {
     if (puzzle.length === 0) return r.fail(404, "No puzzle for that date", "PUZZLE_NOT_FOUND");
 
     // Insert-if-absent, then read back whichever row exists.
-    await pool.query(
+    await q(
       `INSERT INTO public.puzzle_sessions (user_id, puzzle_date, nonce) VALUES ($1, $2, $3)
        ON CONFLICT (user_id, puzzle_date) DO NOTHING`,
       [user.id, puzzleDate, randomNonce(32)],
@@ -180,7 +180,7 @@ export function puzzleRoutes(deps: ApiDeps): Hono {
       "SELECT 1 FROM public.puzzle_attempts WHERE user_id = $1 AND puzzle_date = $2 AND completed LIMIT 1",
       [user.id, puzzleDate],
     );
-    await q("UPDATE public.profiles SET last_active_at = now() WHERE id = $1", [user.id]);
+    await touchLastActive(user.id);
 
     const alreadyCompleted = attempt.length > 0;
     lg.info("session ready", { already_completed: alreadyCompleted });

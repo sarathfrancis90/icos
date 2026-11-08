@@ -1,5 +1,8 @@
 // /api/export-data and /api/account/upgrade-email over HTTP against the Neon
 // `test` branch. Skips without NEON_TEST_DATABASE_URL.
+//
+// Puzzle dates owned by this file: none (it only inserts a streak_freezes row
+// for 2026-03-04 on its own user).
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { setupApi, SKIP, type ApiHarness } from "./helpers/api.js";
@@ -67,6 +70,14 @@ describe("account routes", { skip: SKIP }, () => {
       assert.equal(post.res.status, 200);
     });
 
+    test("a guest's export has user.email null, never the placeholder address", async () => {
+      const guest = await h.signInGuest();
+      const { res, json } = await h.call("POST", "/api/export-data", undefined, guest.token);
+      assert.equal(res.status, 200);
+      assert.equal(json?.user.email, null);
+      assert.equal(json?.user.is_anonymous, true);
+    });
+
     test("401 without a session; 403 BANNED for a banned account", async () => {
       const anon = await h.call("GET", "/api/export-data");
       assert.equal(anon.res.status, 401);
@@ -125,6 +136,77 @@ describe("account routes", { skip: SKIP }, () => {
       );
       assert.equal(again.res.status, 400);
       assert.equal(again.json?.code, "NOT_ANONYMOUS");
+    });
+
+    test("a second upgrade call gets 400 NOT_ANONYMOUS; the account keeps its credential", async () => {
+      const guest = await h.signInGuest();
+      const email = h.uniqueEmail("twice");
+      const first = await h.call("POST", "/api/account/upgrade-email", { email, password: "first-pass" }, guest.token);
+      assert.equal(first.res.status, 200, JSON.stringify(first.json));
+      const second = await h.call(
+        "POST",
+        "/api/account/upgrade-email",
+        { email: h.uniqueEmail("twice-b"), password: "second-pass" },
+        guest.token,
+      );
+      assert.equal(second.res.status, 400);
+      assert.deepEqual(second.json, { error: "This account already has a sign-in method", code: "NOT_ANONYMOUS" });
+
+      const [user] = await h.q<{ email: string; isAnonymous: boolean }>(
+        `SELECT email, "isAnonymous" FROM ba."user" WHERE id = $1`,
+        [guest.id],
+      );
+      assert.deepEqual(user, { email, isAnonymous: false });
+      const creds = await h.q(`SELECT 1 FROM ba.account WHERE "userId" = $1 AND "providerId" = 'credential'`, [guest.id]);
+      assert.equal(creds.length, 1);
+      const [profile] = await h.q<{ is_anonymous: boolean; email: string }>(
+        "SELECT is_anonymous, email FROM public.profiles WHERE id = $1",
+        [guest.id],
+      );
+      assert.deepEqual(profile, { is_anonymous: false, email });
+      const signIn = await h.call("POST", "/auth/sign-in/email", { email, password: "first-pass" });
+      assert.equal(signIn.res.status, 200);
+    });
+
+    test("a failing setPassword restores the user and profile exactly", async () => {
+      const guest = await h.signInGuest();
+      const userRow = `SELECT * FROM ba."user" WHERE id = $1`;
+      // updated_at is rewritten by the profiles trigger on any UPDATE.
+      const profileRow = "SELECT * FROM public.profiles WHERE id = $1";
+      const [userBefore] = await h.q(userRow, [guest.id]);
+      const [{ updated_at: _u, ...profileBefore }] = await h.q(profileRow, [guest.id]);
+
+      const api = h.auth.api as { setPassword: unknown };
+      const real = api.setPassword;
+      let calls = 0;
+      let flippedDuringCall: unknown;
+      api.setPassword = async () => {
+        calls += 1;
+        // The flip has happened by the time setPassword runs.
+        [flippedDuringCall] = await h.q(`SELECT "isAnonymous" FROM ba."user" WHERE id = $1`, [guest.id]);
+        throw new Error("setPassword exploded");
+      };
+      try {
+        const { res, json } = await h.call(
+          "POST",
+          "/api/account/upgrade-email",
+          { email: h.uniqueEmail("boom"), password: "brand-new-pass" },
+          guest.token,
+        );
+        assert.equal(res.status, 500);
+        assert.deepEqual(json, { error: "Internal server error", code: "INTERNAL" });
+      } finally {
+        api.setPassword = real;
+      }
+      assert.equal(calls, 1);
+      assert.deepEqual(flippedDuringCall, { isAnonymous: false });
+
+      const [userAfter] = await h.q(userRow, [guest.id]);
+      const [{ updated_at: _v, ...profileAfter }] = await h.q(profileRow, [guest.id]);
+      assert.deepEqual(userAfter, userBefore);
+      assert.deepEqual(profileAfter, profileBefore);
+      const accounts = await h.q(`SELECT 1 FROM ba.account WHERE "userId" = $1`, [guest.id]);
+      assert.equal(accounts.length, 0);
     });
 
     test("409 EMAIL_EXISTS for a taken email (case-insensitive); the guest stays a guest", async () => {
