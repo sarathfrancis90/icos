@@ -58,7 +58,9 @@ class StatsRepository {
     try {
       final response = await _client
           .from('puzzle_attempts')
-          .select('puzzle_date, time_seconds, hints_used, undos_used, completed')
+          .select(
+            'puzzle_date, time_seconds, hints_used, undos_used, completed',
+          )
           .eq('user_id', userId)
           .order('puzzle_date', ascending: false)
           .limit(limit);
@@ -85,13 +87,15 @@ class StatsRepository {
   /// Count of completed puzzle attempts for the user.
   Future<Result<int, AppError>> getTotalSolved(String userId) async {
     try {
-      final response = await _client
+      // Exact count (HEAD + Content-Range): fetching rows would stop at the
+      // Data API's 200-row cap.
+      final total = await _client
           .from('puzzle_attempts')
-          .select('id')
+          .count(CountOption.exact)
           .eq('user_id', userId)
           .eq('completed', true);
 
-      return Result.success((response as List).length);
+      return Result.success(total);
     } on PostgrestException catch (e) {
       return Result.failure(AppError.database(e.message));
     } catch (e) {
@@ -115,7 +119,8 @@ class StatsRepository {
 
       final totalSeconds = rows.fold<int>(
         0,
-        (sum, row) => sum + ((row as Map<String, dynamic>)['time_seconds'] as int),
+        (sum, row) =>
+            sum + ((row as Map<String, dynamic>)['time_seconds'] as int),
       );
 
       return Result.success(totalSeconds ~/ rows.length);
