@@ -1,7 +1,7 @@
 name: icos
 description: "Icos - one line, every cell. A daily Hamiltonian path puzzle."
 publish_to: 'none'
-version: 1.1.0+14
+version: 1.1.0+15
 
 environment:
   sdk: ^3.11.1
