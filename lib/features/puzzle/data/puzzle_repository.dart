@@ -47,8 +47,8 @@ class PuzzleRepository {
   final PublicGetter? _publicGet;
   final bool Function() _hasSession;
 
-  PostgrestClient get _db => (_client ??
-      (throw StateError('Data API client not configured')))();
+  PostgrestClient get _db =>
+      (_client ?? (throw StateError('Data API client not configured')))();
 
   /// Whether reads should use the Data API (a session exists) rather than
   /// the public route. Never throws.
@@ -92,6 +92,9 @@ class PuzzleRepository {
   Future<Puzzle?> _fetchFromTable(String date) async {
     final publicGet = _publicGet;
     if (publicGet != null && !_useDataApi()) {
+      // The public route serves the archive window up to today only; a
+      // future date answers 400 DATE_OUT_OF_RANGE, so do not ask.
+      if (date.compareTo(AppDateUtils.todayUtc()) > 0) return null;
       return _fetchPublic(publicGet, date);
     }
     try {
@@ -206,9 +209,11 @@ class PuzzleRepository {
   }
 
   /// Pre-cache tomorrow's puzzle (table only; generation is the cron's job).
+  /// Needs a session: tomorrow is readable through the Data API only.
   Future<void> preCacheTomorrowPuzzle([String? tomorrowDate]) async {
     final date = tomorrowDate ?? AppDateUtils.tomorrowUtc();
     if (StorageService.getCachedPuzzle(date) != null) return;
+    if (!_useDataApi()) return;
     await _fetchFromTable(date);
   }
 

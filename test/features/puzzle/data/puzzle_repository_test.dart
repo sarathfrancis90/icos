@@ -123,6 +123,48 @@ void main() {
       expect(puzzle.origin, PuzzleOrigin.server);
     });
 
+    test('without a session tomorrow is never requested publicly', () async {
+      final tomorrow = AppDateUtils.tomorrowUtc();
+      final repo = PuzzleRepository(
+        invoker: (fn, body) async => const EdgeResponse(500, {}),
+        client: () => testDataApi((_) async => fail('no Data API call')),
+        publicGet: (route) async => fail('no public call for $route'),
+        hasSession: () => false,
+      );
+
+      await repo.preCacheTomorrowPuzzle(tomorrow);
+      expect(StorageService.getCachedPuzzle(tomorrow), isNull);
+
+      // getPuzzle(tomorrow) skips the public read and falls through.
+      final result = await repo.getPuzzle(tomorrow);
+      expect(
+        (result as Success<Puzzle, dynamic>).data.origin,
+        PuzzleOrigin.bundled,
+      );
+    });
+
+    test(
+      'with a session tomorrow is pre-cached through the Data API',
+      () async {
+        final tomorrow = AppDateUtils.tomorrowUtc();
+        final seen = <http.Request>[];
+        final repo = PuzzleRepository(
+          invoker: (fn, body) async => fail('no generation expected'),
+          client: () => testDataApi((request) async {
+            seen.add(request);
+            return jsonResponse(_serverPuzzle(tomorrow));
+          }),
+          publicGet: (route) async => fail('no public call'),
+          hasSession: () => true,
+        );
+
+        await repo.preCacheTomorrowPuzzle(tomorrow);
+
+        expect(seen.single.url.queryParameters['puzzle_date'], 'eq.$tomorrow');
+        expect(StorageService.getCachedPuzzle(tomorrow), isNotNull);
+      },
+    );
+
     test('with a session it reads puzzles through the Data API', () async {
       late http.Request seen;
       final repo = PuzzleRepository(
@@ -139,10 +181,7 @@ void main() {
 
       expect(seen.url.toString(), startsWith('$testDataApiUrl/puzzles?'));
       expect(seen.url.queryParameters['puzzle_date'], 'eq.2026-01-04');
-      expect(
-        (result as Success<Puzzle, dynamic>).data.id,
-        'server-2026-01-04',
-      );
+      expect((result as Success<Puzzle, dynamic>).data.id, 'server-2026-01-04');
     });
   });
 }
