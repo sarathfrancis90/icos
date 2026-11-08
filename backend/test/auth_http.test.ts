@@ -209,13 +209,16 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
       | undefined;
     const onLinkAccount = plugin?.options?.onLinkAccount;
     assert.ok(onLinkAccount, "anonymous plugin exposes onLinkAccount");
-    const [{ n: before }] = await q<{ n: number }>("SELECT count(*)::int AS n FROM public.profiles");
+    // Scoped to the two ids: other test files create profiles concurrently.
+    const countBoth = `SELECT count(*)::int AS n FROM public.profiles WHERE id IN ($1, $2)`;
+    const ids = [rekeyed.guestId, rekeyed.user.id];
+    const [{ n: before }] = await q<{ n: number }>(countBoth, ids);
     await onLinkAccount({
       anonymousUser: { user: { id: rekeyed.guestId, isAnonymous: true }, session: {} },
       newUser: { user: { ...rekeyed.user, createdAt: new Date(rekeyed.user.createdAt) }, session: {} },
       ctx: {},
     });
-    const [{ n: afterCount }] = await q<{ n: number }>("SELECT count(*)::int AS n FROM public.profiles");
+    const [{ n: afterCount }] = await q<{ n: number }>(countBoth, ids);
     assert.equal(afterCount, before);
     const p = await profile(rekeyed.user.id);
     assert.equal(p.is_anonymous, false);

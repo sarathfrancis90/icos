@@ -315,7 +315,8 @@ export async function recordLinkedAccount(
   });
 }
 
-async function markProfileLinked(
+/** Flips a profile to a real account (email, verification, provider name for a placeholder). */
+export async function markProfileLinked(
   c: Queryable,
   id: string,
   email: string | null,
@@ -401,4 +402,40 @@ export async function requireSession(
     throw new HTTPException(401, { res });
   }
   return sync(session.user);
+}
+
+/** The profile fields the /api/* gate reads. */
+export interface ProfileGate {
+  id: string;
+  is_banned: boolean;
+  is_anonymous: boolean;
+  deleted_at: Date | null;
+  display_name: string;
+}
+
+export type BanCheckResult =
+  | { ok: true; profile: ProfileGate }
+  | { ok: false; status: number; code: string; message: string };
+
+/**
+ * The edge functions' banCheck: the caller's profile must exist, not be
+ * banned and not be pending deletion. Same statuses, codes and messages.
+ */
+export async function banCheck(userId: string): Promise<BanCheckResult> {
+  let rows: ProfileGate[];
+  try {
+    rows = await q<ProfileGate>(
+      "SELECT id, is_banned, is_anonymous, deleted_at, display_name FROM public.profiles WHERE id = $1 LIMIT 1",
+      [userId],
+    );
+  } catch {
+    return { ok: false, status: 500, code: "PROFILE_LOOKUP_FAILED", message: "Could not load profile" };
+  }
+  const profile = rows[0];
+  if (!profile) return { ok: false, status: 403, code: "PROFILE_NOT_FOUND", message: "Profile not found" };
+  if (profile.is_banned) return { ok: false, status: 403, code: "BANNED", message: "Account suspended" };
+  if (profile.deleted_at) {
+    return { ok: false, status: 403, code: "DELETED", message: "Account scheduled for deletion" };
+  }
+  return { ok: true, profile };
 }

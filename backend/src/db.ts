@@ -6,6 +6,10 @@ import { attachDatabasePool } from "@neon/functions";
 import pg, { type PoolClient, type QueryResultRow } from "pg";
 import { pgConfig } from "./shared/pg_url.js";
 
+// DATE columns come back as "YYYY-MM-DD" strings (as PostgREST returned
+// them), not as JS Dates at local midnight.
+pg.types.setTypeParser(pg.types.builtins.DATE, (value: string) => value);
+
 let instance: pg.Pool | undefined;
 
 export function getPool(): pg.Pool {
