@@ -9,7 +9,8 @@ into `android/` or `ios/` has no effect, which is why they were moved here.
 
 None of them contains a secret: the Android files and the iOS plist carry only
 a client id. The one secret in this setup is the **web** client secret, which
-lives in the Supabase dashboard and nowhere in this repo.
+lives only in the Neon Function env (`backend/.env.neon`, git-ignored) and nowhere
+in this repo.
 
 | File | Client | SHA-1 it was registered against |
 |---|---|---|
@@ -19,4 +20,5 @@ lives in the Supabase dashboard and nowhere in this repo.
 | `...29bmvc0vva....plist` | iOS | n/a, bundle id `com.icos.game` |
 
 Not shown here: the **web** client `876802621972-tsu3ss64bros8iub3mijmraaj20m3t67`,
-which is the one Supabase uses and the one Android sends as `serverClientId`.
+which is the one the Function's Better Auth Google provider uses and the one the app
+sends as `serverClientId`.

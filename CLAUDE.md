@@ -14,15 +14,16 @@ Icos (Dart package `icos`, bundle id `com.icos.game`) is a cross-platform mobile
 | Language | Dart | Latest stable |
 | State Management | Riverpod | 2.x (flutter_riverpod ^2.6, riverpod_annotation ^2.6, codegen) |
 | Navigation | GoRouter | Latest stable, declarative routes |
-| Backend | Supabase | PostgreSQL + Auth + Realtime + Edge Functions + Storage |
-| Auth | Supabase Auth (GoTrue) | Anonymous + Email + Google + Apple |
-| Edge Functions | Deno runtime | daily-puzzle, start-puzzle, submit-score, join-group, export-data (shared code in `_shared/`) |
+| Backend | Neon Lakebase Postgres + Data API | Project `icos` (aws-us-east-1, Free plan); Data API = PostgREST with RLS, Bearer JWT from `/auth/token`; source in `backend/` |
+| Auth | Better Auth, self-hosted on a Neon Function | Anonymous + Email + Google + Apple; `bearer`, `jwt` (ES256, 15 min) and `expo` plugins; tables in schema `ba` |
+| Server logic | Neon Function `api` (Node 24, Hono) | `/auth/*`, `/api/*` (start-puzzle, submit-score, join-group, export-data, daily-puzzle, report, block, …), `/cron/*` (schedule triggers); shared code in `backend/src/shared/` |
+| Email | Resend (HTTPS API from the Function) | Verification, password reset, report alerts; from `noreply@icos.sarathfrancis.work` |
 | Local Storage | Hive | Puzzle cache, offline sync queue |
 | Settings | SharedPreferences | User preferences, flags |
 | Analytics | Firebase Analytics (GA4) | Optional: enabled only when FIREBASE_* env values are set (`lib/firebase_options.dart`); no-op otherwise |
 | Crash Reporting | Firebase Crashlytics | Error monitoring |
 | Performance | Firebase Performance Monitoring | App metrics |
-| Feature Flags / kill switch | Supabase `app_config` table | `min_supported_version`, `latest_version`, `maintenance_mode`, `store_urls` (router gates in `app_router.dart`) |
+| Feature Flags / kill switch | `app_config` table | `min_supported_version`, `latest_version`, `maintenance_mode`, `store_urls` (router gates in `app_router.dart`) |
 | Notifications | flutter_local_notifications (+ FCM topic `daily_puzzle` when Firebase configured) | Daily reminder + streak-at-risk reminder |
 | Animations | Flutter AnimationController + Rive | Celebration animations |
 | CI/CD | GitHub Actions + Fastlane | Automated builds and store deployment |
@@ -38,7 +39,8 @@ lib/
 │   ├── theme/                         # app_theme, dark_theme, light_theme
 │   ├── router/                        # GoRouter configuration
 │   ├── utils/                         # haptics, date_utils, share_utils
-│   └── services/                      # supabase, analytics, notification, storage
+│   ├── backend/                       # BackendConfig, AuthClient, DataApi, ApiClient, TokenStore
+│   └── services/                      # analytics, notification, storage, app config
 ├── features/
 │   ├── auth/                          # data/ domain/ providers/ presentation/
 │   ├── puzzle/                        # data/ domain/ providers/ presentation/
@@ -50,10 +52,14 @@ lib/
 ├── shared/
 │   ├── widgets/                       # Reusable UI components
 │   └── extensions/                    # Dart extension methods
-supabase/
-├── migrations/                        # SQL migration files
-├── functions/                         # Edge Functions (Deno/TypeScript)
-└── seed.sql
+backend/                               # Neon project (run every `neon` command from here)
+├── neon.ts                            # compute pins, Function `api`, schedule triggers
+├── src/                               # Hono app: auth.ts, routes/, shared/ (puzzle_core, http)
+├── migrations/                        # 0001_schema … 0004_better_auth (additive)
+├── scripts/                           # migrate, seed_puzzles, smoke, generate
+├── test/                              # node --test (DB suites need NEON_TEST_DATABASE_URL)
+├── README.md                          # project ids, URLs, CLI commands
+└── CONTRACTS.md                       # RPC, route and cron contracts
 test/
 ├── unit/                              # Business logic tests
 ├── widget/                            # Widget rendering tests
@@ -85,68 +91,82 @@ Every feature under `lib/features/{feature}/` follows this structure:
 
 - Use `riverpod_annotation` with code generation (`@riverpod` annotations)
 - `AsyncNotifierProvider` for server-synced state (puzzles, groups, leaderboards)
-- `StreamProvider` for real-time data (Supabase Realtime subscriptions)
+- `StreamProvider` for live data: the group feed polls the Data API every 15 s while the group screen is visible (no websocket)
 - `NotifierProvider` for local-only state (game state, UI state)
 - Global `connectivityProvider` tracks network state for offline fallback
-- Clean up Realtime WebSocket subscriptions on group leave, screen disposal, app background
-- Maximum 5 concurrent Realtime subscriptions
+- Stop feed polling on group leave, screen disposal and app background
 
 ### Navigation (GoRouter)
 
 - Declarative routes with deep link support
-- Routes: `/join/{invite_code}`, `/puzzle/{date}`
+- Routes: `/join/{invite_code}`, `/puzzle/{date}`, `/reset?token=…` (password-reset universal link → new-password screen)
 - `ShellRoute` for bottom tab navigation (Home, Groups, Stats, Profile)
 - State restoration: persist navigation state for OS process death recovery
 
-### Database Schema (7 PostgreSQL Tables)
+### Database Schema (Neon Postgres, `backend/migrations/`)
 
-| Table | Created In | Purpose |
-|-------|-----------|---------|
-| profiles | 1.1 | Identity, settings, `is_banned`, `deleted_at`, `last_active_at` |
-| puzzles | 3.1 | Public puzzle data (NO solution column) |
-| puzzle_solutions | 2026-09 | Reference path per puzzle; service role only |
-| puzzle_attempts | 3.4 | Solve records; written ONLY by `submit-score`; partial unique on completed |
-| puzzle_sessions / submission_log | 2026-09 | HMAC nonce per user/date; rate limiting |
-| streaks / streak_freezes | 3.5 | Recomputed by `recompute_streak(uid)` from attempts + freezes |
-| groups / group_members / group_feed | 4.1 | Groups, membership (count via trigger), realtime activity feed |
-| user_blocks | 2026-10 | Who blocked whom (RPC-only writes: `block_user`, `unblock_user`, `list_blocked_users`); hides the blocked user from the blocker's leaderboards and feed |
-| app_config | 2026-09 | Force-update / maintenance / store URLs |
-| reports / banned_words | 8.2 | Moderation reports, profanity list used by `contains_profanity()` |
+All tables are created by `backend/migrations/0001_schema.sql` (SQL functions in `0002_functions.sql`, seed in `0003_seed.sql`, Better Auth tables in `0004_better_auth.sql`). Migrations are additive: never edit a shipped file under `backend/migrations/`; add the next numbered file, run `npm run migrate -- --url <unpooled url>` from `backend/`, then `neon data-api refresh-schema --database neondb`.
 
-**Critical:** Create tables just-in-time in the story that first needs them. Do NOT create all tables upfront.
+| Table | Purpose |
+|-------|---------|
+| profiles | Root identity (`id` = Better Auth user id; every app FK points here, `ON UPDATE CASCADE`). Settings, `email`, `email_verified`, `providers`, `is_banned`, `deleted_at`, `last_active_at` |
+| puzzles | Public puzzle data (NO solution column); readable by `anonymous` |
+| puzzle_solutions | Reference path per puzzle; owner (Function) only |
+| puzzle_attempts | Solve records; written ONLY by `/api/submit-score`; partial unique on completed |
+| puzzle_sessions / submission_log | HMAC nonce per user/date; rate limiting |
+| streaks / streak_freezes | Recomputed by `recompute_streak(uid)` from attempts + freezes |
+| groups / group_members / group_feed / group_purged_members | Groups, membership (count via trigger), polled activity feed, purged members kept for leaderboards |
+| user_blocks | Who blocked whom (writes only via `/api/block` / `/api/unblock`; read via the `list_blocked_users` RPC); hides the blocked user from the blocker's leaderboards and feed |
+| app_config | Force-update / maintenance / store URLs; readable by `anonymous` |
+| reports / banned_words | Moderation reports (filed via `/api/report`), profanity list used by `contains_profanity()` |
+| cron_runs | Idempotency ledger for `/cron/*` deliveries |
 
-**Row-Level Security (RLS):** Every public table MUST have RLS policies. Users can only read their own attempts and data within groups they belong to.
+Schemas: `public` (app), `ba` (Better Auth: `user`, `session`, `account`, `verification`, `jwks`, `ratelimit`; not exposed through the Data API), `app` (our helpers `app.uid()`, `app.is_service()`), `auth` (Neon's pg_session_jwt; we never define objects there).
 
-**Database RPC Functions (clients never write groups/attempts/streaks directly):**
+**Row-Level Security (RLS):** Every public table MUST have RLS policies, expressed with `app.uid()` (the JWT `sub`). The Data API roles are `authenticated` and `anonymous`; `anonymous` may only read `puzzles` and `app_config`. The Function connects as the owner role, which bypasses RLS. Users can only read their own attempts and data within groups they belong to.
+
+**Database RPC Functions (Data API `rpc/…`; clients never write groups/attempts/streaks directly):**
 - `get_group_daily_leaderboard(p_group_id, p_puzzle_date)` — rank, hints ASC, time ASC, undos ASC (+ `verified`)
 - `get_group_weekly_leaderboard(p_group_id, p_week_start)` — completed DESC, avg_time ASC
-- `create_group`, `update_group`, `leave_group`, `remove_group_member`, `transfer_group_admin`, `delete_group`
-- `request_account_deletion`, `cancel_account_deletion`; cron: `purge_deleted_accounts`, `purge_inactive_anonymous`, `apply_streak_freezes`, `reset_weekly_freezes`
-- Full contracts: `supabase/README.md`. Migrations are additive: never edit a shipped file under `supabase/migrations/`.
+- `create_group`, `leave_group`, `remove_group_member`, `transfer_group_admin`, `delete_group`, `regenerate_invite_code`, `list_blocked_users`
+- `request_account_deletion`, `cancel_account_deletion`; owner-only jobs run by `/cron/*`: `purge_deleted_accounts`, `purge_inactive_anonymous`, `apply_streak_freezes`, `reset_weekly_freezes`, `expire_stale_streaks`, `prune_submission_log`
+- Blocking is not an RPC: use `/api/block` and `/api/unblock` on the Function
+- Full contracts: `backend/CONTRACTS.md`
 
 **Indexes:** puzzles(puzzle_date), puzzle_attempts(puzzle_date), puzzle_attempts(user_id), groups(invite_code), group_members(user_id)
 
-### Edge Functions (Deno Runtime)
+### Backend Function routes (Neon Function `api`, `backend/src/`)
 
-| Function | Trigger | Purpose |
-|----------|---------|---------|
-| daily-puzzle | Cron (daily) | Generate tomorrow's puzzle via Backbite algorithm |
-| submit-score | HTTP POST | Validate path server-side, record attempt, update streaks |
-| join-group | HTTP POST | Validate invite code, enforce 50-member limit |
+| Route | Purpose |
+|-------|---------|
+| `ALL /auth/*` | Better Auth (anonymous, email, social, link-social, token, jwks, reset/verify, OAuth callbacks) |
+| `GET /api/config` | Public `app_config` (the force-update / maintenance gate needs no JWT) |
+| `GET /api/puzzle/:date` | Public puzzle row for a date (before the guest session exists) |
+| `POST /api/start-puzzle` | Issue the HMAC nonce for (user, date) |
+| `POST /api/submit-score` | Validate path server-side, record attempt, update streaks, feed insert |
+| `POST /api/join-group` | Validate invite code, enforce 50-member limit |
+| `GET/POST /api/export-data` | Full data export (JSON attachment) |
+| `POST /api/daily-puzzle` | Generate a puzzle; users may ask for today/tomorrow only |
+| `POST /api/report` | File a moderation report and send the alert email |
+| `POST /api/block`, `POST /api/unblock` | Block / unblock a user (a new block also files a `blocked_by_user` report) |
+| `POST /api/account/upgrade-email` | Same-id guest → email account |
+| `POST /cron/<job>` | Neon schedule triggers (`neon.ts`), idempotent per `scheduled_at` |
+| `GET /health` | `{status, fn, ts}` |
 
-**All Edge Functions must** (helpers in `supabase/functions/_shared/http.ts`):
-- Expose `/health`, use the structured `Logger` (correlation id from `x-correlation-id`)
-- Check `is_banned` / `deleted_at` via `banCheck`
-- `submit-score` verifies HMAC-SHA256(nonce from `start-puzzle`) over `date|time|hints|undos|sha256(path)`, clock plausibility (5 min), date window, and re-validates the path with `puzzle_core.validatePath`
-- `daily-puzzle` requires `PUZZLE_SEED_SALT`; generation is deterministic per date (also run by `.github/workflows/puzzles.yml` and pg_cron)
+**All `/api/*` routes must** (helpers in `backend/src/shared/http.ts`, `backend/src/identity.ts`, `backend/src/routes/common.ts`):
+- Use the structured `Logger` (correlation id from `x-correlation-id`) and the `{error, code}` error contract
+- Check `is_banned` / `deleted_at` via `banCheck` (`identity.ts`)
+- `/api/submit-score` verifies HMAC-SHA256(nonce from `/api/start-puzzle`) over `date|time|hints|undos|sha256(path)`, clock plausibility (5 min), date window, and re-validates the path with `puzzle_core.validatePath`
+- Puzzle generation requires `PUZZLE_SEED_SALT` in the Function env; generation is deterministic per date (`/cron/daily-puzzle` keeps a 14-day buffer)
+- `/cron/*` accepts only Neon trigger deliveries (`X-Neon-Trigger-Invocation-Id`; Neon strips client-set copies)
 
 ### Authentication Flow
 
-1. First launch → anonymous auth via Supabase (no sign-up wall)
+1. First launch → anonymous session via Better Auth (`/auth/sign-in/anonymous`; no sign-up wall)
 2. Prompt account creation after 3rd puzzle solve or group join attempt
-3. Link anonymous session via `linkIdentity`/`updateUser` (preserve all data)
-4. OAuth providers: Google, Apple, Email/Password
-5. Session tokens expire after 30 days of inactivity; refresh tokens after 90 days
+3. Upgrades keep the user id (all progress stays): Google/Apple via `/auth/link-social` with the guest bearer, email via `POST /api/account/upgrade-email`. Signing in to a different existing account discards the guest (Better Auth `anonymous.onLinkAccount`)
+4. Providers: Google (native id token), Apple (native id token on iOS; on Android the browser flow through Better Auth's authorization proxy, callback `io.icos://oauth-callback`), Email/Password (reset link `https://icos.sarathfrancis.work/reset?token=…`; a reset does not sign the player in)
+5. Sessions last 30 days (refreshed daily on use); the Data API JWT lasts 15 minutes and is re-minted from `/auth/token`
 
 ### Offline-First Architecture
 
@@ -202,11 +222,12 @@ Every feature under `lib/features/{feature}/` follows this structure:
 ### Security Rules
 
 - All network: HTTPS/TLS 1.2+
-- Tokens: supabase_flutter's default session store (SharedPreferences, app-private). Moving to secure storage would sign existing players out unless the session is migrated first
+- Tokens: session token and cached JWT in `flutter_secure_storage` (`lib/core/backend/token_store.dart`), never SharedPreferences
+- The Data API requires a JWT on every request (RLS by `app.uid()`); clients never hold a privileged key. Secrets live only in the Neon Function env (`backend/.env.neon`, git-ignored) and GitHub Actions secrets
 - Puzzle solutions: NEVER transmitted to client; server re-validates submitted paths
 - Score submissions: rate-limited (40/hour/user), HMAC-signed, clock manipulation detection (5-min tolerance)
 - User input: sanitize against XSS, SQL injection, Unicode abuse (zalgo, invisible chars)
-- No certificate pinning (Supabase certificates rotate; TLS 1.2+ via the platform trust store)
+- No certificate pinning (Neon certificates rotate; TLS 1.2+ via the platform trust store)
 - Profanity filter on display names and group names (client + server)
 
 ### Error Handling Pattern
@@ -215,7 +236,7 @@ Every feature under `lib/features/{feature}/` follows this structure:
 // Repository layer
 Future<Result<T, AppError>> fetchData() async {
   try {
-    final response = await supabase.from('table').select();
+    final response = await dataApi.from('table').select();
     return Result.success(Model.fromJson(response));
   } on PostgrestException catch (e) {
     return Result.failure(AppError.database(e.message));
@@ -247,7 +268,7 @@ myProvider.when(
 - **One puzzle per day per user** — enforced server-side. First server-verified solve wins across all devices.
 - **Daily rollover at midnight UTC** — not local time. Weekly boundaries: Monday 00:00 UTC to Sunday 23:59:59 UTC.
 - **Never transmit puzzle solution paths to the client** — server re-validates on submission.
-- **Share cards are client-side** (RepaintBoundary.toImage), NOT server-side Edge Function.
+- **Share cards are client-side** (RepaintBoundary.toImage), NOT server-side.
 - **Tables created just-in-time** — only in the story that first needs them, not all upfront.
 - **No MVP phasing** — all 126 FRs ship in v1. Production-ready from day one.
 - **Puzzle core** (`backend/src/shared/puzzle_core.ts` and its Dart mirror `lib/features/puzzle/domain/solver/`): Warnsdorff DFS + canonical backbite for the reference path, pruned solver proving exactly ONE solution, waypoints chosen to enforce uniqueness (fewer clues = harder). Keep both implementations in sync; `backend/src/shared/fixtures/puzzle_parity.json` is the parity test.
@@ -283,16 +304,22 @@ To implement a story, use: `/bmad-bmm-dev-story`
 # Flutter project creation
 flutter create --org com.icos --project-name icos --platforms ios,android .
 
-# Environment files
-# .env.development — Supabase URL + anon key (dev)
-# .env.staging — Supabase URL + anon key (staging)
-# .env.production — Supabase URL + anon key (prod)
+# App environment files (copy .env.example):
+# .env.development / .env.staging / .env.production with
+#   API_BASE_URL       Neon Function origin, trailing slash (Better Auth at /auth/, routes at /api/)
+#   DATA_API_URL       Neon Data API root (…/neondb/rest/v1)
+#   GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID
+#   APPLE_SERVICE_ID   com.icos.game.signin
+# At runtime https://icos.sarathfrancis.work/config.json (docs/config.json) overrides both hosts.
 
-# Supabase CLI
-supabase init
-supabase start  # Local development
+# Backend (Neon CLI; run from backend/, linked via the git-ignored .neon file)
+cd backend
+npm ci && npm run typecheck && npm test        # DB suites need NEON_TEST_DATABASE_URL
+neon deploy --env .env.neon -y                 # Function + triggers + compute pins (neon.ts)
+npm run migrate -- --url <unpooled url>        # apply backend/migrations/*
+neon data-api refresh-schema --database neondb # after every migration
 ```
 
 ---
 
-Last Updated: 2026-10-07 (see `docs/superpowers/specs/2026-09-09-production-readiness-design.md` and `docs/RELEASE_RUNBOOK.md`)
+Last Updated: 2026-11-08 (Neon migration: see `docs/superpowers/specs/2026-11-08-neon-migration-design.md`, `backend/README.md` and `docs/RELEASE_RUNBOOK.md`)

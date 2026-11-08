@@ -30,7 +30,7 @@ import 'package:icos/features/puzzle/presentation/widgets/game_controls.dart';
 import 'package:icos/features/puzzle/presentation/widgets/puzzle_grid.dart';
 import 'package:icos/features/stats/presentation/stats_screen.dart';
 import 'package:integration_test/integration_test.dart';
-// NOTE: GroupsScreen, ProfileScreen, AuthScreen require Supabase and are
+// NOTE: GroupsScreen, ProfileScreen, AuthScreen require the backend and are
 // tested via the running app, not in this isolated audit.
 
 // -- Test data --------------------------------------------------------
@@ -437,8 +437,8 @@ void main() {
     });
   });
 
-  // ── 7-9. SCREENS REQUIRING SUPABASE ─────────────────────────────
-  // GroupsScreen, ProfileScreen, AuthScreen require Supabase to be
+  // ── 7-9. SCREENS REQUIRING THE BACKEND ──────────────────────────
+  // GroupsScreen, ProfileScreen, AuthScreen require the backend to be
   // initialised. They are tested via the running app, not in isolation.
   // The screens above (onboarding, home, puzzle, celebration, controls,
   // stats) cover ALL self-contained UI components.

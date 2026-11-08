@@ -7,10 +7,17 @@ Google Play, in the order to do them. Automated steps live in `.github/workflows
 Tick the boxes as you go. Items marked **(once)** are one-time setup; everything else
 recurs per release.
 
+> **Backend moved to Neon on 2026-11-08 (app 1.1.0).** The current backend is section
+> **2. Backend on Neon** below, with contracts in `backend/CONTRACTS.md` and sign-in
+> setup in `docs/SIGNIN_SETUP.md`. Passages that still mention Supabase are kept for the
+> record only and are marked *historical*: the 2026-09-10 status note, the 2026-09-24
+> rejection history entry, and section **2-old. Supabase project**. The Supabase project is
+> deleted once 1.1.0 is live; do not follow those steps.
+
 ---
 
 
-> **Status 2026-09-10:** The game was renamed to **Icos** (bundle id `com.icos.game`, auth scheme `io.supabase.icos`, deep-link host `icos.sarathfrancis.work`). The Supabase project (named `icos`, ref `pdvgddvubxldjnemdkok`, us-east-1,
+> *Historical (Supabase era, superseded by section 2).* **Status 2026-09-10:** The game was renamed to **Icos** (bundle id `com.icos.game`, auth scheme `io.supabase.icos`, deep-link host `icos.sarathfrancis.work`). The Supabase project (named `icos`, ref `pdvgddvubxldjnemdkok`, us-east-1,
 > org "Francis Org") is LIVE with all 21 migrations applied, all 5 edge functions deployed,
 > `PUZZLE_SEED_SALT` set, Vault entries (`project_url`, `service_role_key`) created, anonymous
 > sign-ins + email/password enabled (email confirmations currently OFF for testing — turn them on
@@ -31,8 +38,8 @@ recurs per release.
   `flutter config --jdk-dir="$(/usr/libexec/java_home -v 17)"` (already done on this Mac on 2026-09-09)
 - [ ] CocoaPods specs up to date: `cd ios && pod repo update && pod install` (first iOS build after the Firebase/notification plugins were added needs this)
 - [ ] Ruby 3.3 + Bundler: `bundle install` at the repo root installs fastlane and CocoaPods
-- [ ] Deno 2.x (`brew install deno`) and the Supabase CLI (`brew install supabase/tap/supabase`)
-- [ ] Access to: Apple Developer Program, Google Play Console, Supabase org, Firebase (optional), DNS for `icos.sarathfrancis.work`, this GitHub repo's Settings > Secrets
+- [ ] Node 24 + npm (backend in `backend/`) and the Neon CLI `neon`, signed in to the org that owns project `icos`
+- [ ] Access to: Apple Developer Program, Google Play Console, the Neon org, Resend, Firebase (optional), DNS for `icos.sarathfrancis.work`, this GitHub repo's Settings > Secrets
 
 ---
 
@@ -116,6 +123,8 @@ Connect accepts the upload and then fails the asset with `MOV_RESAVE_STEREO`.
 
 ### Rejection history
 
+*The 2026-09-24 entry is historical: the Supabase web OAuth path it describes was replaced by Better Auth on the Neon Function in 1.1.0.*
+
 - **2026-09-24, Guideline 4 (Design), build 1.0.0 (4), iPad Air 11-inch M3.** Apple: "We noticed that the user is taken to the default web browser to sign in or register for an account, which provides a poor user experience. ... please revise the app to enable users to sign in or register for an account in the app. You may also choose to implement the Safari View Controller API to display web content within the app."
   - Cause: `lib/features/auth/providers/auth_provider.dart` launched the web OAuth flows (`linkIdentity` for guests, `signInWithOAuth`) with `LaunchMode.externalApplication`, i.e. Safari.
   - Fix: every web OAuth page now runs in the platform authentication session (ASWebAuthenticationSession on iOS, Custom Tab plus flutter_web_auth_2 `CallbackActivity` on Android) through `lib/features/auth/data/oauth_web_gateway.dart`. The session returns the redirect URL to the app and dismisses itself; the app finishes sign-in with `getSessionFromUrl`. Cancelling reads as cancelled and the busy state clears. iOS uses `preferEphemeral` (no Safari SSO, no "wants to use supabase.co" alert). Reviewer notes updated in `ios/fastlane/metadata/review_information/notes.txt`.
@@ -145,7 +154,60 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 
 ---
 
-## 2. Supabase project
+## 2. Backend on Neon
+
+Everything server-side runs in one Neon project (Free plan). Facts, URLs and CLI cheat
+sheet: `backend/README.md`; route, RPC and cron contracts: `backend/CONTRACTS.md`.
+Run every `neon` and `npm` command from `backend/` (the git-ignored `.neon` file links it).
+
+| Item | Value |
+|---|---|
+| Project | `icos`, id `plain-wind-90305415`, `aws-us-east-1` |
+| Branches | `main` (production), `dev` (development), `test` (DB-backed tests) |
+| Function `api` (main) | `https://br-crimson-bird-bbpbnst1-api.compute.c-15.us-east-1.aws.neon.tech/` |
+| Data API (main) | `https://ep-shiny-morning-bbkdox4x.apirest.c-15.us-east-1.aws.neon.tech/neondb/rest/v1` |
+| Runtime override | `docs/config.json` (served at `https://icos.sarathfrancis.work/config.json`); the app prefers it over the compiled hosts, so a host change ships without a store release |
+| Env file | `backend/.env.neon` (git-ignored): `neon env pull --file .env.neon`, plus the secrets declared in `neon.ts` (`BETTER_AUTH_SECRET`, `PUZZLE_SEED_SALT`, `GOOGLE_WEB_CLIENT_*`, `APPLE_*`, `RESEND_API_KEY`, `REPORT_ALERT_TO`) |
+
+- [ ] **(once per branch)** Link and pick the branch: `neon checkout main` (or `dev`)
+- [ ] Deploy the Function, triggers and compute pins from `neon.ts`:
+  ```bash
+  neon config plan                 # dry run
+  neon deploy --env .env.neon -y
+  neon functions get api           # URL and status
+  ```
+- [ ] Migrations (additive files in `backend/migrations/`), then refresh the Data API schema cache:
+  ```bash
+  npm run migrate -- --url "$DATABASE_URL_UNPOOLED"
+  neon data-api refresh-schema --database neondb
+  ```
+- [ ] Puzzles: the `dailypuzzle` trigger keeps today … today+14 filled. To backfill by hand (needs `PUZZLE_SEED_SALT`; never rotate it after launch):
+  ```bash
+  npm run seed:puzzles -- --url "$DATABASE_URL_UNPOOLED" --from <YYYY-MM-DD> --days 46
+  ```
+- [ ] Smoke test the deployed Function (guest session, puzzle, start + signed submit):
+  ```bash
+  npm run smoke -- --api https://<function host>/
+  ```
+- [ ] **Data API JWKS rotation / host change.** The Data API trusts `<function>/auth/jwks`. `update` has no JWKS flag, so a new Function host (or custom domain) needs a delete + create:
+  ```bash
+  neon data-api delete --database neondb
+  neon data-api create --database neondb --auth-provider external \
+    --jwks-url https://<function host>/auth/jwks --db-schemas public --db-max-rows 200 --add-default-grants
+  neon data-api refresh-schema --database neondb
+  ```
+  Then update `docs/config.json` if the Data API URL changed.
+- [ ] Triggers (all UTC, `neon.ts`): `resetweeklyfreezes` `0 0 * * 1`, `applystreakfreezes` `5 0 * * *`, `expirestalestreaks` `10 0 * * *`, `dailypuzzle` `15 0 * * *`, `purgedeleted` `20 0 * * *`, `purgeanonymous` `23 0 * * *`, `prunesubmissionlog` `26 0 * * *`. Check with `neon triggers list` (7 expected).
+- [ ] Logs: `neon logs query --source function --service-name neon-function/api --since 1h`
+- [ ] **Usage watch (every release):** `python3 scripts/neon_usage.py` prints this period's compute hours, egress and storage against the Free-plan caps (100 CU-hours, 5 GB, 1 GB). Over the cap the compute is suspended until the next period and the app falls back to offline play.
+- [ ] Owner-only: Google and Apple callback URLs on the Function host (see `docs/SIGNIN_SETUP.md`); optional CNAME `api.icos.sarathfrancis.work` → Function host.
+
+---
+
+## 2-old. Supabase project (historical, pre-1.1.0)
+
+> *Historical.* Kept for the record of how 1.0.x was run. The app no longer talks to
+> Supabase from 1.1.0; do not run these steps.
 
 - [ ] **(once)** Create the production project at https://supabase.com/dashboard (region close to your users; note the **Project ref**)
 - [ ] **(once)** Link and push the schema:
@@ -187,9 +249,9 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
   - Associated Domains
   - Push Notifications
   - Sign in with Apple
-- [ ] **(once)** Identifiers > **Services ID** (e.g. `com.icos.game.signin`) with Sign in with Apple enabled;
-      configure it with domain `<PROJECT_REF>.supabase.co` and return URL `https://<PROJECT_REF>.supabase.co/auth/v1/callback`
-- [ ] **(once)** Keys > **Sign in with Apple key** (`.p8`): note Key ID; upload to Supabase Apple provider (step 2)
+- [ ] **(once)** Identifiers > **Services ID** `com.icos.game.signin` with Sign in with Apple enabled;
+      configure it with domain `<function host>` and return URL `https://<function host>/auth/callback/apple`
+- [ ] **(once)** Keys > **Sign in with Apple key** (`.p8`): note Key ID; put it in the Function env as `APPLE_KEY_ID` / `APPLE_P8_BASE64` (`docs/SIGNIN_SETUP.md` A4)
 - [ ] **(once)** Keys > **APNs key** (`.p8`, "Apple Push Notifications service"): upload to Firebase > Project settings > Cloud Messaging > Apple app configuration (step 5). Skip if not using push
 - [ ] **(once)** App Store Connect > Users and Access > Integrations > **App Store Connect API** > Generate key with *App Manager* role.
       Download the `.p8` **once** (cannot be re-downloaded). Record:
@@ -273,7 +335,7 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
   - App access: all functionality available without special access (guest mode) — provide a test account anyway
   - Content rating questionnaire (IARC): Game > Puzzle; no violence/gambling/user-generated *media*; expect *Everyone*
   - Target audience: 13+ (do not target children)
-  - **Data safety** — must match the privacy policy and `PrivacyInfo.xcprivacy`. The AAB includes Firebase Analytics, Crashlytics and Messaging (optional, active only when `FIREBASE_*` values are configured), so declare the Firebase rows. Nothing is sold or shared with third parties; Supabase, Firebase, Google and Apple sign-in act as processors/service providers (Google excludes these from "sharing"):
+  - **Data safety** — must match the privacy policy and `PrivacyInfo.xcprivacy`. The AAB includes Firebase Analytics, Crashlytics and Messaging (optional, active only when `FIREBASE_*` values are configured), so declare the Firebase rows. Nothing is sold or shared with third parties; Neon (database and functions), Resend (email), Firebase, Google and Apple sign-in act as processors/service providers (Google excludes these from "sharing"):
     | Data type | Collected | Shared | Required | Purpose |
     |---|---|---|---|---|
     | Personal info > Email address | Yes (only with an account) | No | Optional | Account management |
@@ -306,19 +368,13 @@ The `docs/` folder is a static site (landing page, privacy policy, terms, `.well
 
 ## 5. Google Cloud OAuth (Google Sign-In) — required for the Google provider
 
-> **Status as of 2026-09-11: not configured.** Supabase reports both the Google and
-> Apple providers as **off**, and `.env.production` has no client ids. Pressing either
-> button in the app fails with `Unsupported provider: provider is not enabled`. The app
-> code is fine; only this configuration is missing.
->
-> Verify at any point with:
-> ```bash
-> python3 scripts/check_signin.py
-> ```
-> It checks Supabase's live provider state, the client ids, and that the iOS URL scheme
-> matches the client id. Non-zero exit means sign-in cannot work yet.
-
 Step-by-step with this project's actual values: **[docs/SIGNIN_SETUP.md](SIGNIN_SETUP.md)**.
+Both providers are served by Better Auth on the Function; a provider is on when its
+secrets are in `backend/.env.neon` and the Function is redeployed. Check with:
+```bash
+curl -s -X POST https://<function host>/auth/sign-in/social -H 'Content-Type: application/json' \
+  -d '{"provider":"google","callbackURL":"io.icos://oauth-callback"}'   # 404 PROVIDER_NOT_FOUND = not configured
+```
 
 ### 5a. Google Cloud Console
 
@@ -326,7 +382,7 @@ Create three OAuth clients under APIs & Services > Credentials, all in one proje
 
 | Type | Used for | Needs |
 |---|---|---|
-| Web application | `serverClientId` on Android, and the Client ID + Secret pasted into Supabase | Authorised redirect URI `https://pdvgddvubxldjnemdkok.supabase.co/auth/v1/callback` |
+| Web application | `serverClientId` for native sign-in, and `GOOGLE_WEB_CLIENT_ID` / `GOOGLE_WEB_CLIENT_SECRET` in the Function env | Authorised redirect URI `https://<function host>/auth/callback/google` |
 | iOS | native iOS sign-in, and the reversed URL scheme | Bundle ID `com.icos.game` |
 | Android | native Android sign-in | Package `com.icos.game` plus the SHA-1 of **both** the upload key and the **Play app signing** key |
 
@@ -342,36 +398,20 @@ GOOGLE_IOS_CLIENT_ID=<ios client id>.apps.googleusercontent.com
 ```
 and set the same two as the `GOOGLE_WEB_CLIENT_ID` / `GOOGLE_IOS_CLIENT_ID` GitHub secrets.
 
-### 5b. Supabase > Authentication > Sign In / Providers > Google
+### 5b. Apple
 
-- Enable it.
-- Client ID and Client Secret: the **web** client.
-- Authorised Client IDs: the **iOS** and **Android** client ids, comma separated. Native
-  sign-in sends an id token minted for those, and Supabase rejects it otherwise.
+Services ID `com.icos.game.signin` with return URL `https://<function host>/auth/callback/apple`;
+the Sign in with Apple key goes into the Function env (`APPLE_SERVICE_ID`, `APPLE_TEAM_ID`,
+`APPLE_KEY_ID`, `APPLE_P8_BASE64`). The Function mints Apple's client secret itself.
+This is a **different** key from `ios/AuthKey_9UC6PN6P9K.p8`, the App Store Connect API key.
 
-### 5c. Supabase > Authentication > Sign In / Providers > Apple
+### 5c. App callbacks
 
-- Enable it.
-- Authorised Client IDs: `com.icos.game`. That alone is enough for native iOS sign-in.
-- The Services ID, Team ID, Key ID and `.p8` are only needed for the **web** flow, which
-  is what Android and any anonymous-account linking use. Create the Services ID and a
-  Sign in with Apple key in the Apple Developer portal, with return URL
-  `https://pdvgddvubxldjnemdkok.supabase.co/auth/v1/callback`.
-  Note this is a **different** key from `ios/AuthKey_9UC6PN6P9K.p8`, which is the App
-  Store Connect API key.
-
-### 5d. Redirect allowlist
-
-Supabase > Authentication > URL Configuration > Redirect URLs must include:
-```
-io.supabase.icos://oauth-callback
-io.supabase.icos://login-callback
-```
-`oauth-callback` is the web Google/Apple return (build 1.0.0+5 onward); `login-callback`
-is still used by emailed links (password recovery, confirmation).
-The app signs in anonymously on first launch, so every sign-in press goes through
-`linkIdentity`, which is a web redirect. Without this entry the browser opens and then
-dead-ends.
+The app's scheme is `io.icos`: the browser OAuth flow (Apple on Android, and any provider
+without a native SDK) returns on `io.icos://oauth-callback`. Emailed links are https:
+password reset `https://icos.sarathfrancis.work/reset?token=…` (universal link / App Link
+into the app; `docs/reset.html` otherwise) and verification
+`https://icos.sarathfrancis.work/verified`.
 
 ## 6. Firebase (optional — analytics, Crashlytics, push)
 
@@ -422,14 +462,12 @@ xcrun simctl openurl booted "https://icos.sarathfrancis.work/join/ABC123"
 
 ## 8. GitHub Actions secrets
 
-Repo > Settings > Secrets and variables > Actions. Every secret referenced by a workflow:
+Repo > Settings > Secrets and variables > Actions. Every secret referenced by a workflow
+(the deploy workflows write `API_BASE_URL`, `DATA_API_URL` and `APPLE_SERVICE_ID` as plain
+values: they are public; backend secrets live only in `backend/.env.neon`):
 
 | Secret | Used by | Source |
 |---|---|---|
-| `SUPABASE_URL` | deploy-android, deploy-ios, puzzles | Supabase > Project Settings > API |
-| `SUPABASE_ANON_KEY` | deploy-android, deploy-ios | Supabase > Project Settings > API |
-| `SUPABASE_SERVICE_ROLE_KEY` | puzzles | Supabase > Project Settings > API (service_role) |
-| `PUZZLE_SEED_SALT` | puzzles | `openssl rand -hex 32`; same value as the Supabase secret |
 | `GOOGLE_WEB_CLIENT_ID` | deploy-android, deploy-ios | Google Cloud > Credentials (Web client) |
 | `GOOGLE_IOS_CLIENT_ID` | deploy-android, deploy-ios | Google Cloud > Credentials (iOS client) |
 | `FIREBASE_PROJECT_ID` | deploy-android, deploy-ios (optional) | Firebase > Project settings |
@@ -460,10 +498,9 @@ Repo > Settings > Secrets and variables > Actions. Every secret referenced by a 
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ci.yml` | PR / push to `main` | codegen, `flutter analyze`, `flutter test`, `deno test` on `supabase/functions/_shared/`, debug APK build |
+| `ci.yml` | PR / push | codegen, `flutter analyze`, `flutter test`, debug APK build; `backend` job: `npm ci`, `npm run typecheck`, `npm test` in `backend/` (DB-backed suites skip without `NEON_TEST_DATABASE_URL`) |
 | `deploy-android.yml` | tag `v*` or manual (track input) | builds signed AAB, uploads AAB + mapping + symbols as artifacts, `fastlane internal|beta|production` |
 | `deploy-ios.yml` | tag `v*` or manual | `fastlane beta` (match -> build once -> TestFlight); uploads IPA + dSYM + symbols |
-| `puzzles.yml` | daily 00:20 UTC or manual | `deno run -A scripts/generate_puzzles.ts daily --days 14` |
 
 ---
 
@@ -494,8 +531,8 @@ Capture screenshots with the Maestro flows in `scripts/run_visual_tests.sh` or f
 ## 10. Release day sequence (per version)
 
 1. `git checkout main && git pull`; bump `version:` in `pubspec.yaml`; update `ios/fastlane/metadata/en-US/release_notes.txt` and `android/fastlane/metadata/android/en-US/changelogs/default.txt`
-2. `supabase db push` / `supabase functions deploy` if backend changed; confirm puzzles exist for the next 14 days (`select puzzle_date from puzzles order by puzzle_date desc limit 14;`)
+2. If `backend/` changed: from `backend/`, `npm run migrate -- --url "$DATABASE_URL_UNPOOLED"` (new migrations), `neon data-api refresh-schema --database neondb`, `neon deploy --env .env.neon -y`, `npm run smoke -- --api https://<function host>/`; confirm puzzles exist for the next 14 days (`select puzzle_date from puzzles order by puzzle_date desc limit 14;`); run `python3 scripts/neon_usage.py`
 3. Commit and push. Local path (used for builds 5–12): `bash scripts/release.sh` builds from a clean tree, uploads the IPA to TestFlight and the AAB to Play Internal + Closed; keep its log outside `build/`. Then attach the processed build to the TestFlight group "Public testers" and submit it for beta review (`scripts/asc.py`). CI path: `git tag vX.Y.Z && git push --tags` -> both deploy workflows run
 4. Android: verify the internal build on a device, then `fastlane promote_to_production` (or console) with a staged rollout
 5. iOS: verify the TestFlight build, then `fastlane release build_number:<N>` or submit from ASC; release manually after approval
-6. Watch Crashlytics / Supabase logs for 24 h; keep the previous AAB/IPA artifacts (90-day retention in Actions) for rollback
+6. Watch Crashlytics and the Function logs (`neon logs query --source function --service-name neon-function/api --since 24h`) for 24 h; keep the previous AAB/IPA artifacts (90-day retention in Actions) for rollback

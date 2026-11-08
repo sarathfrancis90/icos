@@ -44,11 +44,15 @@ jobs:
 
       # .env.production is BOTH a bundled asset (flutter_dotenv) and the
       # --dart-define-from-file source, so it must exist on disk before the build.
+      # The Neon hosts and the Apple Services ID are public (they ship in the
+      # app and docs/config.json overrides the hosts at runtime), so they are
+      # plain values here; only the GOOGLE_* / FIREBASE_* values are secrets.
       - name: Create .env.production
         run: |
           cat > .env.production << EOF
-          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          API_BASE_URL=https://br-crimson-bird-bbpbnst1-api.compute.c-15.us-east-1.aws.neon.tech/
+          DATA_API_URL=https://ep-shiny-morning-bbkdox4x.apirest.c-15.us-east-1.aws.neon.tech/neondb/rest/v1
+          APPLE_SERVICE_ID=com.icos.game.signin
           GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}
           GOOGLE_IOS_CLIENT_ID=${{ secrets.GOOGLE_IOS_CLIENT_ID }}
           FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}

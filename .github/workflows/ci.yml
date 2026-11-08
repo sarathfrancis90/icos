@@ -48,20 +48,29 @@ jobs:
       - name: Build smoke check (debug APK)
         run: flutter build apk --debug
 
-  deno:
-    name: Edge function tests
+  backend:
+    name: Backend typecheck and tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
-      - uses: denoland/setup-deno@v2
+      - uses: actions/setup-node@v4
         with:
-          deno-version: v2.x
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
-      # Run from supabase/functions so its deno.json import map resolves
-      # @supabase/supabase-js for the helpers that talk to the API.
-      - name: Deno tests and type-check (edge functions)
-        working-directory: supabase/functions
-        run: |
-          deno test -A
-          deno check */index.ts
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Unit tests only: the DB-backed suites skip themselves when
+      # NEON_TEST_DATABASE_URL is unset, which is intended here (CI has no
+      # Neon branch). Run them locally against the `test` branch.
+      - name: Test
+        run: npm test

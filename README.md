@@ -12,9 +12,10 @@ origin of what mathematicians now call Hamiltonian paths.
 
 ## Stack
 
-Flutter 3.41 (Riverpod, GoRouter, Hive) on the client; Supabase (Postgres, Auth,
-Edge Functions on Deno, Realtime, pg_cron) on the backend. The puzzle generator and
-uniqueness solver are implemented in TypeScript (`supabase/functions/_shared/puzzle_core.ts`)
+Flutter 3.41 (Riverpod, GoRouter, Hive) on the client; Neon on the backend (Lakebase
+Postgres with the Data API, and one Neon Function `api` on Node 24 with Hono and
+Better Auth, plus schedule triggers). The puzzle generator and uniqueness solver are
+implemented in TypeScript (`backend/src/shared/puzzle_core.ts`)
 and Dart (`lib/features/puzzle/domain/solver/`) with a shared parity fixture.
 
 ## Develop
@@ -27,4 +28,4 @@ flutter test
 flutter run
 ```
 
-Backend: see `supabase/README.md`. Release process and owner checklist: `docs/RELEASE_RUNBOOK.md`.
+Backend: see `backend/README.md` and `backend/CONTRACTS.md`. Release process and owner checklist: `docs/RELEASE_RUNBOOK.md`.
