@@ -163,6 +163,15 @@ abstract final class AppStrings {
   static const errorTimeout = 'Request timed out';
   static const errorPuzzleNotFound = 'Puzzle not available';
 
+  // Backend / auth client
+  static const backendSignInCancelled = 'Sign-in cancelled.';
+  static const backendNotSignedIn = 'You are not signed in.';
+  static const backendIdentityExists =
+      'That account already belongs to another player.';
+  static const backendSignInFailed =
+      'Could not complete sign-in. Please try again.';
+  static const backendNoEmail = 'This account has no email address.';
+
   // Accessibility
   static const a11yEmptyCell = 'empty';
   static const a11yFilledCell = 'filled';
