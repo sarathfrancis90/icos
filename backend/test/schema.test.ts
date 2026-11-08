@@ -51,7 +51,7 @@ const PRIVILEGES = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFEREN
 
 // What the client role may do; RLS narrows the rows further.
 const AUTHENTICATED_GRANTS: Record<string, string[]> = {
-  profiles: ["SELECT", "UPDATE"],
+  // profiles: SELECT and UPDATE are column-level (0006), checked separately.
   puzzles: ["SELECT"],
   puzzle_attempts: ["SELECT"],
   streaks: ["SELECT"],
@@ -59,7 +59,7 @@ const AUTHENTICATED_GRANTS: Record<string, string[]> = {
   groups: ["SELECT"],
   group_members: ["SELECT"],
   group_feed: ["SELECT"],
-  reports: ["SELECT"], // INSERT is column-level, checked separately
+  reports: ["SELECT"], // filed only through POST /api/report (0006)
   app_config: ["SELECT"],
   user_blocks: ["SELECT"],
 };
@@ -248,21 +248,27 @@ describe("0001_schema", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATABASE_
       assert.deepEqual(visible.rows, [{ id: me }], "a client sees only its own profile");
 
       const updated = await db.query<{ theme_mode: string; is_banned: boolean; is_anonymous: boolean }>(
-        `UPDATE public.profiles
-            SET theme_mode = 'dark', is_banned = true, is_anonymous = false
-          RETURNING theme_mode, is_banned, is_anonymous`,
+        `UPDATE public.profiles SET theme_mode = 'dark' RETURNING theme_mode, is_banned, is_anonymous`,
       );
       assert.deepEqual(updated.rows, [{ theme_mode: "dark", is_banned: false, is_anonymous: true }]);
+
+      // Protected columns are not granted for UPDATE (0006).
+      await db.query("SAVEPOINT protected");
+      await assert.rejects(
+        db.query(`UPDATE public.profiles SET is_banned = true, is_anonymous = false`),
+        (err: { code?: string }) => err.code === "42501",
+      );
+      await db.query("ROLLBACK TO SAVEPOINT protected");
 
       const blocked = await db.query(`UPDATE public.profiles SET theme_mode = 'light' WHERE id = $1`, [other]);
       assert.equal(blocked.rowCount, 0, "a client cannot update someone else's profile");
 
-      // The bypass flag is ignored for client roles.
+      // The bypass flag is ignored for client roles (and the columns are not granted).
       await db.query(`SELECT set_config('icos.profile_guard_bypass', 'on', true)`);
-      const bypass = await db.query<{ is_banned: boolean; email_verified: boolean }>(
-        `UPDATE public.profiles SET is_banned = true, email_verified = true RETURNING is_banned, email_verified`,
+      await assert.rejects(
+        db.query(`UPDATE public.profiles SET is_banned = true, email_verified = true`),
+        (err: { code?: string }) => err.code === "42501",
       );
-      assert.deepEqual(bypass.rows, [{ is_banned: false, email_verified: false }]);
     } finally {
       await db.query("ROLLBACK");
     }
@@ -283,21 +289,50 @@ describe("0001_schema", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATABASE_
     }
   });
 
-  test("reports: column-level INSERT for authenticated only", async () => {
-    const { rows } = await db.query<{ column_name: string }>(
-      `SELECT column_name FROM information_schema.column_privileges
-        WHERE table_schema = 'public' AND table_name = 'reports'
-          AND grantee = 'authenticated' AND privilege_type = 'INSERT'
-        ORDER BY column_name`,
-    );
-    assert.deepEqual(
-      rows.map((r) => r.column_name),
-      ["details", "reason", "reported_group_id", "reported_user_id", "reporter_id"],
-    );
-    const anon = await db.query<{ ok: boolean }>(
-      `SELECT has_any_column_privilege('anonymous', 'public.reports', 'INSERT') AS ok`,
-    );
-    assert.equal(anon.rows[0].ok, false);
+  test("profiles: column-level SELECT/UPDATE for authenticated; no client INSERT on reports", async () => {
+    const cols = async (priv: string) =>
+      (
+        await db.query<{ column_name: string }>(
+          `SELECT column_name FROM information_schema.column_privileges
+            WHERE table_schema = 'public' AND table_name = 'profiles'
+              AND grantee = 'authenticated' AND privilege_type = $1
+            ORDER BY column_name`,
+          [priv],
+        )
+      ).rows.map((r) => r.column_name);
+    assert.deepEqual(await cols("SELECT"), [
+      "avatar_url",
+      "colorblind_mode",
+      "created_at",
+      "deleted_at",
+      "display_name",
+      "haptic_enabled",
+      "id",
+      "is_anonymous",
+      "is_banned",
+      "notification_enabled",
+      "purged_at",
+      "sound_enabled",
+      "theme_mode",
+      "updated_at",
+    ]);
+    assert.deepEqual(await cols("UPDATE"), [
+      "avatar_url",
+      "colorblind_mode",
+      "display_name",
+      "haptic_enabled",
+      "notification_enabled",
+      "sound_enabled",
+      "theme_mode",
+      "updated_at",
+    ]);
+    for (const role of ["authenticated", "anonymous"]) {
+      const { rows } = await db.query<{ ok: boolean }>(
+        `SELECT has_any_column_privilege($1, 'public.reports', 'INSERT') AS ok`,
+        [role],
+      );
+      assert.equal(rows[0].ok, false, `${role} INSERT on reports`);
+    }
   });
 
   test("objects created later by the owner start with no client privileges", async () => {

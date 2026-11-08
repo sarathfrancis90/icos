@@ -19,7 +19,7 @@ API, and schedule triggers. Run every `neon` command from this directory;
 
 - `neon.ts` — project policy: compute pins, the `api` function, schedule triggers, Data API.
 - `src/index.ts` — Hono app: `/health`, `/auth/*` (Better Auth), `/api/*`, `/cron/*`.
-- `migrations/*.sql` — 0001_schema … 0005_leave_feed_events, applied in order by `npm run migrate -- --url <unpooled url>`.
+- `migrations/*.sql` — 0001_schema … 0006_profile_column_grants, applied in order by `npm run migrate -- --url <unpooled url>`.
 - `scripts/` — migrate, seed, smoke, puzzle generation; `auth_cli.ts` is the Better Auth CLI config behind `npm run auth:generate` (DDL only; deploys apply `migrations/0004_better_auth.sql`).
 - `test/` — `npm test` (`node --test` via tsx). DB-backed tests need `NEON_TEST_DATABASE_URL`.
 

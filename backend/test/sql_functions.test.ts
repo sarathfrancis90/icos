@@ -425,6 +425,25 @@ describe("0002_functions / 0003_seed", { skip: TEST_DATABASE_URL ? false : "NEON
     });
   });
 
+  test("0006 column grants: co-members read display fields, never email; clients cannot insert reports", async () => {
+    await inTx(async () => {
+      const [me, mate] = await makeUsers(2);
+      await makeGroup(me, [mate]);
+      await asUser(me);
+      const ok = await db.query<{ display_name: string }>(`SELECT display_name FROM public.profiles WHERE id = $1`, [mate]);
+      assert.equal(ok.rowCount, 1);
+      await rejectsWith(`SELECT email FROM public.profiles WHERE id = $1`, [mate], (e: PgError) => e.code === "42501");
+      await rejectsWith(`UPDATE public.profiles SET email = 'x@example.com' WHERE id = $1`, [me], (e: PgError) => e.code === "42501");
+      const upd = await db.query(`UPDATE public.profiles SET display_name = 'Ada Lovelace' WHERE id = $1`, [me]);
+      assert.equal(upd.rowCount, 1);
+      await rejectsWith(
+        `INSERT INTO public.reports (reporter_id, reported_user_id, reason) VALUES ($1, $2, 'spam')`,
+        [me, mate],
+        (e: PgError) => e.code === "42501",
+      );
+    });
+  });
+
   test("RLS: group_feed rows of a blocked user are hidden", async () => {
     await inTx(async () => {
       const [me, blocked, other] = await makeUsers(3);

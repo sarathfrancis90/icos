@@ -55,7 +55,7 @@ lib/
 backend/                               # Neon project (run every `neon` command from here)
 ├── neon.ts                            # compute pins, Function `api`, schedule triggers
 ├── src/                               # Hono app: auth.ts, routes/, shared/ (puzzle_core, http)
-├── migrations/                        # 0001_schema … 0005_leave_feed_events (additive)
+├── migrations/                        # 0001_schema … 0006_profile_column_grants (additive)
 ├── scripts/                           # migrate, seed_puzzles, smoke, generate
 ├── test/                              # node --test (DB suites need NEON_TEST_DATABASE_URL)
 ├── README.md                          # project ids, URLs, CLI commands

@@ -199,6 +199,14 @@ returns them as PostgREST's `{code, message, hint}`.
 - Every request needs a bearer JWT from `/auth/token` (no or invalid token → 400).
 - RLS with `app.uid()` on every public table; role `anonymous` may only read
   `puzzles` and `app_config`. `db-max-rows 200`; schema `public` only (`ba` is not exposed).
+- `profiles` is column-granted (`0006_profile_column_grants.sql`): `authenticated` may
+  SELECT `id, display_name, avatar_url, is_anonymous, is_banned, colorblind_mode,
+  theme_mode, haptic_enabled, sound_enabled, notification_enabled, deleted_at, purged_at,
+  created_at, updated_at` and UPDATE `display_name, avatar_url, colorblind_mode,
+  theme_mode, haptic_enabled, sound_enabled, notification_enabled, updated_at`.
+  `email`, `email_verified`, `providers` and `last_active_at` are never readable through
+  the Data API (use `/api/export-data` for your own). Any other column → `42501`.
+- Clients cannot insert into `reports`; use `POST /api/report`.
 - External JWKS = `<function>/auth/jwks`. Changing it needs `neon data-api delete` + `create`.
 
 ## Function environment (`.env.neon`, git-ignored; declared in `neon.ts`)
