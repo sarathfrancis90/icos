@@ -60,7 +60,7 @@
 				<string>Editor</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<string>io.supabase.icos</string>
+					<string>io.icos</string>
 				</array>
 			</dict>
 		</array>

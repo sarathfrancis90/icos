@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <!-- Network access for Supabase, Firebase and OAuth. Required in the main
+    <!-- Network access for the Icos backend, Firebase and OAuth. Required in the main
          manifest: the debug/profile manifests only merge it into dev builds. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Runtime permission for notifications on Android 13+ (API 33). -->
@@ -51,16 +51,16 @@
                 <data android:scheme="https" android:host="icos.sarathfrancis.work" android:pathPrefix="/join/" />
                 <data android:scheme="https" android:host="icos.sarathfrancis.work" android:pathPrefix="/puzzle/" />
             </intent-filter>
-            <!-- Supabase auth callback -->
+            <!-- Auth callback (io.icos://login-callback) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="io.supabase.icos" android:host="login-callback" />
+                <data android:scheme="io.icos" android:host="login-callback" />
             </intent-filter>
         </activity>
         <!-- Web sign-in (Google/Apple) runs in a Custom Tab started by
-             flutter_web_auth_2. Its redirect io.supabase.icos://oauth-callback
+             flutter_web_auth_2. Its redirect io.icos://oauth-callback
              is delivered to this activity, which hands the URL back to Dart
              and finishes, so the tab is dismissed and MainActivity is never
              restarted. The host differs from MainActivity's login-callback
@@ -74,7 +74,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="io.supabase.icos" android:host="oauth-callback" />
+                <data android:scheme="io.icos" android:host="oauth-callback" />
             </intent-filter>
         </activity>
         <!-- flutter_local_notifications: shows scheduled notifications and

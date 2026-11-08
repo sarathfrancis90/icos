@@ -14,6 +14,7 @@ import 'core/backend/auth_event.dart';
 import 'core/backend/backend_providers.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/audio_service.dart';
+import 'core/services/legacy_cleanup.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/session_service.dart';
 import 'core/services/storage_service.dart';
@@ -46,6 +47,14 @@ Future<void> main() async {
   // Initialize services
   await StorageService.initialize();
   await AnalyticsService.initialize();
+
+  // Upgrade from the old backend: drop its session keys and local caches
+  // before any session exists; the app then shows the fresh-start notice.
+  final showFreshStartNotice = await LegacyCleanup.runIfNeeded(
+    StorageService.prefs,
+    clearCaches: StorageService.clearAllPlayerData,
+    hasLegacyHiveData: () => StorageService.hasHiveData,
+  );
 
   // Backend hosts first: every backend provider reads them synchronously.
   final container = ProviderContainer();
@@ -91,6 +100,9 @@ Future<void> main() async {
   FlutterNativeSplash.remove();
 
   runApp(
-    UncontrolledProviderScope(container: container, child: const IcosApp()),
+    UncontrolledProviderScope(
+      container: container,
+      child: IcosApp(showFreshStartNotice: showFreshStartNotice),
+    ),
   );
 }

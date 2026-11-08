@@ -28,7 +28,7 @@
 -keep class com.google.firebase.crashlytics.** { *; }
 -dontwarn com.google.firebase.crashlytics.**
 
-# --- Supabase / OkHttp / OkIO (used by supabase_flutter via Ktor / OkHttp) --
+# --- OkHttp / OkIO (pulled in transitively by plugins) ---------------------
 -dontwarn okhttp3.**
 -dontwarn okio.**
 -dontwarn org.conscrypt.**

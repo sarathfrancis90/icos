@@ -115,6 +115,28 @@ abstract final class StorageService {
     }
   }
 
+  /// Removes every player's local data: cached puzzles, the sync queue, all
+  /// per-user records (and un-scoped pre-1.0.x ones) and a pending invite.
+  /// Device settings are untouched. Used by the fresh-start cleanup for
+  /// installs upgrading from the old backend.
+  static Future<void> clearAllPlayerData() async {
+    await _puzzleCache.clear();
+    await _syncQueue.clear();
+    bool isPlayerKey(String k) =>
+        k.startsWith('u.') ||
+        _legacyPlayerKeys.contains(k) ||
+        _legacyPlayerPrefixes.any(k.startsWith);
+    for (final key in _prefs.getKeys().where(isPlayerKey).toList()) {
+      await _prefs.remove(key);
+    }
+    await clearPendingInvite();
+  }
+
+  /// Whether the Hive boxes hold anything (only meaningful before the first
+  /// session of a launch, as a sign of an earlier install).
+  static bool get hasHiveData =>
+      _puzzleCache.isNotEmpty || _syncQueue.isNotEmpty;
+
   /// Moves matching SharedPreferences entries to their new key. An existing
   /// value under the new key wins.
   static Future<void> _moveKeys({

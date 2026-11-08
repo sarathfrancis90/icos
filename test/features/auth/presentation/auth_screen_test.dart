@@ -12,7 +12,7 @@ import 'package:icos/core/backend/app_user.dart';
 import '../../../helpers/test_helpers.dart';
 
 /// The screen reads auth state on build, which would otherwise reach for an
-/// uninitialised Supabase instance.
+/// uninitialised backend client.
 class _FakeAuth extends AuthNotifier {
   @override
   AsyncValue<AppUser?> build() => const AsyncValue.data(null);
@@ -21,7 +21,7 @@ class _FakeAuth extends AuthNotifier {
 void main() {
   group('AuthScreen', () {
     /// Routes far enough to assert where a tap sends the user, without
-    /// dragging the real email screen (and Supabase) into the test.
+    /// dragging the real email screen (and the backend) into the test.
     Widget build({List<String>? visited}) {
       final router = GoRouter(
         initialLocation: '/auth',

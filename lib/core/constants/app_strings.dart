@@ -225,4 +225,11 @@ abstract final class AppStrings {
   static String newInviteCodeCreated(String code) => 'New invite code: $code';
   static const groupNoLongerMember =
       "You're no longer a member of this group.";
+
+  // Fresh start (upgrade from the old backend)
+  static const freshStartTitle = 'Icos has moved to a new home';
+  static const freshStartBody =
+      'Progress and groups start fresh in this version; your streak begins '
+      'again today.';
+  static const ok = 'OK';
 }

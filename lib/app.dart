@@ -22,10 +22,15 @@ import 'features/puzzle/domain/models/puzzle.dart';
 import 'features/puzzle/providers/daily_puzzle_provider.dart';
 import 'features/puzzle/providers/puzzle_result_provider.dart';
 import 'features/stats/providers/stats_provider.dart';
+import 'shared/widgets/fresh_start_dialog.dart';
 import 'shared/widgets/text_scale_limit.dart';
 
 class IcosApp extends ConsumerStatefulWidget {
-  const IcosApp({super.key});
+  const IcosApp({super.key, this.showFreshStartNotice = false});
+
+  /// Upgraded from the old backend (see `LegacyCleanup`): show the one-time
+  /// fresh-start notice after the first frame.
+  final bool showFreshStartNotice;
 
   @override
   ConsumerState<IcosApp> createState() => _IcosAppState();
@@ -91,6 +96,23 @@ class _IcosAppState extends ConsumerState<IcosApp>
 
     // Cold start from a notification tap.
     unawaited(NotificationService.handleLaunchFromNotification());
+
+    if (widget.showFreshStartNotice) _showFreshStartNotice();
+  }
+
+  void _showFreshStartNotice({bool retried = false}) {
+    if (!mounted) return;
+    final context =
+        ref.read(appRouterProvider).routerDelegate.navigatorKey.currentContext;
+    if (context == null) {
+      if (!retried) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _showFreshStartNotice(retried: true),
+        );
+      }
+      return;
+    }
+    unawaited(showFreshStartDialog(context));
   }
 
   @override
