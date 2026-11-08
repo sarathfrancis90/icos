@@ -1,9 +1,10 @@
 Icos is a daily path puzzle. Draw one continuous line through every cell of the grid, visiting the numbered waypoints in order. Every puzzle has exactly one solution.
 
-What's new in 1.0.1
+What's new in 1.1.0
+- Icos moved to a new, faster backend. Progress starts fresh in this version.
 - Sign in to an existing account straight from the guest cards (Google, Apple or email).
 - Drawing over a cell you already filled no longer cuts your line.
 - A fully light theme, a first-play guide and Tap to draw.
-- Your streak updates correctly after a missed day and rolls over at midnight UTC while the app is open; the streak reminder stays armed after you solve.
-- Group admins can generate a new invite code; member counts refresh live.
+- Your streak updates correctly after a missed day and rolls over at midnight UTC while the app is open.
+- Group admins can generate a new invite code; member counts refresh live, including when someone leaves.
 - Archive puzzles up to 30 days old now count.

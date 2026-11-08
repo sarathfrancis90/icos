@@ -1,0 +1,7 @@
+- Icos moved to a new, faster backend; progress starts fresh in this version
+- Sign in to an existing account from the guest cards (Google, Apple or email)
+- Drawing over a filled cell no longer cuts your line
+- Fully light theme, first-play guide and Tap to draw
+- Streak updates correctly after a missed day
+- Group admins can generate a new invite code; member counts refresh live
+- Archive puzzles up to 30 days old now count
