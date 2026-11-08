@@ -38,7 +38,7 @@ interface PuzzleRow {
   walls: Cell[];
 }
 
-interface AttemptRow {
+export interface AttemptRow {
   id: string;
   completed: boolean;
   attempt_count: number;
@@ -51,7 +51,7 @@ interface StreakRow {
   last_solve_date: string | null;
 }
 
-interface AttemptWrite {
+export interface AttemptWrite {
   user_id: string;
   puzzle_id: string;
   puzzle_date: string;
@@ -82,9 +82,11 @@ function isPath(v: unknown): v is number[][] {
 
 /**
  * Updates the caller's existing (incomplete) attempt or inserts a new one.
- * "conflict" when the one-completed-per-day unique index rejects the write.
+ * "conflict" when the one-completed-per-day unique index rejects the write, or
+ * when the existing row was completed by a concurrent submission after it was
+ * read (the UPDATE never overwrites a completed attempt).
  */
-async function upsertAttempt(existing: AttemptRow | null, row: AttemptWrite): Promise<"ok" | "conflict"> {
+export async function upsertAttempt(existing: AttemptRow | null, row: AttemptWrite): Promise<"ok" | "conflict"> {
   const values = [
     row.user_id,
     row.puzzle_id,
@@ -100,14 +102,16 @@ async function upsertAttempt(existing: AttemptRow | null, row: AttemptWrite): Pr
   ];
   try {
     if (existing) {
-      await q(
+      const updated = await q<{ id: string }>(
         `UPDATE public.puzzle_attempts
             SET user_id = $1, puzzle_id = $2, puzzle_date = $3, time_seconds = $4, hints_used = $5,
                 undos_used = $6, completed = $7, verified = $8, is_archive = $9, path = $10::jsonb,
                 completed_at = $11, attempt_count = $12, updated_at = now()
-          WHERE id = $13`,
+          WHERE id = $13 AND NOT completed
+          RETURNING id`,
         [...values, existing.attempt_count + 1, existing.id],
       );
+      if (updated.length === 0) return "conflict";
     } else {
       await q(
         `INSERT INTO public.puzzle_attempts
@@ -217,7 +221,7 @@ export function scoreRoutes(deps: ApiDeps): Hono {
     const verdict = validatePath(puzzle.grid_size, puzzle.walls, puzzle.waypoints, path);
     if (!verdict.ok) {
       lg.info("invalid path", { reason: verdict.reason });
-      await upsertAttempt(existing, {
+      const failed = await upsertAttempt(existing, {
         user_id: user.id,
         puzzle_id: puzzle.id,
         puzzle_date: puzzleDate,
@@ -230,6 +234,10 @@ export function scoreRoutes(deps: ApiDeps): Hono {
         path,
         completed_at: null,
       });
+      if (failed === "conflict") {
+        lg.info("concurrent completion detected");
+        return r.fail(409, "Puzzle already completed", "ALREADY_COMPLETED");
+      }
       return r.ok({ completed: false, verified: false, reason: verdict.reason ?? "INVALID_PATH", streak: null });
     }
 

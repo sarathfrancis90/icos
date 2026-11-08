@@ -154,6 +154,45 @@ describe("score routes", { skip: SKIP }, () => {
     assert.deepEqual(attempt, { completed: false, attempt_count: 1 });
   });
 
+  test("upsertAttempt never overwrites an attempt completed after it was read (conflict)", async () => {
+    // Fixture: an incomplete attempt from a short path, then (as if a second
+    // device won the race) the row is completed directly in the database.
+    const guest = await started(monday);
+    await h.call("POST", "/api/submit-score", await signed(monday, guest.nonce, paths[monday].slice(0, 3)), guest.token);
+    const [row] = await h.q<{ id: string; attempt_count: number }>(
+      "SELECT id, attempt_count FROM public.puzzle_attempts WHERE user_id = $1 AND puzzle_date = $2",
+      [guest.id, monday],
+    );
+    await h.q("UPDATE public.puzzle_attempts SET completed = true, completed_at = now(), time_seconds = 7 WHERE id = $1", [
+      row.id,
+    ]);
+    const [puzzle] = await h.q<{ id: string }>("SELECT id FROM public.puzzles WHERE puzzle_date = $1", [monday]);
+
+    const { upsertAttempt } = await import("../src/routes/score.js");
+    const result = await upsertAttempt(
+      { id: row.id, completed: false, attempt_count: row.attempt_count },
+      {
+        user_id: guest.id,
+        puzzle_id: puzzle.id,
+        puzzle_date: monday,
+        time_seconds: 99,
+        hints_used: 0,
+        undos_used: 0,
+        completed: false,
+        verified: false,
+        is_archive: false,
+        path: [],
+        completed_at: null,
+      },
+    );
+    assert.equal(result, "conflict");
+    const [after] = await h.q<{ completed: boolean; time_seconds: number }>(
+      "SELECT completed, time_seconds FROM public.puzzle_attempts WHERE id = $1",
+      [row.id],
+    );
+    assert.deepEqual(after, { completed: true, time_seconds: 7 });
+  });
+
   test("429 RATE_LIMITED after 40 submissions in an hour", async () => {
     const guest = await started(monday);
     await h.q("INSERT INTO public.submission_log (user_id) SELECT $1 FROM generate_series(1, 40)", [guest.id]);
