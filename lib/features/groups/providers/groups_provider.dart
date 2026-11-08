@@ -43,16 +43,17 @@ class GroupsSession {
 @riverpod
 GroupsSession groupsSession(Ref ref) {
   // Re-evaluate whenever the auth state changes (guest → account link).
-  final user = ref.watch(authNotifierProvider).valueOrNull ??
+  final user =
+      ref.watch(authNotifierProvider).valueOrNull ??
       ref.read(authClientProvider).currentUser;
   if (user == null) return const GroupsSession.signedOut();
   return GroupsSession(userId: user.id, isAnonymous: user.isAnonymous);
 }
 
 T _unwrap<T>(Result<T, AppError> result) => switch (result) {
-      Success(data: final data) => data,
-      Failure(error: final error) => throw error,
-    };
+  Success(data: final data) => data,
+  Failure(error: final error) => throw error,
+};
 
 /// The current user's groups. Kept alive across tab switches; rebuilds when
 /// the session changes.
@@ -73,8 +74,10 @@ class MyGroups extends _$MyGroups {
       case Success(data: final groups):
         state = AsyncValue.data(groups);
       case Failure(error: final error):
-        state = AsyncValue<List<Group>>.error(error, StackTrace.current)
-            .copyWithPrevious(state);
+        state = AsyncValue<List<Group>>.error(
+          error,
+          StackTrace.current,
+        ).copyWithPrevious(state);
     }
   }
 
@@ -107,7 +110,9 @@ class MyGroups extends _$MyGroups {
   }
 
   Future<Result<Group, AppError>> joinGroup(String inviteCode) async {
-    final result = await ref.read(groupRepositoryProvider).joinGroup(inviteCode);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .joinGroup(inviteCode);
     if (result case Success(data: final group)) {
       _upsertLocal(group);
     }
@@ -129,8 +134,9 @@ class MyGroups extends _$MyGroups {
   /// Admin-only: swaps the group's invite code. The updated group replaces
   /// the cached one, so the detail screen and list refresh in place.
   Future<Result<Group, AppError>> regenerateInviteCode(String groupId) async {
-    final result =
-        await ref.read(groupRepositoryProvider).regenerateInviteCode(groupId);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .regenerateInviteCode(groupId);
     if (result case Success(data: final group)) {
       _upsertLocal(group);
     }
@@ -172,7 +178,9 @@ Future<Group> groupDetail(Ref ref, String groupId) async {
 
 @riverpod
 Future<List<GroupMember>> groupMembers(Ref ref, String groupId) async {
-  final result = await ref.read(groupRepositoryProvider).getGroupMembers(groupId);
+  final result = await ref
+      .read(groupRepositoryProvider)
+      .getGroupMembers(groupId);
   return _unwrap(result);
 }
 
@@ -200,26 +208,59 @@ Future<List<WeeklyLeaderboardEntry>> weeklyLeaderboard(
   return _unwrap(result);
 }
 
-/// How often the activity feed is polled while a group screen is open.
+/// How often the activity feed is polled while events keep arriving.
 const feedPollInterval = Duration(seconds: 15);
 
-/// Runs a poll callback every [interval] while started and the app is in
-/// the foreground. Backgrounding the app ([AppLifecycleState.paused],
-/// `hidden`, `detached`) cancels the timer; returning to
-/// [AppLifecycleState.resumed] polls once at once and restarts it.
-class GroupFeedPoller with WidgetsBindingObserver {
-  GroupFeedPoller(this._poll, {this.interval = feedPollInterval});
+/// Poll interval once the feed has been quiet for [feedPollSlowAfter] polls.
+const feedPollSlowInterval = Duration(seconds: 60);
 
-  final Future<void> Function(String groupId) _poll;
+/// Consecutive polls without a new event before slowing to
+/// [feedPollSlowInterval].
+const feedPollSlowAfter = 20;
+
+/// Consecutive polls without a new event before polling stops until
+/// [GroupFeedPoller.startFeedPolling] runs again or the app is resumed.
+const feedPollStopAfter = 30;
+
+/// Runs a poll callback while started and the app is in the foreground.
+///
+/// The callback reports whether the poll found at least one new event. The
+/// poller polls every [interval] while events keep arriving, slows to
+/// [slowInterval] after [slowAfter] consecutive empty polls and stops after
+/// [stopAfter] (each Data API call wakes and bills the Free-plan compute).
+/// Backgrounding the app ([AppLifecycleState.paused], `hidden`, `detached`)
+/// cancels the timer; returning to [AppLifecycleState.resumed] resets the
+/// counters, polls once at once and restarts at [interval].
+class GroupFeedPoller with WidgetsBindingObserver {
+  GroupFeedPoller(
+    this._poll, {
+    this.interval = feedPollInterval,
+    this.slowInterval = feedPollSlowInterval,
+    this.slowAfter = feedPollSlowAfter,
+    this.stopAfter = feedPollStopAfter,
+  });
+
+  final Future<bool> Function(String groupId) _poll;
   final Duration interval;
+  final Duration slowInterval;
+  final int slowAfter;
+  final int stopAfter;
 
   Timer? _timer;
   String? _groupId;
   bool _foreground = true;
   bool _observing = false;
+  int _emptyPolls = 0;
+  Duration _current = feedPollInterval;
 
   /// True while a timer is scheduled.
   bool get isPolling => _timer?.isActive ?? false;
+
+  /// The interval of the scheduled timer (or of the last one).
+  Duration get currentInterval => _current;
+
+  /// Consecutive polls that returned no new event.
+  int get emptyPolls => _emptyPolls;
 
   void startFeedPolling(String groupId) {
     _groupId = groupId;
@@ -229,10 +270,11 @@ class GroupFeedPoller with WidgetsBindingObserver {
       _observing = true;
     }
     final state = binding.lifecycleState;
-    _foreground = state == null ||
+    _foreground =
+        state == null ||
         state == AppLifecycleState.resumed ||
         state == AppLifecycleState.inactive;
-    _schedule();
+    _restart();
   }
 
   void stopFeedPolling() {
@@ -252,8 +294,8 @@ class GroupFeedPoller with WidgetsBindingObserver {
         _foreground = true;
         final groupId = _groupId;
         if (groupId == null) return;
-        unawaited(_poll(groupId));
-        _schedule();
+        _restart();
+        unawaited(_run(groupId));
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
@@ -264,11 +306,40 @@ class GroupFeedPoller with WidgetsBindingObserver {
     }
   }
 
-  void _schedule() {
+  /// Resets the counters and schedules at [interval].
+  void _restart() {
+    _emptyPolls = 0;
+    _schedule(interval);
+  }
+
+  void _schedule(Duration every) {
     _cancel();
+    _current = every;
     final groupId = _groupId;
     if (groupId == null || !_foreground) return;
-    _timer = Timer.periodic(interval, (_) => unawaited(_poll(groupId)));
+    _timer = Timer.periodic(every, (_) => unawaited(_run(groupId)));
+  }
+
+  Future<void> _run(String groupId) async {
+    bool fresh;
+    try {
+      fresh = await _poll(groupId);
+    } on Object {
+      fresh = false;
+    }
+    // Stopped, backgrounded or switched group while the poll was in flight.
+    if (_groupId != groupId || !_foreground) return;
+    if (fresh) {
+      _emptyPolls = 0;
+      if (_current != interval || !isPolling) _schedule(interval);
+      return;
+    }
+    _emptyPolls++;
+    if (_emptyPolls >= stopAfter) {
+      _cancel();
+    } else if (_emptyPolls >= slowAfter && _current != slowInterval) {
+      _schedule(slowInterval);
+    }
   }
 
   void _cancel() {
@@ -282,8 +353,9 @@ class GroupFeedPoller with WidgetsBindingObserver {
 /// Emits the latest 50 events, then polls `group_feed` for rows newer than
 /// the newest one held (`id=gt.<lastId>`) every [feedPollInterval] while the
 /// provider is alive (the group screen is mounted) and the app is in the
-/// foreground. New rows are prepended and invalidate the daily/weekly
-/// leaderboards so ranks refresh; the screen rechecks membership when the
+/// foreground, backing off when the feed is quiet (see [GroupFeedPoller]).
+/// New rows are prepended and invalidate the daily/weekly leaderboards so
+/// ranks refresh; the screen rechecks membership when the
 /// newest event changes. Polling stops when the provider is disposed.
 @riverpod
 Stream<List<GroupFeedEvent>> groupFeed(Ref ref, String groupId) {
@@ -300,40 +372,44 @@ Stream<List<GroupFeedEvent>> groupFeed(Ref ref, String groupId) {
     controller.add(List.unmodifiable(events));
   }
 
-  Future<void> fetch(String id) async {
-    if (disposed || inFlight) return;
+  /// Loads (first call) or polls the feed; true when a new event arrived.
+  Future<bool> fetch(String id) async {
+    if (disposed || inFlight) return false;
     inFlight = true;
     try {
       final afterId = loaded && events.isNotEmpty ? events.first.id : null;
       final result = await repo.getGroupFeed(id, afterId: afterId);
-      if (disposed) return;
+      if (disposed) return false;
       switch (result) {
         case Success(data: final incoming):
           final wasLoaded = loaded;
           loaded = true;
           if (!wasLoaded) {
             emit(incoming);
-            return;
+            return incoming.isNotEmpty;
           }
           final known = {for (final e in events) e.id};
           final fresh = [
             for (final e in incoming)
               if (!known.contains(e.id)) e,
           ];
-          if (fresh.isEmpty) return;
+          if (fresh.isEmpty) return false;
           emit(
-            [...fresh, ...events]
-                .take(GroupRepository.defaultFeedLimit)
-                .toList(),
+            [
+              ...fresh,
+              ...events,
+            ].take(GroupRepository.defaultFeedLimit).toList(),
           );
           ref.invalidate(dailyLeaderboardProvider);
           ref.invalidate(weeklyLeaderboardProvider);
+          return true;
         case Failure(error: final error):
           // A failed poll keeps the current list; only a first load with
           // nothing to show surfaces the error.
           if (!loaded && events.isEmpty && !controller.isClosed) {
             controller.addError(error, StackTrace.current);
           }
+          return false;
       }
     } finally {
       inFlight = false;

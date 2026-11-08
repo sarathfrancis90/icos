@@ -73,32 +73,35 @@ void main() {
     binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   });
 
-  test('initial load, then a tick fetches id > lastId and prepends new rows', () {
-    fakeAsync((async) {
-      setUpContainer([_event(2), _event(1)]);
-      async.flushMicrotasks();
+  test(
+    'initial load, then a tick fetches id > lastId and prepends new rows',
+    () {
+      fakeAsync((async) {
+        setUpContainer([_event(2), _event(1)]);
+        async.flushMicrotasks();
 
-      expect(repo.fetches, [null]);
-      expect(emitted.last.map((e) => e.id), ['2', '1']);
-      final buildsAfterLoad = leaderboardBuilds;
+        expect(repo.fetches, [null]);
+        expect(emitted.last.map((e) => e.id), ['2', '1']);
+        final buildsAfterLoad = leaderboardBuilds;
 
-      repo.next = Result.success([_event(4), _event(3)]);
-      async.elapse(feedPollInterval);
+        repo.next = Result.success([_event(4), _event(3)]);
+        async.elapse(feedPollInterval);
 
-      expect(repo.fetches, [null, '2']);
-      expect(emitted.last.map((e) => e.id), ['4', '3', '2', '1']);
-      expect(leaderboardBuilds, buildsAfterLoad + 1);
+        expect(repo.fetches, [null, '2']);
+        expect(emitted.last.map((e) => e.id), ['4', '3', '2', '1']);
+        expect(leaderboardBuilds, buildsAfterLoad + 1);
 
-      // A quiet tick changes nothing.
-      repo.next = const Result.success([]);
-      async.elapse(feedPollInterval);
-      expect(repo.fetches, [null, '2', '4']);
-      expect(emitted.last.map((e) => e.id), ['4', '3', '2', '1']);
-      expect(leaderboardBuilds, buildsAfterLoad + 1);
+        // A quiet tick changes nothing.
+        repo.next = const Result.success([]);
+        async.elapse(feedPollInterval);
+        expect(repo.fetches, [null, '2', '4']);
+        expect(emitted.last.map((e) => e.id), ['4', '3', '2', '1']);
+        expect(leaderboardBuilds, buildsAfterLoad + 1);
 
-      container.dispose();
-    });
-  });
+        container.dispose();
+      });
+    },
+  );
 
   test('a failed poll keeps the list', () {
     fakeAsync((async) {
@@ -108,7 +111,10 @@ void main() {
       repo.next = const Result.failure(AppError.network('offline'));
       async.elapse(feedPollInterval);
 
-      expect(container.read(groupFeedProvider('g-1')).valueOrNull?.single.id, '1');
+      expect(
+        container.read(groupFeedProvider('g-1')).valueOrNull?.single.id,
+        '1',
+      );
       container.dispose();
     });
   });
@@ -149,6 +155,99 @@ void main() {
       expect(repo.fetches, [null, '1', '2']);
 
       container.dispose();
+    });
+  });
+
+  group('GroupFeedPoller back-off', () {
+    test('20 empty polls slow to 60 s; 30 stop the timer', () {
+      fakeAsync((async) {
+        var polls = 0;
+        final poller = GroupFeedPoller((_) async {
+          polls++;
+          return false;
+        })..startFeedPolling('g-1');
+        expect(poller.currentInterval, feedPollInterval);
+
+        async.elapse(feedPollInterval * (feedPollSlowAfter - 1));
+        expect(polls, feedPollSlowAfter - 1);
+        expect(poller.currentInterval, feedPollInterval);
+
+        async.elapse(feedPollInterval);
+        expect(polls, feedPollSlowAfter);
+        expect(poller.currentInterval, feedPollSlowInterval);
+        expect(poller.isPolling, isTrue);
+
+        // No poll fires at the old 15 s cadence any more.
+        async.elapse(feedPollInterval);
+        expect(polls, feedPollSlowAfter);
+
+        async.elapse(
+          feedPollSlowInterval * (feedPollStopAfter - feedPollSlowAfter),
+        );
+        expect(polls, feedPollStopAfter);
+        expect(poller.isPolling, isFalse);
+        expect(async.periodicTimerCount, 0);
+
+        async.elapse(feedPollSlowInterval * 5);
+        expect(polls, feedPollStopAfter);
+
+        // Starting again resets the counters.
+        poller.startFeedPolling('g-1');
+        expect(poller.isPolling, isTrue);
+        expect(poller.currentInterval, feedPollInterval);
+        expect(poller.emptyPolls, 0);
+        poller.stopFeedPolling();
+      });
+    });
+
+    test('a poll with a new event resets to 15 s', () {
+      fakeAsync((async) {
+        var polls = 0;
+        var fresh = false;
+        final poller = GroupFeedPoller((_) async {
+          polls++;
+          return fresh;
+        })..startFeedPolling('g-1');
+
+        async.elapse(feedPollInterval * feedPollSlowAfter);
+        expect(poller.currentInterval, feedPollSlowInterval);
+
+        fresh = true;
+        async.elapse(feedPollSlowInterval);
+        expect(polls, feedPollSlowAfter + 1);
+        expect(poller.currentInterval, feedPollInterval);
+        expect(poller.emptyPolls, 0);
+
+        fresh = false;
+        async.elapse(feedPollInterval);
+        expect(polls, feedPollSlowAfter + 2);
+        expect(poller.emptyPolls, 1);
+        poller.stopFeedPolling();
+      });
+    });
+
+    test('resumed after a stop polls once and restarts at 15 s', () {
+      fakeAsync((async) {
+        var polls = 0;
+        final poller = GroupFeedPoller((_) async {
+          polls++;
+          return false;
+        })..startFeedPolling('g-1');
+        async.elapse(
+          feedPollInterval * feedPollSlowAfter +
+              feedPollSlowInterval * (feedPollStopAfter - feedPollSlowAfter),
+        );
+        expect(poller.isPolling, isFalse);
+
+        binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        async.flushMicrotasks();
+        expect(polls, feedPollStopAfter + 1);
+        expect(poller.isPolling, isTrue);
+        expect(poller.currentInterval, feedPollInterval);
+        expect(poller.emptyPolls, 1);
+        poller.stopFeedPolling();
+      });
     });
   });
 }
