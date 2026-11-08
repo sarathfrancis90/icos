@@ -6,13 +6,14 @@ import { getAuth, type Auth } from "./auth.js";
 import { sendEmail } from "./email.js";
 import { accountRoutes } from "./routes/account.js";
 import type { ApiDeps } from "./routes/common.js";
+import { cronRoutes, type CronOptions } from "./routes/cron.js";
 import { groupRoutes } from "./routes/groups.js";
 import { puzzleRoutes } from "./routes/puzzle.js";
 import { scoreRoutes } from "./routes/score.js";
 import { corsHeaders, correlationIdFrom, errorFields, errorResponse, Logger } from "./shared/http.js";
 
-/** Optional overrides for the /api/* routes (tests stub email and logging). */
-export type AppDeps = Partial<Omit<ApiDeps, "auth">>;
+/** Optional overrides for the /api/* and /cron/* routes (tests stub email, logging and jobs). */
+export type AppDeps = Partial<Omit<ApiDeps, "auth">> & { cron?: CronOptions };
 
 /** Builds the app; tests pass their own Better Auth instance and deps. */
 export function createApp(auth: () => Auth = getAuth, deps: AppDeps = {}): Hono {
@@ -36,6 +37,9 @@ export function createApp(auth: () => Auth = getAuth, deps: AppDeps = {}): Hono 
   app.route("/api", scoreRoutes(api));
   app.route("/api", groupRoutes(api));
   app.route("/api", accountRoutes(api));
+
+  // Neon schedule triggers (neon.ts `triggers`).
+  app.route("/cron", cronRoutes(api, deps.cron));
 
   app.onError((err, c) => {
     // requireSession's 401 (and any other deliberate HTTP error) as built.
