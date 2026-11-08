@@ -220,6 +220,15 @@ describe("0001_schema", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATABASE_
     }
   });
 
+  test("app.uid() is SECURITY DEFINER with an empty search_path", async () => {
+    const { rows } = await db.query<{ prosecdef: boolean; proconfig: string[] | null }>(
+      `SELECT prosecdef, proconfig FROM pg_proc WHERE oid = 'app.uid()'::regprocedure`,
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].prosecdef, true);
+    assert.deepEqual(rows[0].proconfig, ['search_path=""']);
+  });
+
   test("RLS and protect_profile_columns for an authenticated client", async () => {
     const me = randomUUID();
     const other = randomUUID();

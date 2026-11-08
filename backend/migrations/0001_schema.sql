@@ -25,29 +25,24 @@ REVOKE ALL ON SCHEMA app FROM PUBLIC;
 GRANT USAGE ON SCHEMA app TO authenticated, anonymous;
 
 -- The caller's user id, or NULL.
---   1. pg_session_jwt's auth.user_id(), when installed and the current role may
---      use schema auth (Neon does not grant USAGE on it to the Data API roles).
---   2. Otherwise the `sub` claim of request.jwt.claims (set per request by the
---      Data API; also what auth.user_id() falls back to without a JWT session).
+--   1. pg_session_jwt's auth.user_id() (the Data API keeps the verified JWT in
+--      connection session state via auth.jwt_session_init).
+--   2. If that is NULL/empty, the `sub` claim of request.jwt.claims.
+-- SECURITY DEFINER: Neon grants the Data API roles no USAGE on schema auth;
+-- the owner has it, so this works under authenticated and anonymous.
 -- Any error (malformed claims, non-uuid sub) yields NULL.
 CREATE OR REPLACE FUNCTION app.uid()
 RETURNS uuid
 LANGUAGE plpgsql
 STABLE
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
   v_text text;
 BEGIN
-  -- Nested on purpose: to_regprocedure() raises without USAGE on the schema,
-  -- and has_schema_privilege() raises when the schema does not exist.
-  IF to_regnamespace('auth') IS NOT NULL THEN
-    IF has_schema_privilege('auth', 'USAGE') THEN
-      IF to_regprocedure('auth.user_id()') IS NOT NULL THEN
-        EXECUTE 'SELECT auth.user_id()' INTO v_text;
-      END IF;
-    END IF;
+  IF to_regprocedure('auth.user_id()') IS NOT NULL THEN
+    EXECUTE 'SELECT auth.user_id()' INTO v_text;
   END IF;
   IF nullif(v_text, '') IS NULL THEN
     v_text := nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub';
