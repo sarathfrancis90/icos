@@ -198,4 +198,65 @@ void main() {
     expect(dataRequests.single.headers.containsKey('Authorization'), isFalse);
     expect(tokenCalls, 0);
   });
+
+  group('Prefer header normalisation', () {
+    DataApi apiWithJwt() {
+      store
+        ..sessionToken = 's'
+        ..jwt = 'cached-jwt'
+        ..expiry = now.add(const Duration(minutes: 10));
+      return api((req, _) async => rows());
+    }
+
+    Future<void> sendWithPrefer(String? prefer) async {
+      final db = apiWithJwt();
+      final request = http.Request(
+        'GET',
+        Uri.parse('${testConfig.dataApiUrl}/profiles'),
+      );
+      if (prefer != null) request.headers['Prefer'] = prefer;
+      await db.client.httpClient!.send(request);
+    }
+
+    test('a leading comma is dropped', () async {
+      await sendWithPrefer(',return=representation');
+      expect(dataRequests.single.headers['Prefer'], 'return=representation');
+    });
+
+    test('valid values are kept and trimmed', () async {
+      await sendWithPrefer('return=representation, count=exact');
+      expect(
+        dataRequests.single.headers['Prefer'],
+        'return=representation,count=exact',
+      );
+    });
+
+    test('a lone comma removes the header', () async {
+      await sendWithPrefer(',');
+      expect(
+        dataRequests.single.headers.keys.map((k) => k.toLowerCase()),
+        isNot(contains('prefer')),
+      );
+    });
+
+    test('a request without Prefer is unchanged', () async {
+      await sendWithPrefer(null);
+      expect(
+        dataRequests.single.headers.keys.map((k) => k.toLowerCase()),
+        isNot(contains('prefer')),
+      );
+    });
+
+    test('update().select() reaches the server with a clean Prefer', () async {
+      final db = apiWithJwt();
+      await db
+          .from('profiles')
+          .update({'display_name': 'x'})
+          .eq('id', 'u1')
+          .select();
+      final prefer = dataRequests.single.headers['Prefer']!;
+      expect(prefer, isNot(startsWith(',')));
+      expect(prefer, contains('return=representation'));
+    });
+  });
 }

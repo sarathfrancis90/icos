@@ -66,6 +66,7 @@ class JwtHttpClient extends http.BaseClient {
     final jwt = await _jwt();
     if (request is! http.Request) {
       // Streamed / multipart bodies cannot be replayed: send once.
+      _normalizePrefer(request);
       _authorize(request, jwt);
       return _withRequest(await _inner.send(request), request);
     }
@@ -126,8 +127,28 @@ class JwtHttpClient extends http.BaseClient {
     final type =
         source.headers['content-type'] ?? source.headers['Content-Type'];
     if (type != null) copy.headers['content-type'] = type;
+    _normalizePrefer(copy);
     _authorize(copy, jwt);
     return copy;
+  }
+
+  /// postgrest-dart 2.6.0 can emit `Prefer: ,return=representation` (leading
+  /// comma), which the Data API rejects with PGRST100. Drops empty segments,
+  /// trims the rest and removes the header when nothing remains.
+  static void _normalizePrefer(http.BaseRequest request) {
+    final keys = request.headers.keys
+        .where((k) => k.toLowerCase() == 'prefer')
+        .toList();
+    if (keys.isEmpty) return;
+    final value = keys
+        .map((k) => request.headers[k]!)
+        .join(',')
+        .split(',')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .join(',');
+    keys.forEach(request.headers.remove);
+    if (value.isNotEmpty) request.headers['Prefer'] = value;
   }
 
   static http.StreamedResponse _restream(

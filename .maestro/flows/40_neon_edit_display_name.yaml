@@ -1,0 +1,15 @@
+# Neon dev: signed-in Profile -> edit display name -> Save must close the dialog
+# and show the new name (regression for the Data API Prefer-header 400). Pass -e NAME -e SHOTS.
+appId: com.icos.game
+---
+- tapOn:
+    text: "Profile\nTab 4 of 4"
+- tapOn: "Display name.*Tap to edit.*"
+- eraseText: 40
+- inputText: ${NAME}
+- tapOn: "Save"
+- waitForAnimationToEnd:
+    timeout: 6000
+- takeScreenshot: ${SHOTS}/n1_after_save
+- assertNotVisible: "Something went wrong.*"
+- assertVisible: "Display name ${NAME}.*"
