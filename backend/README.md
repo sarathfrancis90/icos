@@ -11,6 +11,7 @@ API, and schedule triggers. Run every `neon` command from this directory;
 | Branches | `main` (production), `dev`, `test` |
 | Function `api` (main) | `https://br-crimson-bird-bbpbnst1-api.compute.c-15.us-east-1.aws.neon.tech/` |
 | Data API (main) | `https://ep-shiny-morning-bbkdox4x.apirest.c-15.us-east-1.aws.neon.tech/neondb/rest/v1` |
+| Data API (dev / test) | `https://ep-soft-morning-bb0psfhw.apirest…/neondb/rest/v1` / `https://ep-royal-wildflower-bbmk73ms.apirest…/neondb/rest/v1` (same JWKS) |
 | Data API auth | external JWKS = `<function>/auth/jwks` (ES256, Better Auth), `db-max-rows 200`, schema `public` |
 | Compute | pinned 0.25 CU min/max on every branch (`neon.ts`); Free plan suspends after 5 min |
 
