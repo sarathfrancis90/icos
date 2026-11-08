@@ -104,7 +104,9 @@ Errors: 400 `INVALID_JSON|INVALID_INVITE_CODE`, 404 `GROUP_NOT_FOUND`, 409 `GROU
 Body: `{ "reported_user_id" | "reported_group_id", "reason", "details"? }`,
 `reason` ∈ `inappropriate_name, harassment, cheating, spam, other`.
 Inserts into `reports` and emails the alert to `REPORT_ALERT_TO` (Resend; best effort).
-201 `{id}`. Errors: 400 `INVALID_JSON|INVALID_FIELD`, 401, 403, 404 `PROFILE_NOT_FOUND|GROUP_NOT_FOUND`.
+At most 10 reports per reporter in a rolling 24 h (block notices count); the 11th gets
+429 `RATE_LIMITED` (`Too many reports; try again later`), nothing is stored and no email is sent.
+201 `{id}`. Errors: 400 `INVALID_JSON|INVALID_FIELD`, 401, 403, 404 `PROFILE_NOT_FOUND|GROUP_NOT_FOUND`, 429 `RATE_LIMITED`.
 
 ### `POST /api/block`, `POST /api/unblock`
 Body: `{ "user_id": "<uuid>" }`.

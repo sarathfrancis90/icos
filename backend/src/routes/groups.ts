@@ -26,6 +26,8 @@ import {
 const MAX_GROUPS_PER_USER = 20;
 const INVITE_RE = /^[A-Z0-9]{6}$/;
 const MAX_DETAILS = 1000;
+/** Reports one reporter may file in a rolling 24 h window (block notices included). */
+export const MAX_REPORTS_PER_DAY = 10;
 
 /** Reasons the app offers (ReportReason in report_dialog.dart). */
 export const REPORT_REASONS = ["inappropriate_name", "harassment", "cheating", "spam", "other"] as const;
@@ -148,6 +150,16 @@ export function groupRoutes(deps: ApiDeps): Hono {
     if (typeof reason !== "string" || !(REPORT_REASONS as readonly string[]).includes(reason)) return bad("reason");
     const details = body.details ?? "";
     if (typeof details !== "string") return bad("details");
+
+    const [{ n }] = await q<{ n: number }>(
+      `SELECT count(*)::int AS n FROM public.reports
+        WHERE reporter_id = $1 AND created_at > now() - interval '24 hours'`,
+      [user.id],
+    );
+    if (n >= MAX_REPORTS_PER_DAY) {
+      r.log.warn("report rate limited", { user_id: user.id, reports_24h: n });
+      return r.fail(429, "Too many reports; try again later", "RATE_LIMITED");
+    }
 
     let report: ReportRow;
     try {

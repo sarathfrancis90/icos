@@ -182,6 +182,24 @@ describe("group routes", { skip: SKIP }, () => {
       const [row] = await h.q<{ n: number }>("SELECT length(details) AS n FROM public.reports WHERE id = $1", [long.json?.id]);
       assert.equal(row.n, 1000);
     });
+
+    test("429 RATE_LIMITED on the 11th report within 24 h, without an alert email", async () => {
+      const reporter = await h.signInGuest();
+      const target = await h.signInGuest();
+      for (let i = 0; i < 10; i++) {
+        const ok = await h.call("POST", "/api/report", { reported_user_id: target.id, reason: "spam" }, reporter.token);
+        assert.equal(ok.res.status, 201, `report ${i + 1}`);
+      }
+      const before = h.routeEmails.length;
+      const { res, json } = await h.call("POST", "/api/report", { reported_user_id: target.id, reason: "spam" }, reporter.token);
+      assert.equal(res.status, 429);
+      assert.deepEqual(json, { error: "Too many reports; try again later", code: "RATE_LIMITED" });
+      assert.equal(h.routeEmails.length, before, "no alert email for a refused report");
+      const [row] = await h.q<{ n: number }>("SELECT count(*)::int AS n FROM public.reports WHERE reporter_id = $1", [
+        reporter.id,
+      ]);
+      assert.equal(row.n, 10);
+    });
   });
 
   describe("POST /api/block and /api/unblock", () => {
