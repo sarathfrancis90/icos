@@ -130,12 +130,12 @@ describe("responses", () => {
     assert.match(correlationIdFrom(withId("bad id!")), uuid);
   });
 
-  test("json sets CORS, content type and no-store", async () => {
+  test("json sets content type and no-store, and leaves CORS to the middleware", async () => {
     const res = json({ a: 1 }, 201, { "x-extra": "1" });
     assert.equal(res.status, 201);
     assert.equal(res.headers.get("content-type"), "application/json; charset=utf-8");
     assert.equal(res.headers.get("cache-control"), "no-store");
-    assert.equal(res.headers.get("access-control-allow-origin"), corsHeaders["Access-Control-Allow-Origin"]);
+    assert.equal(res.headers.get("access-control-allow-origin"), null);
     assert.equal(res.headers.get("x-extra"), "1");
     assert.deepEqual(await res.json(), { a: 1 });
   });

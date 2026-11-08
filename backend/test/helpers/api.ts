@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { TEST_DATABASE_URL } from "./env.js";
+import { dropForeignJwks } from "./jwks.js";
 import type { EmailMessage, EmailResult } from "../../src/email.js";
 import { Logger } from "../../src/shared/http.js";
 
@@ -48,6 +49,7 @@ export async function setupApi(): Promise<ApiHarness> {
   const { createAuth } = await import("../../src/auth.js");
   const { createApp } = await import("../../src/index.js");
   const { q, closePool } = await import("../../src/db.js");
+  await dropForeignJwks(q, process.env.BETTER_AUTH_SECRET);
 
   const routeEmails: EmailMessage[] = [];
   const authEmails: EmailMessage[] = [];

@@ -280,15 +280,32 @@ function functionUrl(env: NodeJS.ProcessEnv): string | undefined {
     : undefined;
 }
 
-/** Builds the dependencies from the environment; providers only when configured. */
-export function authDepsFromEnv(env: NodeJS.ProcessEnv = process.env): AuthDeps {
+/** Stands in for a missing Google client secret (see authDepsFromEnv). */
+export const GOOGLE_SECRET_PLACEHOLDER = "unset";
+
+/**
+ * Builds the dependencies from the environment; providers only when configured.
+ * Google needs only GOOGLE_WEB_CLIENT_ID: native sign-in posts an ID token,
+ * which Better Auth verifies against Google's JWKS (issuer, audience = client
+ * id, expiry) without the client secret. The secret is only used by the
+ * browser (authorization-code) flow, which stays broken until it is set.
+ */
+export function authDepsFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  log: Logger = new Logger("auth", "startup"),
+): AuthDeps {
   const secret = env.BETTER_AUTH_SECRET;
   if (!secret) throw new Error("BETTER_AUTH_SECRET is not set");
   const baseURL = env.AUTH_BASE_URL || functionUrl(env);
   if (!baseURL) throw new Error("AUTH_BASE_URL is not set");
   const deps: AuthDeps = { sendEmail: defaultSendEmail, baseURL, secret };
-  if (env.GOOGLE_WEB_CLIENT_ID && env.GOOGLE_WEB_CLIENT_SECRET) {
-    deps.google = { clientId: env.GOOGLE_WEB_CLIENT_ID, clientSecret: env.GOOGLE_WEB_CLIENT_SECRET };
+  if (env.GOOGLE_WEB_CLIENT_ID) {
+    let clientSecret = env.GOOGLE_WEB_CLIENT_SECRET;
+    if (!clientSecret) {
+      log.warn("Google browser flow disabled until GOOGLE_WEB_CLIENT_SECRET is set");
+      clientSecret = GOOGLE_SECRET_PLACEHOLDER;
+    }
+    deps.google = { clientId: env.GOOGLE_WEB_CLIENT_ID, clientSecret };
   }
   const { APPLE_SERVICE_ID, APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_P8_BASE64 } = env;
   if (APPLE_SERVICE_ID && APPLE_TEAM_ID && APPLE_KEY_ID && APPLE_P8_BASE64) {

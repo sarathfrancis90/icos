@@ -2,7 +2,16 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { decodeJwt, decodeProtectedHeader, exportPKCS8, generateKeyPair, importSPKI, exportSPKI, jwtVerify } from "jose";
-import { authDepsFromEnv, mintAppleClientSecret } from "../src/auth.js";
+import { authDepsFromEnv, GOOGLE_SECRET_PLACEHOLDER, mintAppleClientSecret } from "../src/auth.js";
+import { Logger } from "../src/shared/http.js";
+
+/** Records warnings instead of printing them. */
+class RecordingLogger extends Logger {
+  readonly warnings: string[] = [];
+  override warn(msg: string): void {
+    this.warnings.push(msg);
+  }
+}
 
 const BASE = { BETTER_AUTH_SECRET: "s".repeat(40), AUTH_BASE_URL: "https://api.example.test" };
 
@@ -21,10 +30,16 @@ describe("authDepsFromEnv", () => {
     assert.equal(deps.baseURL, "https://br-abc-123-api.fn.example.test");
   });
 
-  test("configures providers only when their env is complete", () => {
-    const none = authDepsFromEnv({ ...BASE, GOOGLE_WEB_CLIENT_ID: "g", APPLE_SERVICE_ID: "svc" });
+  test("configures Apple only when its env is complete; Google needs only the client id", () => {
+    const log = new RecordingLogger("auth", "test");
+    const partial = authDepsFromEnv({ ...BASE, GOOGLE_WEB_CLIENT_ID: "g", APPLE_SERVICE_ID: "svc" }, log);
+    assert.deepEqual(partial.google, { clientId: "g", clientSecret: GOOGLE_SECRET_PLACEHOLDER });
+    assert.equal(GOOGLE_SECRET_PLACEHOLDER, "unset");
+    assert.deepEqual(log.warnings, ["Google browser flow disabled until GOOGLE_WEB_CLIENT_SECRET is set"]);
+    assert.equal(partial.apple, undefined);
+    const none = authDepsFromEnv({ ...BASE }, log);
     assert.equal(none.google, undefined);
-    assert.equal(none.apple, undefined);
+    assert.equal(log.warnings.length, 1, "no warning without a Google client id");
     const both = authDepsFromEnv({
       ...BASE,
       GOOGLE_WEB_CLIENT_ID: "g",

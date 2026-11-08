@@ -77,10 +77,11 @@ export function json(
   status = 200,
   extraHeaders: Record<string, string> = {},
 ): Response {
+  // No CORS headers here: the app's cors() middleware (src/index.ts) owns them,
+  // so only the website's origin is ever allowed.
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
       ...extraHeaders,

@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { decodeJwt, decodeProtectedHeader } from "jose";
 import { TEST_DATABASE_URL } from "./helpers/env.js";
+import { dropForeignJwks } from "./helpers/jwks.js";
 import { applyMigrations } from "../scripts/migrate.js";
 import { Hono } from "hono";
 import type { EmailMessage, EmailResult } from "../src/email.js";
@@ -39,6 +40,7 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
     const { createAuth } = await import("../src/auth.js");
     const { createApp } = await import("../src/index.js");
     ({ q, closePool } = await import("../src/db.js"));
+    await dropForeignJwks(q, process.env.BETTER_AUTH_SECRET);
     identity = await import("../src/identity.js");
     makeAuth = (extra = {}) =>
       createAuth({
@@ -151,6 +153,31 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
   // --- cases ------------------------------------------------------------------
+  test("Google with only a client id is registered: a bad idToken is 401, not PROVIDER_NOT_FOUND", async () => {
+    const { authDepsFromEnv } = await import("../src/auth.js");
+    const silent = new (class extends (await import("../src/shared/http.js")).Logger {
+      override warn(): void {}
+    })("auth", "test");
+    const deps = authDepsFromEnv(
+      { BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET, AUTH_BASE_URL: "http://localhost", GOOGLE_WEB_CLIENT_ID: "test-client.apps.googleusercontent.com" },
+      silent,
+    );
+    const googleApp = makeApp(makeAuth({ google: deps.google }));
+    // "not-a-jwt" fails verification locally (no call to Google).
+    const { res, json } = await quietly(() =>
+      call("POST", "/auth/sign-in/social", { provider: "google", idToken: { token: "not-a-jwt" } }, undefined, googleApp),
+    );
+    assert.equal(res.status, 401, JSON.stringify(json));
+    assert.notEqual(json?.code, "PROVIDER_NOT_FOUND");
+
+    // Without any Google config the same call is the 404 the app saw in production.
+    const bare = await quietly(() =>
+      call("POST", "/auth/sign-in/social", { provider: "google", idToken: { token: "not-a-jwt" } }),
+    );
+    assert.equal(bare.res.status, 404);
+    assert.equal(bare.json?.code, "PROVIDER_NOT_FOUND");
+  });
+
   test("anonymous sign-in creates a guest profile with a placeholder name", async () => {
     const guest = await signInGuest();
     assert.match(guest.id, UUID);

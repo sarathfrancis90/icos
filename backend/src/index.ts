@@ -1,6 +1,7 @@
 // Icos API — the single Neon Function hosting auth (/auth/*), the former
 // edge functions (/api/*) and scheduled jobs (/cron/*).
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { getAuth, type Auth } from "./auth.js";
 import { sendEmail } from "./email.js";
@@ -11,7 +12,10 @@ import { configRoutes } from "./routes/config.js";
 import { groupRoutes } from "./routes/groups.js";
 import { puzzleRoutes } from "./routes/puzzle.js";
 import { scoreRoutes } from "./routes/score.js";
-import { corsHeaders, correlationIdFrom, errorFields, errorResponse, Logger } from "./shared/http.js";
+import { correlationIdFrom, errorFields, errorResponse, Logger } from "./shared/http.js";
+
+/** The website's origin (docs/reset.html POSTs /auth/reset-password from it). */
+export const WEB_ORIGIN = "https://icos.sarathfrancis.work";
 
 /** Optional overrides for the /api/* and /cron/* routes (tests stub email, logging and jobs). */
 export type AppDeps = Partial<Omit<ApiDeps, "auth">> & { cron?: CronOptions };
@@ -25,6 +29,19 @@ export function createApp(auth: () => Auth = getAuth, deps: AppDeps = {}): Hono 
     logger: deps.logger ?? ((fn, cid) => new Logger(fn, cid)),
   };
 
+  // Browser CORS for the website only. A request without an Origin header (the
+  // app) passes through untouched; a preflight from another origin gets no
+  // Access-Control-Allow-Origin, so the browser blocks it.
+  const webCors = cors({
+    origin: [WEB_ORIGIN],
+    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    maxAge: 600,
+    credentials: false,
+  });
+  app.use("/auth/*", webCors);
+  app.use("/api/*", webCors);
+
   app.get("/health", (c) =>
     c.json({ status: "ok", fn: "api", ts: new Date().toISOString() }),
   );
@@ -33,7 +50,6 @@ export function createApp(auth: () => Auth = getAuth, deps: AppDeps = {}): Hono 
   app.on(["GET", "POST"], "/auth/*", (c) => auth().handler(c.req.raw));
 
   // The former edge functions (same request/response contracts).
-  app.options("/api/*", () => new Response("ok", { headers: corsHeaders }));
   app.route("/api", puzzleRoutes(api));
   app.route("/api", scoreRoutes(api));
   app.route("/api", groupRoutes(api));
