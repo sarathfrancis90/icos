@@ -1,24 +1,38 @@
 import 'dart:convert';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:postgrest/postgrest.dart';
 
+import '../../../core/backend/data_api.dart';
 import '../../../core/services/app_logger.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/edge_function_client.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../domain/models/profile.dart';
 
 class ProfileRepository {
+  /// [client] resolves the Data API (PostgREST) client; [invoker] calls the
+  /// server routes (`export-data`).
+  ProfileRepository({
+    required PostgrestClientGetter client,
+    required EdgeInvoker invoker,
+  }) : _clientGetter = client,
+       _invoke = invoker;
+
+  final PostgrestClientGetter _clientGetter;
+  final EdgeInvoker _invoke;
+
+  PostgrestClient get _client => _clientGetter();
+
   /// Explicit column list — never `select()` so schema additions (or
   /// sensitive columns) can't leak into the client model unintentionally.
   static const String columns = 'id, display_name, avatar_url, is_anonymous, '
       'is_banned, colorblind_mode, theme_mode, haptic_enabled, sound_enabled, '
       'notification_enabled, deleted_at, created_at, updated_at';
 
-  /// Fetch user profile from Supabase profiles table.
+  /// Fetch user profile from the profiles table.
   Future<Result<UserProfile, AppError>> getProfile(String userId) async {
     try {
-      final response = await SupabaseService.client
+      final response = await _client
           .from('profiles')
           .select(columns)
           .eq('id', userId)
@@ -53,7 +67,7 @@ class ProfileRepository {
       if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
       if (colorblindMode != null) updates['colorblind_mode'] = colorblindMode;
 
-      final response = await SupabaseService.client
+      final response = await _client
           .from('profiles')
           .update(updates)
           .eq('id', userId)
@@ -87,7 +101,7 @@ class ProfileRepository {
         updates['notification_enabled'] = notificationEnabled;
       }
 
-      final response = await SupabaseService.client
+      final response = await _client
           .from('profiles')
           .update(updates)
           .eq('id', userId)
@@ -107,7 +121,7 @@ class ProfileRepository {
   /// period and anonymises leaderboard rows).
   Future<Result<void, AppError>> requestAccountDeletion() async {
     try {
-      await SupabaseService.client.rpc<void>('request_account_deletion');
+      await _client.rpc<void>('request_account_deletion');
       return const Result.success(null);
     } on PostgrestException catch (e) {
       return Result.failure(AppError.database(e.message));
@@ -119,7 +133,7 @@ class ProfileRepository {
   /// Cancels a pending deletion via the `cancel_account_deletion` RPC.
   Future<Result<void, AppError>> cancelAccountDeletion() async {
     try {
-      await SupabaseService.client.rpc<void>('cancel_account_deletion');
+      await _client.rpc<void>('cancel_account_deletion');
       return const Result.success(null);
     } on PostgrestException catch (e) {
       return Result.failure(AppError.database(e.message));
@@ -128,12 +142,31 @@ class ProfileRepository {
     }
   }
 
-  /// Calls the `export-data` edge function and returns the user's data as a
+  /// Calls the `export-data` route and returns the user's data as a
   /// JSON-encodable map.
   Future<Result<Map<String, dynamic>, AppError>> exportData() async {
     try {
-      final response = await SupabaseService.functions.invoke('export-data');
-      final data = response.data;
+      final response = await _invoke('export-data', const {});
+      if (response.status < 200 || response.status >= 300) {
+        AppLogger.warn(
+          'export-data failed',
+          data: {'status': response.status, 'code': response.code},
+        );
+        if (response.status == 429) {
+          return const Result.failure(
+            AppError.rateLimit('Too many export requests'),
+          );
+        }
+        final message = response.json?['error'];
+        return Result.failure(
+          AppError.database(
+            message is String && message.isNotEmpty
+                ? message
+                : 'Export failed (${response.status})',
+          ),
+        );
+      }
+      final data = response.body;
       if (data is Map<String, dynamic>) return Result.success(data);
       if (data is Map) return Result.success(Map<String, dynamic>.from(data));
       if (data is String && data.isNotEmpty) {
@@ -142,16 +175,6 @@ class ProfileRepository {
       }
       return const Result.failure(
         AppError.unknown('Unexpected export format'),
-      );
-    } on FunctionException catch (e) {
-      AppLogger.warn('export-data failed', error: e, data: {'status': e.status});
-      if (e.status == 429) {
-        return const Result.failure(
-          AppError.rateLimit('Too many export requests'),
-        );
-      }
-      return Result.failure(
-        AppError.database(e.reasonPhrase ?? 'Export failed (${e.status})'),
       );
     } catch (e) {
       return Result.failure(AppError.network(e.toString()));

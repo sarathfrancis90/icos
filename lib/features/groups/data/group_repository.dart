@@ -1,9 +1,9 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:postgrest/postgrest.dart';
 
-import '../../../core/services/supabase_service.dart';
+import '../../../core/backend/data_api.dart';
+import '../../../core/services/edge_function_client.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../domain/invite_code.dart';
@@ -14,7 +14,7 @@ import 'group_parsers.dart';
 /// Data access for groups, membership, leaderboards, the activity feed and
 /// content reports.
 ///
-/// Every mutation goes through a server-side RPC or edge function so that
+/// Every mutation goes through a Data API RPC or a server route so that
 /// invite codes, `member_count`, admin transfer and soft-delete are enforced
 /// by the database, never by the client. All methods return
 /// `Result<T, AppError>` and never throw.
@@ -22,7 +22,6 @@ class GroupRepository {
   static const _groupsTable = 'groups';
   static const _groupMembersTable = 'group_members';
   static const _groupFeedTable = 'group_feed';
-  static const _reportsTable = 'reports';
 
   static const groupColumns = 'id, name, description, invite_code, admin_id, '
       'member_count, max_members, is_active, created_at';
@@ -33,22 +32,24 @@ class GroupRepository {
   /// Default page size for the activity feed.
   static const defaultFeedLimit = 50;
 
-  /// [client] and [userIdOverride] exist so tests can drive the repository
-  /// through an in-memory HTTP handler; production code uses the defaults.
+  /// [client] resolves the Data API (PostgREST) client (tables + RPCs);
+  /// [invoker] calls the server routes (`join-group`, `report`, `block`,
+  /// `unblock`); [userId] reads the signed-in user's id.
   GroupRepository({
-    @visibleForTesting SupabaseClient? client,
-    @visibleForTesting String? Function()? userIdOverride,
-  })  : _clientOverride = client,
-        _userIdOverride = userIdOverride;
+    required PostgrestClientGetter client,
+    required EdgeInvoker invoker,
+    required String? Function() userId,
+  })  : _clientGetter = client,
+        _invoke = invoker,
+        _currentUserId = userId;
 
-  final SupabaseClient? _clientOverride;
-  final String? Function()? _userIdOverride;
+  final PostgrestClientGetter _clientGetter;
+  final EdgeInvoker _invoke;
+  final String? Function() _currentUserId;
 
-  SupabaseClient get _client => _clientOverride ?? SupabaseService.client;
+  PostgrestClient get _client => _clientGetter();
 
-  String? get _userId => _userIdOverride != null
-      ? _userIdOverride()
-      : SupabaseService.auth.currentUser?.id;
+  String? get _userId => _currentUserId();
 
   // ─── Group lifecycle ───────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ class GroupRepository {
     });
   }
 
-  /// Joins a group via the `join-group` edge function.
+  /// Joins a group via the `join-group` route.
   ///
   /// `ALREADY_MEMBER` is treated as success (the existing group is fetched).
   Future<Result<Group, AppError>> joinGroup(String inviteCode) {
@@ -91,27 +92,19 @@ class GroupRepository {
       }
       final code = InviteCode.normalize(inviteCode);
 
-      try {
-        final response = await SupabaseService.functions.invoke(
-          'join-group',
-          body: {'invite_code': code},
-        );
-        if (response.status < 200 || response.status >= 300) {
-          final failure =
-              GroupParsers.parseJoinGroupError(response.status, response.data);
-          throw AppErrorException(failure.error);
-        }
-        return GroupParsers.parseJoinGroupResponse(response.data);
-      } on FunctionException catch (e) {
-        final failure = GroupParsers.parseJoinGroupError(e.status, e.details);
-        if (failure.code == JoinGroupErrorCode.alreadyMember) {
-          final existing = failure.groupId != null
-              ? await _fetchGroup(failure.groupId!)
-              : await _fetchGroupByInviteCode(code);
-          if (existing != null) return existing;
-        }
-        throw AppErrorException(failure.error);
+      final response = await _invoke('join-group', {'invite_code': code});
+      if (_isSuccess(response.status)) {
+        return GroupParsers.parseJoinGroupResponse(response.body);
       }
+      final failure =
+          GroupParsers.parseJoinGroupError(response.status, response.body);
+      if (failure.code == JoinGroupErrorCode.alreadyMember) {
+        final existing = failure.groupId != null
+            ? await _fetchGroup(failure.groupId!)
+            : await _fetchGroupByInviteCode(code);
+        if (existing != null) return existing;
+      }
+      throw AppErrorException(failure.error);
     });
   }
 
@@ -256,33 +249,38 @@ class GroupRepository {
     });
   }
 
-  /// Most recent [limit] activity events for the group, newest first.
+  /// Most recent [limit] activity events for the group, newest first
+  /// (`order=id.desc`; ids are a bigint identity, so newer rows have larger
+  /// ids). With [afterId] only rows with `id > afterId` are returned (the
+  /// feed poll's incremental fetch).
   Future<Result<List<GroupFeedEvent>, AppError>> getGroupFeed(
     String groupId, {
     int limit = defaultFeedLimit,
+    String? afterId,
   }) {
     return _guard(() async {
-      final rows = await _client
+      var query = _client
           .from(_groupFeedTable)
           .select(feedColumns)
-          .eq('group_id', groupId)
-          .order('created_at', ascending: false)
-          .limit(limit);
+          .eq('group_id', groupId);
+      if (afterId != null) query = query.gt('id', afterId);
+      final rows = await query.order('id', ascending: false).limit(limit);
       return GroupParsers.parseFeed(rows);
     });
   }
 
   // ─── Blocking ──────────────────────────────────────────────────────
 
-  /// Blocks [userId] via the `block_user` RPC. Their scores and activity are
+  /// Blocks [userId] via `POST /api/block`. Their scores and activity are
   /// hidden from the caller server-side; the developer is notified through a
-  /// `reports` row the RPC files.
+  /// `reports` row the route files.
   Future<Result<void, AppError>> blockUser(String userId) {
-    return _guard(() => _rpcVoid('block_user', {'p_user_id': userId}));
+    return _guard(() => _routeVoid('block', {'user_id': userId}));
   }
 
+  /// Unblocks [userId] via `POST /api/unblock`.
   Future<Result<void, AppError>> unblockUser(String userId) {
-    return _guard(() => _rpcVoid('unblock_user', {'p_user_id': userId}));
+    return _guard(() => _routeVoid('unblock', {'user_id': userId}));
   }
 
   /// The caller's blocked users, newest first (`list_blocked_users`).
@@ -296,12 +294,13 @@ class GroupRepository {
 
   // ─── Reports ───────────────────────────────────────────────────────
 
+  /// Files a report via `POST /api/report` (201 `{id}`).
   Future<Result<void, AppError>> reportUser({
     required String userId,
     required String reason,
     String details = '',
   }) {
-    return _insertReport({'reported_user_id': userId}, reason, details);
+    return _fileReport({'reported_user_id': userId}, reason, details);
   }
 
   Future<Result<void, AppError>> reportGroup({
@@ -309,23 +308,21 @@ class GroupRepository {
     required String reason,
     String details = '',
   }) {
-    return _insertReport({'reported_group_id': groupId}, reason, details);
+    return _fileReport({'reported_group_id': groupId}, reason, details);
   }
 
-  Future<Result<void, AppError>> _insertReport(
+  Future<Result<void, AppError>> _fileReport(
     Map<String, dynamic> target,
     String reason,
     String details,
   ) {
     return _guard(() async {
-      final reporterId = _userId;
-      if (reporterId == null) {
+      if (_userId == null) {
         throw const AppErrorException(
           AppError.auth('You must be signed in to report'),
         );
       }
-      await _client.from(_reportsTable).insert({
-        'reporter_id': reporterId,
+      await _route('report', {
         ...target,
         'reason': reason,
         'details': details.trim(),
@@ -353,6 +350,36 @@ class GroupRepository {
     return row == null ? null : Group.fromJson(row);
   }
 
+  static bool _isSuccess(int status) => status >= 200 && status < 300;
+
+  Future<void> _routeVoid(String name, Map<String, dynamic> body) async {
+    if (_userId == null) {
+      throw const AppErrorException(AppError.auth('You must be signed in'));
+    }
+    await _route(name, body);
+  }
+
+  /// `POST /api/<name>`; a non-2xx answer becomes an [AppErrorException].
+  Future<EdgeResponse> _route(String name, Map<String, dynamic> body) async {
+    final response = await _invoke(name, body);
+    if (_isSuccess(response.status)) return response;
+    throw AppErrorException(routeError(response));
+  }
+
+  /// Maps a route's `{error, code}` failure to an [AppError].
+  static AppError routeError(EdgeResponse response) {
+    final raw = response.json?['error'];
+    final message = raw is String && raw.isNotEmpty ? raw : null;
+    return switch (response.status) {
+      400 || 422 => AppError.validation(message ?? 'Invalid request'),
+      401 => AppError.auth(message ?? 'You must be signed in'),
+      403 => AppError.auth(message ?? 'You do not have permission to do that'),
+      404 => AppError.notFound(message ?? 'Not found'),
+      429 => AppError.rateLimit(message ?? 'Too many requests'),
+      _ => AppError.network('Service unavailable (${response.status})'),
+    };
+  }
+
   Future<void> _rpcVoid(String fn, Map<String, dynamic> params) async {
     if (_userId == null) {
       throw const AppErrorException(AppError.auth('You must be signed in'));
@@ -373,12 +400,6 @@ class GroupRepository {
       final override = onDatabaseError?.call(e);
       if (override != null) return override;
       return Result.failure(_mapPostgrest(e));
-    } on AuthException catch (e) {
-      return Result.failure(AppError.auth(e.message));
-    } on FunctionException catch (e) {
-      return Result.failure(
-        AppError.network('Service unavailable (${e.status})'),
-      );
     } on SocketException {
       return const Result.failure(AppError.network('No connection'));
     } on FormatException catch (e) {

@@ -1,15 +1,22 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:postgrest/postgrest.dart';
 
-import '../../../core/services/supabase_service.dart';
+import '../../../core/backend/data_api.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../domain/models/streak.dart';
 
 class StatsRepository {
+  /// [client] resolves the Data API (PostgREST) client.
+  StatsRepository(this._clientGetter);
+
+  final PostgrestClientGetter _clientGetter;
+
+  PostgrestClient get _client => _clientGetter();
+
   /// Fetch the user's streak record from the streaks table.
   Future<Result<Streak, AppError>> getStreak(String userId) async {
     try {
-      final response = await SupabaseService.client
+      final response = await _client
           .from('streaks')
           .select()
           .eq('user_id', userId)
@@ -49,7 +56,7 @@ class StatsRepository {
     int limit = 30,
   }) async {
     try {
-      final response = await SupabaseService.client
+      final response = await _client
           .from('puzzle_attempts')
           .select('puzzle_date, time_seconds, hints_used, undos_used, completed')
           .eq('user_id', userId)
@@ -78,7 +85,7 @@ class StatsRepository {
   /// Count of completed puzzle attempts for the user.
   Future<Result<int, AppError>> getTotalSolved(String userId) async {
     try {
-      final response = await SupabaseService.client
+      final response = await _client
           .from('puzzle_attempts')
           .select('id')
           .eq('user_id', userId)
@@ -95,7 +102,7 @@ class StatsRepository {
   /// Average solve time in seconds for completed puzzles.
   Future<Result<int, AppError>> getAverageTime(String userId) async {
     try {
-      final response = await SupabaseService.client
+      final response = await _client
           .from('puzzle_attempts')
           .select('time_seconds')
           .eq('user_id', userId)

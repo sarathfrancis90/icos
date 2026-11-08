@@ -7,8 +7,7 @@ import '../services/edge_function_client.dart';
 import 'backend_config.dart';
 import 'token_store.dart';
 
-/// Client for the Function's app routes (`{apiBaseUrl}/api/<name>`), the
-/// replacement for the Supabase functions client.
+/// Client for the Function's app routes (`{apiBaseUrl}/api/<name>`).
 ///
 /// Non-2xx responses are returned as [EdgeResponse] (not thrown) so callers
 /// keep classifying `code`; transport failures (no network, the 20 s

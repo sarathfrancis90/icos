@@ -9,11 +9,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:share_plus/share_plus.dart' show XFile;
 
+import '../../../core/backend/backend_providers.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/app_logger.dart';
 import '../../../core/services/audio_service.dart';
 import '../../../core/services/auth_session_provider.dart';
+import '../../../core/services/edge_function_client.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/utils/app_error.dart';
@@ -27,7 +29,10 @@ part 'profile_provider.g.dart';
 
 @riverpod
 ProfileRepository profileRepository(Ref ref) {
-  return ProfileRepository();
+  return ProfileRepository(
+    client: () => ref.read(dataApiProvider).client,
+    invoker: ref.watch(edgeInvokerProvider),
+  );
 }
 
 /// Overridable in tests: how a file reaches the OS share sheet.

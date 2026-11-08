@@ -10,8 +10,11 @@ import 'package:icos/features/profile/domain/models/profile.dart';
 import 'package:icos/features/profile/providers/profile_provider.dart';
 import 'package:icos/core/backend/app_user.dart';
 
+import '../../../helpers/data_api_test_helpers.dart';
+
 class _FakeRepo extends ProfileRepository {
-  _FakeRepo({this.pendingDeletion = true});
+  _FakeRepo({this.pendingDeletion = true})
+    : super(client: unusedDataApi, invoker: unusedInvoker);
   bool pendingDeletion;
   bool failGet = false;
   int cancelCalls = 0;

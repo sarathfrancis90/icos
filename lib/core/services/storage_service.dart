@@ -19,7 +19,7 @@ abstract final class StorageService {
   // ─── Per-user scope ────────────────────────────────────────────────
   //
   // Everything about a player (results, game state, session nonces, solve
-  // count, practice stats, queued submissions) is keyed by the Supabase user
+  // count, practice stats, queued submissions) is keyed by the signed-in user
   // id so a different account on the same device never sees it. Device
   // settings (theme, onboarding, ...) stay global. The key prefix is a cached
   // string: building a key is concatenation only, no I/O.

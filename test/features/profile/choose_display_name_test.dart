@@ -19,11 +19,12 @@ import 'package:icos/features/profile/presentation/widgets/choose_display_name_s
 import 'package:icos/features/profile/providers/profile_provider.dart';
 import 'package:icos/core/backend/app_user.dart';
 
+import '../../helpers/data_api_test_helpers.dart';
 import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
 
 class _Repo extends ProfileRepository {
-  _Repo(this.name);
+  _Repo(this.name) : super(client: unusedDataApi, invoker: unusedInvoker);
   String name;
   bool failGet = false;
   int gets = 0;

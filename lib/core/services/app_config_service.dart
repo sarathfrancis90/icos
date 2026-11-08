@@ -2,11 +2,11 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 
+import '../backend/api_client.dart';
 import 'app_logger.dart';
-import 'supabase_service.dart';
 
-/// Remote application configuration stored in the public `app_config`
-/// table (`key text pk, value jsonb`).
+/// Remote application configuration stored in the `app_config` table
+/// (`key text pk, value jsonb`), served by `GET /api/config`.
 @immutable
 class AppConfig {
   const AppConfig({
@@ -176,17 +176,24 @@ class AppConfig {
       'maintenance: $maintenanceMode, stores: $storeUrls)';
 }
 
-/// Fetches [AppConfig] from Supabase. Never throws.
+/// Fetches [AppConfig] from the public `GET /api/config` route (works
+/// before the app has a session). Never throws.
 abstract final class AppConfigService {
   static const Duration timeout = Duration(seconds: 5);
 
-  static Future<AppConfig> fetch() async {
+  static Future<AppConfig> fetch(ApiClient Function() api) async {
     try {
-      final rows = await SupabaseService.client
-          .from('app_config')
-          .select('key, value')
-          .timeout(timeout);
-      return AppConfig.fromRows(List<Map<String, dynamic>>.from(rows));
+      final response =
+          await api().get('config', public: true).timeout(timeout);
+      final config = response.json?['config'];
+      if (response.status != 200 || config is! Map<String, dynamic>) {
+        AppLogger.warn(
+          'app_config fetch failed; using defaults',
+          data: {'status': response.status, 'code': response.code},
+        );
+        return AppConfig.defaults;
+      }
+      return AppConfig.fromMap(config);
     } catch (e, st) {
       AppLogger.warn('app_config fetch failed; using defaults',
           error: e, st: st);

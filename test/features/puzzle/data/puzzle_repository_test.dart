@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:icos/core/services/edge_function_client.dart';
 import 'package:icos/core/services/storage_service.dart';
 import 'package:icos/core/utils/date_utils.dart';
@@ -8,6 +9,7 @@ import 'package:icos/core/utils/result.dart';
 import 'package:icos/features/puzzle/data/puzzle_repository.dart';
 import 'package:icos/features/puzzle/domain/models/puzzle.dart';
 
+import '../../../helpers/data_api_test_helpers.dart';
 import '../../../helpers/storage_test_helpers.dart';
 
 Map<String, dynamic> _serverPuzzle(String date) => {
@@ -98,5 +100,49 @@ void main() {
     final repo = repoWith((fn, body) async => const EdgeResponse(500, {}));
     await repo.getPuzzle(today);
     expect(StorageService.getCachedPuzzle(today), isNull);
+  });
+
+  group('table read', () {
+    test('before a session exists it uses GET /api/puzzle/<date>', () async {
+      final routes = <String>[];
+      final repo = PuzzleRepository(
+        invoker: (fn, body) async => fail('no generation expected'),
+        client: () => testDataApi((_) async => fail('no Data API call')),
+        publicGet: (route) async {
+          routes.add(route);
+          return EdgeResponse(200, {'puzzle': _serverPuzzle('2026-01-03')});
+        },
+        hasSession: () => false,
+      );
+
+      final result = await repo.getPuzzle('2026-01-03');
+
+      expect(routes, ['puzzle/2026-01-03']);
+      final puzzle = (result as Success<Puzzle, dynamic>).data;
+      expect(puzzle.id, 'server-2026-01-03');
+      expect(puzzle.origin, PuzzleOrigin.server);
+    });
+
+    test('with a session it reads puzzles through the Data API', () async {
+      late http.Request seen;
+      final repo = PuzzleRepository(
+        invoker: (fn, body) async => fail('no generation expected'),
+        client: () => testDataApi((request) async {
+          seen = request;
+          return jsonResponse(_serverPuzzle('2026-01-04'));
+        }),
+        publicGet: (route) async => fail('no public call'),
+        hasSession: () => true,
+      );
+
+      final result = await repo.getPuzzle('2026-01-04');
+
+      expect(seen.url.toString(), startsWith('$testDataApiUrl/puzzles?'));
+      expect(seen.url.queryParameters['puzzle_date'], 'eq.2026-01-04');
+      expect(
+        (result as Success<Puzzle, dynamic>).data.id,
+        'server-2026-01-04',
+      );
+    });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/backend/backend_providers.dart';
 import '../../../core/services/auth_session_provider.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/utils/app_error.dart';
@@ -13,7 +14,7 @@ part 'stats_provider.g.dart';
 
 @riverpod
 StatsRepository statsRepository(Ref ref) {
-  return StatsRepository();
+  return StatsRepository(() => ref.read(dataApiProvider).client);
 }
 
 @riverpod

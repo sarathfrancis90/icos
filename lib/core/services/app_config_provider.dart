@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../backend/backend_providers.dart';
 import 'app_config_service.dart';
 
 part 'app_config_provider.g.dart';
@@ -10,7 +11,8 @@ part 'app_config_provider.g.dart';
 /// (falls back to [AppConfig.defaults]). Call
 /// `ref.invalidate(appConfigProvider)` on app resume to refresh.
 @Riverpod(keepAlive: true)
-Future<AppConfig> appConfig(Ref ref) => AppConfigService.fetch();
+Future<AppConfig> appConfig(Ref ref) =>
+    AppConfigService.fetch(() => ref.read(apiClientProvider));
 
 /// Current app version (`1.2.3`) without build number.
 @Riverpod(keepAlive: true)

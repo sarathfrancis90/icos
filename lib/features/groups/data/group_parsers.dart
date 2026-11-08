@@ -6,7 +6,7 @@ import '../domain/models/group.dart';
 /// Pure, network-free parsing helpers for the groups backend contract.
 ///
 /// Kept separate from [GroupRepository] so they can be unit-tested with
-/// fake JSON without initialising Supabase.
+/// fake JSON without a backend client.
 abstract final class GroupParsers {
   /// Decodes a raw function/RPC payload that may arrive as a JSON string,
   /// a `Map`, or a `List`.

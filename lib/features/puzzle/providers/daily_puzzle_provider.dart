@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/backend/backend_providers.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/edge_function_client.dart';
 import '../../../core/utils/date_utils.dart';
@@ -12,7 +13,12 @@ part 'daily_puzzle_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 PuzzleRepository puzzleRepository(Ref ref) {
-  return PuzzleRepository(invoker: ref.watch(edgeInvokerProvider));
+  return PuzzleRepository(
+    invoker: ref.watch(edgeInvokerProvider),
+    client: () => ref.read(dataApiProvider).client,
+    publicGet: (route) => ref.read(apiClientProvider).get(route, public: true),
+    hasSession: () => ref.read(authClientProvider).currentUser != null,
+  );
 }
 
 /// Puzzle for an ISO [date] (cache → table → daily-puzzle → bundled).

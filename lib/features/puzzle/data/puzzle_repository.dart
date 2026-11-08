@@ -1,12 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:postgrest/postgrest.dart';
 
+import '../../../core/backend/data_api.dart';
 import '../../../core/services/app_logger.dart';
 import '../../../core/services/edge_function_client.dart';
 import '../../../core/services/storage_service.dart';
-import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/result.dart';
@@ -23,11 +23,43 @@ const _attemptColumns =
     'puzzle_date, time_seconds, hints_used, undos_used, completed, verified, '
     'is_archive, path, completed_at';
 
+/// `GET /api/<route>` without a session (see [ApiClient.get]).
+typedef PublicGetter = Future<EdgeResponse> Function(String route);
+
 class PuzzleRepository {
-  PuzzleRepository({EdgeInvoker? invoker})
-    : _invoke = invoker ?? supabaseEdgeInvoke;
+  /// [client] resolves the Data API (PostgREST) client, used once a session
+  /// exists ([hasSession]); before that (first paint while the guest
+  /// session is still being created) single puzzles come from the public
+  /// `GET /api/puzzle/<date>` route via [publicGet]. Either may be omitted
+  /// in tests: the corresponding read then counts as unreachable.
+  PuzzleRepository({
+    required EdgeInvoker invoker,
+    PostgrestClientGetter? client,
+    PublicGetter? publicGet,
+    bool Function()? hasSession,
+  }) : _invoke = invoker,
+       _client = client,
+       _publicGet = publicGet,
+       _hasSession = hasSession ?? (() => client != null);
 
   final EdgeInvoker _invoke;
+  final PostgrestClientGetter? _client;
+  final PublicGetter? _publicGet;
+  final bool Function() _hasSession;
+
+  PostgrestClient get _db => (_client ??
+      (throw StateError('Data API client not configured')))();
+
+  /// Whether reads should use the Data API (a session exists) rather than
+  /// the public route. Never throws.
+  bool _useDataApi() {
+    if (_client == null) return false;
+    try {
+      return _hasSession();
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Puzzle for [date]: cache → `puzzles` table → (today/tomorrow only)
   /// `daily-puzzle` edge function → bundled fallback. Only the fallback is
@@ -58,8 +90,12 @@ class PuzzleRepository {
       getPuzzle(date);
 
   Future<Puzzle?> _fetchFromTable(String date) async {
+    final publicGet = _publicGet;
+    if (publicGet != null && !_useDataApi()) {
+      return _fetchPublic(publicGet, date);
+    }
     try {
-      final response = await SupabaseService.client
+      final response = await _db
           .from('puzzles')
           .select(puzzlePublicColumns)
           .eq('puzzle_date', date)
@@ -73,6 +109,39 @@ class PuzzleRepository {
       return null;
     } catch (e) {
       AppLogger.debug('puzzles select unreachable', error: e);
+      return null;
+    }
+  }
+
+  /// `GET /api/puzzle/<date>` → `{puzzle}` (404 `PUZZLE_NOT_FOUND`).
+  Future<Puzzle?> _fetchPublic(PublicGetter publicGet, String date) async {
+    try {
+      final response = await publicGet(
+        'puzzle/$date',
+      ).timeout(const Duration(seconds: 10));
+      final row = response.json?['puzzle'];
+      if (response.status != 200 || row is! Map<String, dynamic>) {
+        if (response.status != 404) {
+          AppLogger.warn(
+            'public puzzle fetch failed',
+            data: {
+              'date': date,
+              'status': response.status,
+              'code': response.code,
+            },
+          );
+        }
+        return null;
+      }
+      final public = <String, dynamic>{
+        for (final column in puzzlePublicColumns.split(', '))
+          column: row[column],
+      };
+      final puzzle = Puzzle.fromJson(public);
+      await StorageService.cachePuzzle(date, public);
+      return puzzle;
+    } catch (e) {
+      AppLogger.debug('public puzzle unreachable', error: e);
       return null;
     }
   }
@@ -146,7 +215,7 @@ class PuzzleRepository {
   /// The signed-in user's completed attempt for [date], or `null`.
   Future<SubmissionResult?> getOwnAttempt(String userId, String date) async {
     try {
-      final row = await SupabaseService.client
+      final row = await _db
           .from('puzzle_attempts')
           .select(_attemptColumns)
           .eq('user_id', userId)
@@ -170,7 +239,7 @@ class PuzzleRepository {
     required String to,
   }) async {
     try {
-      final rows = await SupabaseService.client
+      final rows = await _db
           .from('puzzles')
           .select('puzzle_date')
           .gte('puzzle_date', from)
@@ -190,7 +259,7 @@ class PuzzleRepository {
     required String to,
   }) async {
     try {
-      final rows = await SupabaseService.client
+      final rows = await _db
           .from('puzzle_attempts')
           .select(_attemptColumns)
           .eq('user_id', userId)

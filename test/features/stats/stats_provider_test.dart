@@ -12,12 +12,14 @@ import 'package:icos/features/stats/domain/models/streak.dart';
 import 'package:icos/features/stats/presentation/stats_screen.dart';
 import 'package:icos/features/stats/providers/stats_provider.dart';
 
+import '../../helpers/data_api_test_helpers.dart';
 import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
 
 class _FakeRepo extends StatsRepository {
   _FakeRepo({this.fail = false, String? lastSolveDate})
-    : lastSolveDate = lastSolveDate ?? AppDateUtils.todayUtc();
+    : lastSolveDate = lastSolveDate ?? AppDateUtils.todayUtc(),
+      super(unusedDataApi);
   bool fail;
   String lastSolveDate;
 

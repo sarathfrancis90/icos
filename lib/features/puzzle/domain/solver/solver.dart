@@ -1,7 +1,7 @@
 /// Exhaustive puzzle solver used for uniqueness checks, difficulty scoring
 /// and hints. Pure Dart; safe to run inside `Isolate.run`.
 ///
-/// Mirrors `supabase/functions/_shared/puzzle_core.ts` (`countSolutions`).
+/// Mirrors `backend/src/shared/puzzle_core.ts` (`countSolutions`).
 library;
 
 import 'dart:typed_data';

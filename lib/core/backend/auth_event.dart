@@ -1,3 +1,2 @@
-/// Auth state changes broadcast by `AuthClient.events` (mirrors the subset
-/// of Supabase's `AuthChangeEvent` the app listens to).
+/// Auth state changes broadcast by `AuthClient.events`.
 enum AuthEvent { signedIn, signedOut, userUpdated, passwordRecovery }

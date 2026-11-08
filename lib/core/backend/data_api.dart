@@ -44,6 +44,12 @@ class DataApi {
   }
 }
 
+/// Lazily resolves the Data API client. Repositories take this instead of
+/// a [PostgrestClient] so building them never touches the backend
+/// providers; a missing configuration then fails inside the call (and is
+/// mapped to an `AppError`) rather than when the repository is created.
+typedef PostgrestClientGetter = PostgrestClient Function();
+
 /// Returns a JWT (forced refresh when [force]) or null when signed out.
 typedef JwtProvider = Future<String?> Function({bool force});
 

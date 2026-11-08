@@ -13,11 +13,10 @@ enum StartSessionOutcome {
   failed,
 }
 
-/// Wraps the `start-puzzle` edge function and persists the per-date nonce
+/// Wraps the `start-puzzle` route (`POST /api/start-puzzle`) and persists the per-date nonce
 /// used to sign score submissions.
 class PuzzleSessionService {
-  PuzzleSessionService({EdgeInvoker? invoker})
-      : _invoke = invoker ?? supabaseEdgeInvoke;
+  PuzzleSessionService({required EdgeInvoker invoker}) : _invoke = invoker;
 
   final EdgeInvoker _invoke;
 

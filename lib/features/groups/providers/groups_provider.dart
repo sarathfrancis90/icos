@@ -1,11 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/backend/backend_providers.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../core/services/edge_function_client.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -15,10 +15,16 @@ import '../domain/models/group.dart';
 part 'groups_provider.g.dart';
 
 @riverpod
-GroupRepository groupRepository(Ref ref) => GroupRepository();
+GroupRepository groupRepository(Ref ref) {
+  return GroupRepository(
+    client: () => ref.read(dataApiProvider).client,
+    invoker: ref.watch(edgeInvokerProvider),
+    userId: () => ref.read(authClientProvider).currentUser?.id,
+  );
+}
 
 /// Minimal auth snapshot the groups feature needs. Overridable in widget
-/// tests so screens never touch `Supabase.instance` directly.
+/// tests so screens never touch the auth client directly.
 class GroupsSession {
   const GroupsSession({required this.userId, required this.isAnonymous});
 
@@ -194,21 +200,98 @@ Future<List<WeeklyLeaderboardEntry>> weeklyLeaderboard(
   return _unwrap(result);
 }
 
-/// The single realtime channel the groups feature is allowed to hold.
-/// Opening a feed for another group tears the previous one down first.
-RealtimeChannel? _activeFeedChannel;
+/// How often the activity feed is polled while a group screen is open.
+const feedPollInterval = Duration(seconds: 15);
 
-/// Live activity feed for [groupId].
+/// Runs a poll callback every [interval] while started and the app is in
+/// the foreground. Backgrounding the app ([AppLifecycleState.paused],
+/// `hidden`, `detached`) cancels the timer; returning to
+/// [AppLifecycleState.resumed] polls once at once and restarts it.
+class GroupFeedPoller with WidgetsBindingObserver {
+  GroupFeedPoller(this._poll, {this.interval = feedPollInterval});
+
+  final Future<void> Function(String groupId) _poll;
+  final Duration interval;
+
+  Timer? _timer;
+  String? _groupId;
+  bool _foreground = true;
+  bool _observing = false;
+
+  /// True while a timer is scheduled.
+  bool get isPolling => _timer?.isActive ?? false;
+
+  void startFeedPolling(String groupId) {
+    _groupId = groupId;
+    final binding = WidgetsBinding.instance;
+    if (!_observing) {
+      binding.addObserver(this);
+      _observing = true;
+    }
+    final state = binding.lifecycleState;
+    _foreground = state == null ||
+        state == AppLifecycleState.resumed ||
+        state == AppLifecycleState.inactive;
+    _schedule();
+  }
+
+  void stopFeedPolling() {
+    _cancel();
+    _groupId = null;
+    if (_observing) {
+      WidgetsBinding.instance.removeObserver(this);
+      _observing = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        if (_foreground) return;
+        _foreground = true;
+        final groupId = _groupId;
+        if (groupId == null) return;
+        unawaited(_poll(groupId));
+        _schedule();
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        _foreground = false;
+        _cancel();
+      case AppLifecycleState.inactive:
+        break;
+    }
+  }
+
+  void _schedule() {
+    _cancel();
+    final groupId = _groupId;
+    if (groupId == null || !_foreground) return;
+    _timer = Timer.periodic(interval, (_) => unawaited(_poll(groupId)));
+  }
+
+  void _cancel() {
+    _timer?.cancel();
+    _timer = null;
+  }
+}
+
+/// Activity feed for [groupId].
 ///
-/// Emits the initial 50 events, then re-emits whenever a `group_feed` row is
-/// inserted for this group (via Supabase realtime `postgres_changes`). Each
-/// insert also invalidates the daily/weekly leaderboards so ranks refresh.
-/// The channel is unsubscribed when the provider is disposed.
+/// Emits the latest 50 events, then polls `group_feed` for rows newer than
+/// the newest one held (`id=gt.<lastId>`) every [feedPollInterval] while the
+/// provider is alive (the group screen is mounted) and the app is in the
+/// foreground. New rows are prepended and invalidate the daily/weekly
+/// leaderboards so ranks refresh; the screen rechecks membership when the
+/// newest event changes. Polling stops when the provider is disposed.
 @riverpod
 Stream<List<GroupFeedEvent>> groupFeed(Ref ref, String groupId) {
   final repo = ref.read(groupRepositoryProvider);
   final controller = StreamController<List<GroupFeedEvent>>();
   var events = <GroupFeedEvent>[];
+  var loaded = false;
+  var inFlight = false;
   var disposed = false;
 
   void emit(List<GroupFeedEvent> next) {
@@ -217,66 +300,54 @@ Stream<List<GroupFeedEvent>> groupFeed(Ref ref, String groupId) {
     controller.add(List.unmodifiable(events));
   }
 
-  Future<void> reload() async {
-    final result = await repo.getGroupFeed(groupId);
-    if (disposed) return;
-    switch (result) {
-      case Success(data: final list):
-        emit(list);
-      case Failure(error: final error):
-        if (events.isEmpty && !controller.isClosed) {
-          controller.addError(error, StackTrace.current);
-        }
-    }
-  }
-
-  void onInsert(PostgresChangePayload payload) {
-    if (disposed) return;
-    // Show the row immediately (profile join is not part of the realtime
-    // payload), then reconcile with a full fetch to pick up display names.
+  Future<void> fetch(String id) async {
+    if (disposed || inFlight) return;
+    inFlight = true;
     try {
-      final incoming = GroupFeedEvent.fromJson(payload.newRecord);
-      if (!events.any((e) => e.id == incoming.id)) {
-        emit([incoming, ...events].take(GroupRepository.defaultFeedLimit).toList());
+      final afterId = loaded && events.isNotEmpty ? events.first.id : null;
+      final result = await repo.getGroupFeed(id, afterId: afterId);
+      if (disposed) return;
+      switch (result) {
+        case Success(data: final incoming):
+          final wasLoaded = loaded;
+          loaded = true;
+          if (!wasLoaded) {
+            emit(incoming);
+            return;
+          }
+          final known = {for (final e in events) e.id};
+          final fresh = [
+            for (final e in incoming)
+              if (!known.contains(e.id)) e,
+          ];
+          if (fresh.isEmpty) return;
+          emit(
+            [...fresh, ...events]
+                .take(GroupRepository.defaultFeedLimit)
+                .toList(),
+          );
+          ref.invalidate(dailyLeaderboardProvider);
+          ref.invalidate(weeklyLeaderboardProvider);
+        case Failure(error: final error):
+          // A failed poll keeps the current list; only a first load with
+          // nothing to show surfaces the error.
+          if (!loaded && events.isEmpty && !controller.isClosed) {
+            controller.addError(error, StackTrace.current);
+          }
       }
-    } catch (_) {
-      // Malformed payload; the reload below is authoritative.
+    } finally {
+      inFlight = false;
     }
-    ref.invalidate(dailyLeaderboardProvider);
-    ref.invalidate(weeklyLeaderboardProvider);
-    unawaited(reload());
   }
 
-  // Enforce "at most one channel active" for the groups feature.
-  final previous = _activeFeedChannel;
-  if (previous != null) {
-    unawaited(previous.unsubscribe());
-    _activeFeedChannel = null;
-  }
-
-  final channel = SupabaseService.client
-      .channel('group_feed:$groupId')
-      .onPostgresChanges(
-        event: PostgresChangeEvent.insert,
-        schema: 'public',
-        table: 'group_feed',
-        filter: PostgresChangeFilter(
-          type: PostgresChangeFilterType.eq,
-          column: 'group_id',
-          value: groupId,
-        ),
-        callback: onInsert,
-      )
-      .subscribe();
-  _activeFeedChannel = channel;
+  final poller = GroupFeedPoller(fetch)..startFeedPolling(groupId);
 
   ref.onDispose(() {
     disposed = true;
-    if (identical(_activeFeedChannel, channel)) _activeFeedChannel = null;
-    unawaited(channel.unsubscribe());
+    poller.stopFeedPolling();
     unawaited(controller.close());
   });
 
-  unawaited(reload());
+  unawaited(fetch(groupId));
   return controller.stream;
 }

@@ -10,10 +10,12 @@ import 'package:icos/features/groups/domain/models/group.dart';
 import 'package:icos/features/groups/presentation/group_detail_screen.dart';
 import 'package:icos/features/groups/providers/groups_provider.dart';
 
+import '../../../helpers/data_api_test_helpers.dart';
 import '../../../helpers/test_helpers.dart';
 
 class _FakeRepo extends GroupRepository {
-  _FakeRepo(this.current, {this.fail = false});
+  _FakeRepo(this.current, {this.fail = false})
+    : super(client: unusedDataApi, invoker: unusedInvoker, userId: () => 'u-1');
 
   Group current;
   final bool fail;

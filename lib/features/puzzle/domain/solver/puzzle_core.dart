@@ -1,5 +1,5 @@
 /// Barrel for the Dart puzzle core (mirror of
-/// `supabase/functions/_shared/puzzle_core.ts`).
+/// `backend/src/shared/puzzle_core.ts`).
 ///
 /// Everything exported here is pure Dart with no Flutter dependencies, so it
 /// can run inside `Isolate.run`.
