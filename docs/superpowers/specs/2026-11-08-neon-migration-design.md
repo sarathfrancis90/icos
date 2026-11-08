@@ -44,7 +44,7 @@ Flutter app (1.1.0)
  ├─ Auth: HTTPS → Neon Function "api" /auth/*  (Better Auth: anonymous, email, Google, Apple, bearer, jwt, expo)
  ├─ Tables & RPCs: HTTPS → Neon Data API  (PostgREST; Bearer = 15-min JWT from /auth/token; RLS by auth.user_id())
  ├─ Server logic: HTTPS → Neon Function "api" /api/*  (start-puzzle, submit-score, join-group, export-data, daily-puzzle, report)
- └─ Feed: polls Data API group_feed every 10 s while the group screen is visible
+ └─ Feed: polls Data API group_feed every 15 s while the group screen is visible
 Neon project "icos" (aws-us-east-1, Free): Postgres (0.25 CU, scale-to-zero) + Function "api" + 7 schedule triggers → /cron/*
 Email: Resend HTTPS API from the Function (auth mail + report alerts), from noreply@icos.sarathfrancis.work
 Website (GitHub Pages, icos.sarathfrancis.work): /reset (password reset page), /verified (email confirmed page)
@@ -65,12 +65,12 @@ One Neon Function hosts everything server-side (fewer cold starts, one URL to re
 Same 17 tables as today, re-created from a single consolidated migration (`neon/migrations/0001_schema.sql`) with these changes:
 - `profiles.id` is the root identity: every former FK to `auth.users(id)` points to `profiles(id)` instead (puzzle_attempts, streaks, streak_freezes, puzzle_sessions, submission_log, groups.admin_id, group_members, group_feed, reports.reporter_id / reported_user_id, user_blocks). `profiles.id` has **no** FK to `ba.user`; the two are kept equal by the Function's hooks.
 - `profiles` gains `email text`, `email_verified boolean default false`, `providers text[] default '{}'` (so the profile screen and export no longer need an auth admin API).
-- `reports` gains `notified_at timestamptz` (report alert emails are sent by a cron route, not a DB trigger).
+- `reports` loses its email trigger; alert emails are sent by the `/api/report` and `/api/block` routes (no cron, no DB trigger).
 - `puzzles.seed_version` = 3 (new salt).
 - Dropped: Vault/pg_net/pg_cron statements, `supabase_realtime` publication, `NOTIFY pgrst`, auth.users triggers, `auth.role()` policy, `protect_profile_columns`' `request.jwt.claims` reads (uses `current_user IN ('authenticated','anonymous')` instead).
 
 ### 5.3 Functions (SQL)
-All current SECURITY DEFINER functions are ported verbatim with `auth.uid()` → `app.uid()`; grants `TO authenticated`. Removed: `handle_new_user`, `handle_user_updated`, `notify_report_filed`, `trigger_daily_puzzle_generation`, `decrement_group_member_count`, `update_group` (unused). `purge_deleted_accounts` and `purge_inactive_anonymous` no longer touch `auth.*`; the Function performs the `ba."user"` deletes (see 7.3). `provider_display_name(meta, email)` moves to TypeScript (it runs in the user-create hook).
+All current SECURITY DEFINER functions are ported verbatim with `auth.uid()` → `app.uid()`; grants `TO authenticated`. Removed: `handle_new_user`, `handle_user_updated`, `notify_report_filed`, `trigger_daily_puzzle_generation`, `decrement_group_member_count`, `update_group` (unused), `block_user`, `unblock_user` (now Function routes). `purge_deleted_accounts` and `purge_inactive_anonymous` no longer touch `auth.*`; the Function performs the `ba."user"` deletes (see 7.3). `provider_display_name(meta, email)` moves to TypeScript (it runs in the user-create hook).
 
 ### 5.4 RLS
 Identical policy set, expressed with `app.uid()`. `puzzles` and `app_config` are readable by `anonymous`. `group_feed` select policy unchanged (members minus blocked). `reports`: insert own, select own. The Data API is created with `--db-max-rows 200`.
@@ -91,7 +91,8 @@ Node 24, TypeScript, Hono, `pg`, `better-auth`, `jose`, bundled by the Neon CLI.
 | `POST /api/join-group` | join-group | same contract (keeps 200 `{group, already_member}`) |
 | `GET/POST /api/export-data` | export-data | reads `profiles.email/providers`, no admin API |
 | `POST /api/daily-puzzle` | daily-puzzle | user callers: today/tomorrow only; cron: any |
-| `POST /api/report` | client insert into `reports` | inserts, returns 201; the cron notifier emails it |
+| `POST /api/report` | client insert into `reports` | inserts, sends the alert email via Resend, returns 201 |
+| `POST /api/block`, `POST /api/unblock` | `block_user` / `unblock_user` RPCs | direct SQL (insert/delete `user_blocks`, the automatic `blocked_by_user` report) and the alert email; `list_blocked_users` stays an RPC |
 | `POST /api/account/upgrade-email` | `updateUser(email,password)` | same-id guest→email (see 7.2) |
 | `POST /api/account/delete-request`, `/cancel` | RPCs | thin wrappers kept as RPCs too; the app keeps calling the RPCs |
 | `POST /cron/<job>` | pg_cron | guarded by `X-Neon-Trigger-Invocation-Id`; idempotent per `scheduled_at` |
@@ -133,33 +134,37 @@ The app always sends the guest's bearer token on `/auth/sign-up/email`, `/auth/s
 - `/cron/purge-inactive-anonymous`: `DELETE FROM profiles` (cascade) and `DELETE FROM ba."user"` for guests inactive 90 days.
 
 ## 8. Scheduled jobs (Function Triggers, UTC)
+All nightly jobs run inside one 30-minute window so Postgres wakes once a day for them (each wake costs at least 5 minutes of compute; the 15-minute report notifier from the first draft was dropped for this reason — it alone would have cost about 60 CU-hours a month).
+
 | Trigger | cron | functionPath | Body |
 |---|---|---|---|
 | resetweeklyfreezes | `0 0 * * 1` | `/cron/reset-weekly-freezes` | `SELECT public.reset_weekly_freezes()` |
 | applystreakfreezes | `5 0 * * *` | `/cron/apply-streak-freezes` | SQL |
 | expirestalestreaks | `10 0 * * *` | `/cron/expire-stale-streaks` | SQL |
 | dailypuzzle | `15 0 * * *` | `/cron/daily-puzzle` | generate every missing date in today … today+14 |
-| purgedeleted | `0 1 * * *` | `/cron/purge-deleted-accounts` | 7.3 |
-| purgeanonymous | `30 1 * * *` | `/cron/purge-inactive-anonymous` | 7.3 |
-| prunesubmissionlog | `0 2 * * *` | `/cron/prune-submission-log` | SQL |
-| notifyreports | `*/15 * * * *` | `/cron/notify-reports` | email unsent `reports` via Resend, set `notified_at` |
+| purgedeleted | `20 0 * * *` | `/cron/purge-deleted-accounts` | 7.3 |
+| purgeanonymous | `23 0 * * *` | `/cron/purge-inactive-anonymous` | 7.3 |
+| prunesubmissionlog | `26 0 * * *` | `/cron/prune-submission-log` | SQL |
 
 Every handler checks the invocation header, records `(trigger, scheduled_at)` in `cron_runs` to ignore duplicate deliveries, and returns 200 on success. `.github/workflows/puzzles.yml` is deleted (the trigger retries for 72 h and generates a 14-day buffer).
 
 ## 9. Flutter client
 
 ### 9.1 New backend layer (`lib/core/backend/`)
-- `BackendConfig` from dotenv: `API_BASE_URL`, `DATA_API_URL`, `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`, `APPLE_SERVICE_ID`.
+- `BackendConfig` from dotenv: `API_BASE_URL`, `DATA_API_URL`, `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`, `APPLE_SERVICE_ID`. At startup the app also fetches `https://icos.sarathfrancis.work/config.json` (`{api_base_url, data_api_url}`, 5 s timeout, cached in SharedPreferences) and prefers it over the compiled defaults, so a changed Neon host can be fixed without a store release. The Function is additionally exposed on a custom domain `api.icos.sarathfrancis.work` (`customDomains` in `neon.ts`) when the Free plan allows it, which keeps the Google/Apple callbacks stable; if not allowed, the generated host is used and re-registered on change.
 - `TokenStore` (flutter_secure_storage): session token, cached JWT + expiry. (Change from today: tokens leave SharedPreferences; CLAUDE.md is updated.)
 - `AuthClient`: typed wrappers for `/auth/sign-in/anonymous`, `/auth/sign-up/email`, `/auth/sign-in/email`, `/auth/sign-in/social` (idToken), `/auth/link-social`, `/auth/expo-authorization-proxy` (web flow via flutter_web_auth_2, callback `io.icos://oauth-callback`, parse `cookie` → session token; `error` → failure), `/auth/get-session`, `/auth/token`, `/auth/sign-out`, `/auth/request-password-reset`, `/auth/reset-password`, `/auth/send-verification-email`, `/api/account/upgrade-email`. Exposes `AppUser {id, email, emailVerified, isAnonymous, providers, name, createdAt}` and a broadcast `Stream<AuthEvent>` (`signedIn`, `signedOut`, `userUpdated`, `passwordRecovery`) so `auth_provider.dart`, `session_keeper.dart` and `main.dart` keep their shape.
 - `DataApi`: a `PostgrestClient` (package `postgrest`) pointed at `DATA_API_URL` with a header provider that injects `Authorization: Bearer <fresh JWT>` (refreshing via `/auth/token` when < 60 s left; no header when signed out → anonymous role). Repositories swap `SupabaseService.client.from/rpc` for `DataApi.from/rpc`; query shapes unchanged; `PostgrestException` mapping unchanged.
 - `ApiClient` replaces `EdgeFunctionClient`: `POST {API_BASE_URL}/api/<name>` with the bearer session token; returns `EdgeResponse(status, body)` so `sync_service`, `puzzle_session_service`, `puzzle_repository`, `group_repository`, `profile_repository` keep their contracts (`EdgeInvoker` typedef stays).
-- Feed: `groups_provider` replaces the Realtime channel with a `Timer.periodic(10 s)` poll of `group_feed?group_id=eq.X&id=gt.<lastId>` while the detail screen is mounted and the app is in the foreground; stops on dispose/background.
+- Feed: `groups_provider` replaces the Realtime channel with a `Timer.periodic(15 s)` poll of `group_feed?group_id=eq.X&id=gt.<lastId>` while the detail screen is mounted and the app is in the foreground; stops on dispose/background.
 
-### 9.2 Removed
+### 9.2 Fresh-start notice for upgraders
+On first launch of 1.1.0, if SharedPreferences holds a Supabase session key (`supabase.auth.token` or any key prefixed `sb-`) or Hive holds the old user id, the app clears its local caches, removes those keys and shows a one-time dialog: "Icos has moved to a new home. Progress and groups start fresh in this version; your streak begins again today." (AppStrings). Nothing else is migrated.
+
+### 9.3 Removed
 `supabase_flutter` and transitive direct uses; `SupabaseService`; `oauth_web_gateway.dart` (replaced by `AuthClient.webOAuth`); the `io.supabase.icos` scheme (now `io.icos`, in AndroidManifest, Info.plist, `auth_strategy.dart`); `SUPABASE_*` env keys; `scripts/check_signin.py`, `scripts/apple_client_secret.py` (secret minted by the Function).
 
-### 9.3 Kept as is
+### 9.4 Kept as is
 Game engine, puzzle solver (Dart mirror + parity fixture), offline queue and HMAC signing, notifications, router, theming, Maestro flows (updated selectors only where copy changes), golden/widget tests not touching auth.
 
 ## 10. Website and legal
@@ -177,18 +182,19 @@ Game engine, puzzle solver (Dart mirror + parity fixture), offline queue and HMA
 - `neon.ts` `branch()` pins `autoscalingLimitMinCu: 0.25, autoscalingLimitMaxCu: 0.25, suspendTimeout: "5m"` for every branch.
 - Data API `db_max_rows 200`; feed polling only while visible; `app_config` cached 1 h on the client (already); leaderboard reads unchanged (small).
 - Puzzle generation: one puzzle per day in cron (14-day buffer), node budget unchanged.
-- A `scripts/neon_usage.py` prints compute hours and egress for the month from the Neon API so the owner can watch the cap.
+- Budget estimate at a few dozen daily players: nightly window ≈ 4 CU-hours/month; ~50 player sessions a day each waking the compute for ≥ 5 minutes ≈ 30 CU-hours/month; dev-branch use during the build ≈ 10. Headroom ≈ 50 CU-hours. If the cap is hit the compute is suspended until the next cycle and the app falls back to offline play (bundled puzzles, queued scores); that is accepted. `scripts/neon_usage.py` prints the month's compute hours and egress from the Neon API so the owner can watch the cap; it is run at the end of every release.
 
 ## 13. Cutover and release
-1. Build everything against a `dev` Neon branch; run the Dart suite, the Function's tests, and the two-emulator social flow.
+1. Build everything against a `dev` Neon branch; run the Dart suite, the Function's tests, and the two-emulator social flow with freshly created QA accounts (native-token sign-ins; the browser OAuth flow is verified on `main` only, since only the `main` host is registered with Google and Apple).
 2. Deploy to the `main` Neon branch; seed; register the Google and Apple callback URLs (owner); verify sign-ins on a real device.
 3. Ship 1.1.0 (+14): TestFlight public group + App Store review; Play internal + closed. If 1.0.1 is still waiting for review, cancel that submission and submit 1.1.0 instead.
-4. After 1.1.0 is live on both stores: set the old Supabase `app_config.min_supported_version` to `1.1.0` so stale builds prompt an update; the owner deletes the Supabase project.
+4. "Live" means App Store production plus the Play closed track (Play production stays gated on testers). Then set the old Supabase `app_config.min_supported_version` to `1.1.0` so stale builds prompt an update, and the owner deletes the Supabase project.
 
 ## 14. Owner-only steps
 - Google Cloud console: add `https://<function-host>/auth/callback/google` to the web OAuth client's redirect URIs.
 - Apple Developer: add the Function host and `https://<function-host>/auth/callback/apple` to the Services ID; confirm the Sign in with Apple key id.
-- Approve the Neon Function env file contents (secrets copied from the existing Supabase env: Google client secret, Apple key, Resend key) — the orchestrator writes the git-ignored file, the owner reviews nothing is missing.
+- Secrets for the Function env (git-ignored `.env.neon`): Google web client id/secret from the `oauth-clients/` JSON already on disk; the Sign in with Apple key `.p8`, key id and team id already on disk; a NEW Resend API key minted through the Resend connector (the old one stays in Supabase Vault); `BETTER_AUTH_SECRET` and `PUZZLE_SEED_SALT` freshly generated. The owner is asked only if one of these cannot be found.
+- DNS: one CNAME `api.icos.sarathfrancis.work` → the Function host, if custom domains are available on Free.
 - Delete the Supabase project after 1.1.0 is live.
 
 ## 15. Left to the builder
