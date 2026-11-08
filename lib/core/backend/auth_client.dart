@@ -344,21 +344,11 @@ class AuthClient {
       case Success(data: final r) when !_ok(r):
         return Result.failure(_errorFrom(r));
       case Success(data: final r):
+        // The route answers with the profile row (snake_case), not Better
+        // Auth's user: re-fetch the session so the cached user matches what
+        // get-session reports everywhere else.
         await _captureRotatedToken(r);
-        final userJson = _json(r.body)?['user'];
-        if (userJson is! Map<String, dynamic>) {
-          return const Result.failure(
-            AppError.unknown(AppStrings.errorGeneric),
-          );
-        }
-        final user = AppUser.fromJson(
-          userJson,
-          providers: {...?_currentUser?.providers, 'email'}.toList(),
-        );
-        await _resetJwt();
-        await _setUser(user);
-        _emit(AuthEvent.userUpdated);
-        return Result.success(user);
+        return _refreshAfterLink('email');
     }
   }
 

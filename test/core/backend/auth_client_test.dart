@@ -526,22 +526,43 @@ void main() {
     expect(store.jwt, isNull);
   });
 
-  test('upgradeEmail updates the user; 409 is a conflict', () async {
+  test('upgradeEmail re-fetches the session; 409 is a conflict', () async {
     store.sessionToken = 's';
     var status = 200;
-    final auth = client(
-      (req) async => status == 200
-          ? _json({'user': userJson()})
-          : _json({'error': 'Email taken', 'code': 'EMAIL_EXISTS'}, 409),
-    );
-    final ok = await auth.upgradeEmail('a@b.co', 'pw123456');
+    final auth = client((req) async {
+      switch (req.url.path) {
+        case '/auth/get-session':
+          return _json({
+            'session': <String, Object?>{},
+            'user': userJson(id: 'u1', email: 'new@b.co'),
+          });
+        case '/auth/list-accounts':
+          return _json([
+            {'providerId': 'credential'},
+          ]);
+      }
+      return status == 200
+          // The route's snake_case profile row must not become the user.
+          ? _json({
+              'user': {'id': 'u1', 'email': 'stale@b.co', 'is_anonymous': true},
+            })
+          : _json({'error': 'Email taken', 'code': 'EMAIL_EXISTS'}, 409);
+    });
+    final ok = await auth.upgradeEmail('new@b.co', 'pw123456');
     expect(
-      requests.single.url.toString(),
+      requests.first.url.toString(),
       'https://fn.example.test/api/account/upgrade-email',
     );
-    expect(requests.single.headers['authorization'], 'Bearer s');
-    expect((ok as Success).data, isNotNull);
-    expect(auth.currentUser?.email, 'a@b.co');
+    expect(requests.first.headers['authorization'], 'Bearer s');
+    final session = requests.firstWhere(
+      (r) => r.url.path == '/auth/get-session',
+    );
+    expect(session.headers['authorization'], 'Bearer s');
+    final user = (ok as Success<AppUser, AppError>).data;
+    expect(user.email, 'new@b.co');
+    expect(user.isAnonymous, isFalse);
+    expect(user.providers, contains('email'));
+    expect(auth.currentUser?.email, 'new@b.co');
 
     status = 409;
     final clash = await auth.upgradeEmail('a@b.co', 'pw123456');
