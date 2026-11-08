@@ -1,5 +1,8 @@
 # Neon dev: signed-in Profile -> Delete Account -> confirm must not show the generic
 # error (regression for no-arg RPCs sending a JSON null body). Pass -e SHOTS.
+# Manual only (outside config.yaml's flows/*): it requests deletion of the
+# signed-in account. Run on its own with a throwaway account:
+#   maestro test -e SHOTS=<dir> .maestro/manual/40_neon_account_deletion.yaml
 appId: com.icos.game
 ---
 - tapOn:

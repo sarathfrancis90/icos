@@ -4,6 +4,8 @@ appId: com.icos.game
 
 flows:
   - "flows/*"
+# .maestro/manual/ holds destructive flows (e.g. account deletion) that are
+# never part of a full-suite run; run them one by one.
 
 executionOrder:
   continueOnFailure: true
