@@ -43,7 +43,7 @@ Done automatically via the App Store Connect API (`scripts/asc.py`):
 | Item | Value |
 |---|---|
 | App record | `Icos: Daily Path Puzzle`, bundle `com.icos.game`, SKU `icos-ios`, Apple ID `6810895361` |
-| Builds uploaded | 1.0 (1) through (12). Build **7** is attached to version 1.0 and resubmitted for review on 2026-10-06 after the 2026-09-24 Guideline 4 rejection. Builds 8–12 are the follow-up on TestFlight (public link) and Play internal/closed: light theme, display-name prompt, first-play guidance and Tap to draw (8–10), drag no longer cuts the line over filled cells (11), sign-in mode for existing accounts, correct streak after a missed day, midnight-UTC rollover in the foreground, streak reminder armed after a solve, admin New invite code, live member counts, reset counted as an undo, 30-day archive scoring (12) |
+| Builds uploaded | 1.0 (1) through (12) and 1.0.1 (13). **Version 1.0 (build 7) was approved and released on 2026-11-08** after the 2026-10-06 resubmission. **Version 1.0.1 (build 13)** carries everything from builds 8–12 (light theme, display-name prompt, first-play guidance, Tap to draw, drag no longer cuts the line, sign-in mode, streak and midnight-UTC fixes, invite-code regeneration, live member counts, reset counted as an undo, 30-day archive scoring) and was submitted for review on 2026-11-08; it is also on the public TestFlight link and Play internal/closed |
 | Category | Games / Puzzle (secondary: Board) |
 | Age rating | All content descriptors "None" (expect 4+) |
 | Name, subtitle, description, keywords, promo text | Uploaded (en-US) |
