@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:icos/features/puzzle/domain/solver/puzzle_core.dart';
 
 /// Cross-implementation parity: the TypeScript core writes
-/// `supabase/functions/_shared/fixtures/puzzle_parity.json`; this test checks
+/// `backend/src/shared/fixtures/puzzle_parity.json`; this test checks
 /// that the Dart core reaches the same validation verdicts and uniqueness.
 ///
 /// Accepted fixture shapes (tolerant on purpose):
@@ -73,7 +73,7 @@ List<List<int>> _cells(dynamic list, int size) {
 
 void main() {
   final file = File(
-    '${projectRoot().path}/supabase/functions/_shared/fixtures/puzzle_parity.json',
+    '${projectRoot().path}/backend/src/shared/fixtures/puzzle_parity.json',
   );
 
   if (!file.existsSync()) {

@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { TEST_DATABASE_URL } from "./helpers/env.js";
-import { applyMigrations, clientConfig } from "../scripts/migrate.js";
+import { applyMigrations } from "../scripts/migrate.js";
+import { pgConfig } from "../src/shared/pg_url.js";
 
 const APP_TABLES = [
   "profiles",
@@ -73,7 +74,7 @@ describe("0001_schema", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATABASE_
 
   before(async () => {
     await applyMigrations(url);
-    db = new pg.Client(clientConfig(url));
+    db = new pg.Client(pgConfig(url));
     await db.connect();
   });
 

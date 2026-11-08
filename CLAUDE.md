@@ -250,7 +250,7 @@ myProvider.when(
 - **Share cards are client-side** (RepaintBoundary.toImage), NOT server-side Edge Function.
 - **Tables created just-in-time** — only in the story that first needs them, not all upfront.
 - **No MVP phasing** — all 126 FRs ship in v1. Production-ready from day one.
-- **Puzzle core** (`supabase/functions/_shared/puzzle_core.ts` and its Dart mirror `lib/features/puzzle/domain/solver/`): Warnsdorff DFS + canonical backbite for the reference path, pruned solver proving exactly ONE solution, waypoints chosen to enforce uniqueness (fewer clues = harder). Keep both implementations in sync; `fixtures/puzzle_parity.json` is the parity test.
+- **Puzzle core** (`backend/src/shared/puzzle_core.ts` and its Dart mirror `lib/features/puzzle/domain/solver/`): Warnsdorff DFS + canonical backbite for the reference path, pruned solver proving exactly ONE solution, waypoints chosen to enforce uniqueness (fewer clues = harder). Keep both implementations in sync; `backend/src/shared/fixtures/puzzle_parity.json` is the parity test.
 - **Weekday difficulty:** Mon/Tue 5x5 easy, Wed/Thu 6x6 medium, Fri/Sat 7x7 hard, Sun 8x8 expert (UTC).
 - **Celebration animation:** 800ms total (200ms grid ripple + 600ms confetti burst). Reduced motion: green glow on grid border.
 - **Pre-permission screen** before OS notification dialog — shown after first puzzle completion.

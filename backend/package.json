@@ -9,7 +9,8 @@
   "scripts": {
     "test": "tsx --test test/**/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "migrate": "tsx scripts/migrate.ts"
+    "migrate": "tsx scripts/migrate.ts",
+    "generate": "tsx scripts/generate.ts"
   },
   "keywords": [],
   "author": "",

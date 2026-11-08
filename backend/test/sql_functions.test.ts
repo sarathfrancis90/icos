@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { TEST_DATABASE_URL } from "./helpers/env.js";
-import { applyMigrations, clientConfig } from "../scripts/migrate.js";
+import { applyMigrations } from "../scripts/migrate.js";
+import { pgConfig } from "../src/shared/pg_url.js";
 
 // Callable by signed-in clients through the Data API.
 const CLIENT_FUNCTIONS = [
@@ -68,7 +69,7 @@ describe("0002_functions / 0003_seed", { skip: TEST_DATABASE_URL ? false : "NEON
 
   before(async () => {
     await applyMigrations(url);
-    db = new pg.Client(clientConfig(url));
+    db = new pg.Client(pgConfig(url));
     await db.connect();
   });
 

@@ -10,21 +10,11 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
+import { pgConfig } from "../src/shared/pg_url.js";
 
 const DEFAULT_DIR = fileURLToPath(new URL("../migrations", import.meta.url));
 // Arbitrary constant so two concurrent runs serialise instead of racing.
 const LOCK_KEY = 4_276_601;
-
-/**
- * pg warns that `sslmode=require` will change meaning; ask for full
- * certificate and host verification explicitly instead.
- */
-export function clientConfig(url: string): pg.ClientConfig {
-  return {
-    connectionString: url.replace(/([?&])sslmode=require\b/, "$1sslmode=verify-full"),
-    enableChannelBinding: /[?&]channel_binding=require\b/.test(url),
-  };
-}
 
 export function versionOf(file: string): string {
   const match = /^(\d+)_.*\.sql$/.exec(file);
@@ -38,7 +28,7 @@ export async function applyMigrations(url: string, dir: string = DEFAULT_DIR): P
   const versions = files.map(versionOf);
   if (new Set(versions).size !== versions.length) throw new Error("duplicate migration versions");
 
-  const client = new pg.Client(clientConfig(url));
+  const client = new pg.Client(pgConfig(url));
   await client.connect();
   const applied: string[] = [];
   try {
