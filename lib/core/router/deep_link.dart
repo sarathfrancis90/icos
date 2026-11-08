@@ -37,9 +37,13 @@ String? onboardingRedirect({
   return Uri(path: '/onboarding', queryParameters: {'from': from}).toString();
 }
 
-/// Where a player whose password-recovery link just signed them in sets a
-/// new password.
+/// Where a player who opened a password-reset link in the app sets a new
+/// password (the link's token is held by `PasswordRecoveryPending`).
 const String kNewPasswordPath = '/auth/new-password';
+
+/// The password-reset universal link (`https://<site>/reset?token=…`). The
+/// route shows the new-password screen with the link's token.
+const String kResetLinkPath = '/reset';
 
 /// Sends the player to the "set a new password" screen while a recovery is
 /// pending, and away from it once it is not. `null` = no redirect.
@@ -60,8 +64,8 @@ String? deletionRedirect({required String path, required bool pending}) {
 }
 
 /// The single app-level redirect. Gates are checked in priority order
-/// (maintenance, force update, banned, pending deletion, password recovery,
-/// onboarding) and every active gate is terminal: it either holds the player
+/// (maintenance, force update, banned, pending deletion, reset link, password
+/// recovery, onboarding) and every active gate is terminal: it either holds the player
 /// on its own screen (`null`) or sends them there, so a lower gate can never
 /// bounce them away and cause a redirect loop.
 String? appRedirect({
@@ -86,6 +90,12 @@ String? appRedirect({
     return deletionRedirect(path: path, pending: true);
   }
   if (path == kDeletionPendingPath) return '/';
+  // A reset link opens its own screen (it starts the recovery), also while an
+  // earlier recovery is pending, so the newest token wins. No token: home.
+  if (path == kResetLinkPath) {
+    final token = uri.queryParameters['token'] ?? '';
+    return token.isEmpty ? '/' : null;
+  }
   if (recoveryPending) {
     return recoveryRedirect(path: path, pending: true);
   }

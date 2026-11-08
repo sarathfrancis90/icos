@@ -14,10 +14,16 @@ import '../domain/password_rules.dart';
 import '../providers/auth_provider.dart';
 import 'widgets/forgot_password_dialog.dart';
 
-/// Shown after a password-recovery link signs the player in: choose a new
-/// password, then continue to Home.
+/// Shown when a password-reset link opens the app: choose a new password,
+/// then sign in with it (a reset does not sign the player in).
+///
+/// [resetToken] is the token from the `/reset?token=…` link when the screen
+/// is opened by that route; it starts the recovery so the router holds the
+/// player here. Without it the token comes from [PasswordRecoveryPending].
 class NewPasswordScreen extends ConsumerStatefulWidget {
-  const NewPasswordScreen({super.key});
+  const NewPasswordScreen({super.key, this.resetToken});
+
+  final String? resetToken;
 
   @override
   ConsumerState<NewPasswordScreen> createState() => _NewPasswordScreenState();
@@ -32,6 +38,24 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
   String? _error;
   bool _expired = false;
 
+  String? get _linkToken {
+    final token = widget.resetToken;
+    return token == null || token.isEmpty ? null : token;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final token = _linkToken;
+    if (token != null) {
+      // After the first frame: starting the recovery notifies the router.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(passwordRecoveryPendingProvider.notifier).start(token);
+      });
+    }
+  }
+
   @override
   void dispose() {
     _password.dispose();
@@ -45,9 +69,11 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
       _saving = true;
       _error = null;
     });
-    final result = await ref
-        .read(authNotifierProvider.notifier)
-        .updatePassword(_password.text);
+    final auth = ref.read(authNotifierProvider.notifier);
+    final token = _linkToken;
+    final result = token != null
+        ? await auth.completePasswordReset(token, _password.text)
+        : await auth.updatePassword(_password.text);
     if (!mounted) return;
     switch (result) {
       case Success():
@@ -55,9 +81,9 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
         final router = GoRouter.of(context);
         ref.read(passwordRecoveryPendingProvider.notifier).clear();
         messenger.showSnackBar(
-          const SnackBar(content: Text(AppStrings.passwordUpdated)),
+          const SnackBar(content: Text(AppStrings.passwordUpdatedSignIn)),
         );
-        router.go('/');
+        router.go('/auth?mode=signin');
       case Failure(:final error):
         setState(() {
           _saving = false;
@@ -68,8 +94,8 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
     }
   }
 
-  /// Leave without changing the password: the player stays signed in to the
-  /// recovered account and goes home.
+  /// Leave without changing the password: the player keeps the current
+  /// session on this device (usually the guest) and goes home.
   void _notNow() {
     ref.read(passwordRecoveryPendingProvider.notifier).clear();
     context.go('/');

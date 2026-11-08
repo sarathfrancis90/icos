@@ -4,7 +4,7 @@
     "details": [
       {
         "appID": "H845PX7Q62.com.icos.game",
-        "paths": ["/join/*", "/puzzle/*"]
+        "paths": ["/join/*", "/puzzle/*", "/reset", "/reset/*"]
       }
     ]
   },

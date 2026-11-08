@@ -67,7 +67,8 @@ abstract final class AppStrings {
   static const newPasswordLabel = 'New password';
   static const confirmPasswordLabel = 'Confirm password';
   static const savePassword = 'Save password';
-  static const passwordUpdated = 'Password updated.';
+  static const passwordUpdatedSignIn =
+      'Password updated. Sign in with your new password.';
   static const passwordRequired = 'Password is required';
   static const passwordTooShort = 'Password must be at least 6 characters';
   static const passwordsDoNotMatch = 'Passwords do not match';

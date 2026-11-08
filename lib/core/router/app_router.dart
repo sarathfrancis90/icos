@@ -161,6 +161,13 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) => const NewPasswordScreen(),
       ),
       GoRoute(
+        path: kResetLinkPath,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => NewPasswordScreen(
+          resetToken: state.uri.queryParameters['token'],
+        ),
+      ),
+      GoRoute(
         path: '/auth/email',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => EmailAuthScreen(

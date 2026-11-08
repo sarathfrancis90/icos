@@ -209,5 +209,18 @@ void _appRedirectTests() {
         expect(settle({}, s), '/');
       }
     });
+
+    test('a reset link opens its screen unless a higher gate is on', () {
+      const link = '/reset?token=abc';
+      expect(settle({}, link), link);
+      expect(settle({'onboarding'}, link), link);
+      expect(settle({'recovery'}, link), link);
+      expect(settle({'maintenance'}, link), '/maintenance');
+      expect(settle({'banned'}, link), '/banned');
+      expect(settle({'deletion'}, link), kDeletionPendingPath);
+      // Without a token there is nothing to reset.
+      expect(settle({}, '/reset'), '/');
+      expect(settle({'recovery'}, '/reset?token='), kNewPasswordPath);
+    });
   });
 }

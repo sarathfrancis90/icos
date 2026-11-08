@@ -50,6 +50,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="icos.sarathfrancis.work" android:pathPrefix="/join/" />
                 <data android:scheme="https" android:host="icos.sarathfrancis.work" android:pathPrefix="/puzzle/" />
+                <data android:scheme="https" android:host="icos.sarathfrancis.work" android:pathPrefix="/reset" />
             </intent-filter>
             <!-- Auth callback (io.icos://login-callback) -->
             <intent-filter>

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:icos/core/router/deep_link.dart';
+import 'package:icos/core/services/app_config_provider.dart';
 import 'package:icos/core/utils/app_error.dart';
 import 'package:icos/core/utils/result.dart';
 import 'package:icos/features/auth/domain/auth_strategy.dart';
@@ -22,6 +23,7 @@ class _FakeAuth extends AuthNotifier {
   static Result<void, AppError> updateResult = const Result.success(null);
   static final resetCalls = <String>[];
   static final updateCalls = <String>[];
+  static final completeCalls = <(String, String)>[];
 
   @override
   AsyncValue<AppUser?> build() => const AsyncValue.data(null);
@@ -37,6 +39,15 @@ class _FakeAuth extends AuthNotifier {
     updateCalls.add(newPassword);
     return updateResult;
   }
+
+  @override
+  Future<Result<void, AppError>> completePasswordReset(
+    String token,
+    String newPassword,
+  ) async {
+    completeCalls.add((token, newPassword));
+    return updateResult;
+  }
 }
 
 void main() {
@@ -48,6 +59,7 @@ void main() {
     _FakeAuth.updateResult = const Result.success(null);
     _FakeAuth.resetCalls.clear();
     _FakeAuth.updateCalls.clear();
+    _FakeAuth.completeCalls.clear();
   });
 
   final overrides = [
@@ -243,6 +255,11 @@ void main() {
             path: kNewPasswordPath,
             builder: (_, _) => const NewPasswordScreen(),
           ),
+          GoRoute(
+            path: '/auth',
+            builder: (_, state) =>
+                Scaffold(body: Text('AUTH ${state.uri.query}')),
+          ),
         ],
       );
       await tester.pumpWidget(
@@ -265,8 +282,84 @@ void main() {
       await tester.pumpAndSettle();
       expect(_FakeAuth.updateCalls, ['hunter22']);
       expect(container.read(passwordRecoveryPendingProvider), isFalse);
-      expect(find.text('HOME'), findsOneWidget);
-      expect(find.text('Password updated.'), findsOneWidget);
+      // A reset does not sign the player in: they sign in with it next.
+      expect(find.text('AUTH mode=signin'), findsOneWidget);
+      expect(
+        find.text('Password updated. Sign in with your new password.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('/reset?token=abc opens the screen with the token, and a '
+        'successful reset goes to sign-in', (tester) async {
+      final container = ProviderContainer(overrides: overrides);
+      addTearDown(container.dispose);
+      final refresh = ValueNotifier(0);
+      container.listen<bool>(
+        passwordRecoveryPendingProvider,
+        (_, _) => refresh.value++,
+      );
+      final router = GoRouter(
+        initialLocation: '/reset?token=abc',
+        refreshListenable: refresh,
+        redirect: (context, state) => appRedirect(
+          uri: state.uri,
+          gate: AppGate.ok,
+          banned: false,
+          pendingDeletion: false,
+          recoveryPending: container.read(passwordRecoveryPendingProvider),
+          hasSeenOnboarding: true,
+        ),
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (_, _) => const Scaffold(body: Text('HOME')),
+          ),
+          GoRoute(
+            path: kNewPasswordPath,
+            builder: (_, _) => const NewPasswordScreen(),
+          ),
+          GoRoute(
+            path: kResetLinkPath,
+            builder: (_, state) => NewPasswordScreen(
+              resetToken: state.uri.queryParameters['token'],
+            ),
+          ),
+          GoRoute(
+            path: '/auth',
+            builder: (_, state) =>
+                Scaffold(body: Text('AUTH ${state.uri.query}')),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Set a new password'), findsWidgets);
+      expect(router.routeInformationProvider.value.uri.path, kResetLinkPath);
+      expect(container.read(passwordRecoveryPendingProvider), isTrue);
+      expect(
+        container.read(passwordRecoveryPendingProvider.notifier).token,
+        'abc',
+      );
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'hunter22');
+      await tester.enterText(find.byType(TextFormField).at(1), 'hunter22');
+      await tester.tap(find.text('Save password'));
+      await tester.pumpAndSettle();
+      expect(_FakeAuth.completeCalls, [('abc', 'hunter22')]);
+      expect(_FakeAuth.updateCalls, isEmpty);
+      expect(container.read(passwordRecoveryPendingProvider), isFalse);
+      expect(find.text('AUTH mode=signin'), findsOneWidget);
+      expect(
+        find.text('Password updated. Sign in with your new password.'),
+        findsOneWidget,
+      );
     });
   });
 
