@@ -162,11 +162,11 @@ All `SECURITY DEFINER`, `search_path=''`, the caller is `app.uid()` (the JWT
 | RPC | Args | Returns |
 |-----|------|---------|
 | `create_group` | `p_name, p_description?` | `groups` row (creator is admin, member_count=1) |
-| `remove_group_member` | `p_group_id, p_user_id` | `groups` row |
+| `remove_group_member` | `p_group_id, p_user_id` | `groups` row (also writes a `left` feed event with payload `{"removed": true}`) |
 | `transfer_group_admin` | `p_group_id, p_new_admin_id` | `groups` row |
 | `delete_group` | `p_group_id` | `groups` row (soft: `is_active=false`) |
 | `regenerate_invite_code` | `p_group_id` | `groups` row with a new `invite_code` (admin only, `42501`/`NOT_ADMIN` otherwise; the old code stops working) |
-| `leave_group` | `p_group_id` | void (admin leaving → oldest member promoted, or group deactivated) |
+| `leave_group` | `p_group_id` | void (admin leaving → oldest member promoted, or group deactivated; writes a `left` feed event) |
 | `get_group_daily_leaderboard` | `p_group_id, p_puzzle_date` | `rank, user_id, display_name, avatar_url, time_seconds, hints_used, undos_used, completed, verified` (hints ASC, time ASC, undos ASC) |
 | `get_group_weekly_leaderboard` | `p_group_id, p_week_start` | `rank, user_id, display_name, avatar_url, completed_count, avg_time_seconds, total_hints` (completed DESC, avg time ASC) |
 | `list_blocked_users` | – | `user_id, display_name, blocked_at` (caller's blocks, newest first; `''` names show as `Anonymous`) |

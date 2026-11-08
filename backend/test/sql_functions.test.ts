@@ -274,6 +274,44 @@ describe("0002_functions / 0003_seed", { skip: TEST_DATABASE_URL ? false : "NEON
     });
   });
 
+  test("leave_group writes one `left` feed event for the leaver", async () => {
+    await inTx(async () => {
+      const [admin, member] = await makeUsers(2);
+      const groupId = await makeGroup(admin, [member]);
+
+      await asUser(member);
+      await db.query(`SELECT public.leave_group($1)`, [groupId]);
+
+      await asOwner();
+      const { rows } = await db.query<{ user_id: string; payload: unknown }>(
+        `SELECT user_id, payload FROM public.group_feed WHERE group_id = $1 AND event = 'left'`,
+        [groupId],
+      );
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].user_id, member);
+      assert.deepEqual(rows[0].payload, {});
+    });
+  });
+
+  test("remove_group_member writes one `left` feed event with removed=true for the removed user", async () => {
+    await inTx(async () => {
+      const [admin, member] = await makeUsers(2);
+      const groupId = await makeGroup(admin, [member]);
+
+      await asUser(admin);
+      await db.query(`SELECT public.remove_group_member($1, $2)`, [groupId, member]);
+
+      await asOwner();
+      const { rows } = await db.query<{ user_id: string; payload: { removed?: boolean } }>(
+        `SELECT user_id, payload FROM public.group_feed WHERE group_id = $1 AND event = 'left'`,
+        [groupId],
+      );
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].user_id, member);
+      assert.equal(rows[0].payload.removed, true);
+    });
+  });
+
   test("transfer_group_admin to a non-member raises P0002 NOT_A_MEMBER", async () => {
     await inTx(async () => {
       const [admin, outsider] = await makeUsers(2);
