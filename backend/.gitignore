@@ -1,0 +1,4 @@
+.neon
+.env.neon
+.env.local
+.better-auth.generated.sql

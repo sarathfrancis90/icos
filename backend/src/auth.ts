@@ -3,8 +3,10 @@
 // Tables live in schema `ba` (migrations/0004_better_auth.sql, applied by our
 // own runner) with uuid ids, so ba."user".id can equal public.profiles.id. The
 // database hooks below keep profiles in step (they replace the Supabase-era
-// auth.users triggers); onLinkAccount moves a guest's progress onto the account
-// it signs up with, or discards it when the guest signs in to an existing one.
+// auth.users triggers). onLinkAccount moves a guest's progress onto the account
+// it signs up or signs in with when that account owns no progress yet (no
+// attempts, groups or streak; how old the account is does not matter), and
+// otherwise discards the guest: an account with progress is never overwritten.
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { anonymous, bearer, jwt } from "better-auth/plugins";
@@ -15,8 +17,9 @@ import { sendEmail as defaultSendEmail } from "./email.js";
 import {
   discardGuest,
   ensureProfile,
-  isFreshAccount,
+  GuestLinkError,
   mirrorUserUpdate,
+  placeholderName,
   recordLinkedAccount,
   rekeyGuest,
 } from "./identity.js";
@@ -35,8 +38,18 @@ export interface AppleConfig {
   appBundleIdentifier: string;
 }
 
+/** The identity operations the hooks call; tests swap in failing versions. */
+export interface IdentityOps {
+  ensureProfile: typeof ensureProfile;
+  mirrorUserUpdate: typeof mirrorUserUpdate;
+  recordLinkedAccount: typeof recordLinkedAccount;
+  rekeyGuest: typeof rekeyGuest;
+  discardGuest: typeof discardGuest;
+}
+
 export interface AuthDeps {
   sendEmail: typeof defaultSendEmail;
+  identity?: Partial<IdentityOps>;
   baseURL: string;
   secret: string;
   google?: { clientId: string; clientSecret: string };
@@ -70,6 +83,14 @@ async function softly(hook: string, fields: Record<string, unknown>, fn: () => P
 
 export function createAuth(deps: AuthDeps) {
   const { sendEmail } = deps;
+  const ops: IdentityOps = {
+    ensureProfile,
+    mirrorUserUpdate,
+    recordLinkedAccount,
+    rekeyGuest,
+    discardGuest,
+    ...deps.identity,
+  };
   let appleSecret: Promise<string> | undefined;
   const apple = deps.apple;
 
@@ -155,23 +176,34 @@ export function createAuth(deps: AuthDeps) {
     databaseHooks: {
       user: {
         create: {
-          after: async (user) => softly("user.create.after", { user_id: user.id }, () => ensureProfile(user)),
+          after: async (user) => softly("user.create.after", { user_id: user.id }, () => ops.ensureProfile(user)),
         },
         update: {
-          after: async (user) => softly("user.update.after", { user_id: user.id }, () => mirrorUserUpdate(user)),
+          after: async (user) => softly("user.update.after", { user_id: user.id }, () => ops.mirrorUserUpdate(user)),
         },
       },
       account: {
         create: {
-          after: async (account) =>
-            softly("account.create.after", { user_id: account.userId, provider: account.providerId }, () =>
-              recordLinkedAccount(account),
-            ),
+          after: async (account) => {
+            try {
+              await ops.recordLinkedAccount(account);
+            } catch (err) {
+              hookLogger("account.create.after").error("auth hook failed", {
+                user_id: account.userId,
+                provider: account.providerId,
+                ...errorFields(err),
+              });
+              // A guest that could not be turned into a real account must fail
+              // the request; requireSession also repairs it on the next call.
+              if (err instanceof GuestLinkError) throw err;
+            }
+          },
         },
       },
     },
     plugins: [
       anonymous({
+        generateName: () => placeholderName(),
         onLinkAccount: async ({ anonymousUser, newUser }) => {
           const guestId = anonymousUser.user.id;
           const target = newUser.user;
@@ -179,8 +211,8 @@ export function createAuth(deps: AuthDeps) {
           // (link-social keeps the guest id) or the new session is a guest.
           if (target.id === guestId || target.isAnonymous) return;
           try {
-            if (await isFreshAccount(target)) await rekeyGuest(guestId, target);
-            else await discardGuest(guestId);
+            const outcome = await ops.rekeyGuest(guestId, target);
+            if (outcome === "has-progress") await ops.discardGuest(guestId);
           } catch (err) {
             hookLogger("onLinkAccount").error("guest link failed", {
               guest_id: guestId,
@@ -200,7 +232,7 @@ export function createAuth(deps: AuthDeps) {
             sub: s.user.id,
             role: "authenticated",
             is_anonymous: Boolean(s.user.isAnonymous),
-            email: s.user.email ?? null,
+            email: s.user.isAnonymous ? null : (s.user.email ?? null),
           }),
         },
       }),

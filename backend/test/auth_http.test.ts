@@ -10,7 +10,9 @@ import { randomUUID } from "node:crypto";
 import { decodeJwt, decodeProtectedHeader } from "jose";
 import { TEST_DATABASE_URL } from "./helpers/env.js";
 import { applyMigrations } from "../scripts/migrate.js";
+import { Hono } from "hono";
 import type { EmailMessage, EmailResult } from "../src/email.js";
+import type { AuthDeps } from "../src/auth.js";
 
 type Json = Record<string, any>;
 
@@ -25,6 +27,9 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
   let auth: import("../src/auth.js").Auth;
   let q: typeof import("../src/db.js").q;
   let closePool: typeof import("../src/db.js").closePool;
+  let identity: typeof import("../src/identity.js");
+  let makeAuth: (extra?: Partial<AuthDeps>) => import("../src/auth.js").Auth;
+  let makeApp: (a: import("../src/auth.js").Auth) => typeof app;
 
   before(async () => {
     process.env.DATABASE_URL = TEST_DATABASE_URL;
@@ -34,12 +39,24 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
     const { createAuth } = await import("../src/auth.js");
     const { createApp } = await import("../src/index.js");
     ({ q, closePool } = await import("../src/db.js"));
-    auth = createAuth({
-      sendEmail: fakeSendEmail,
-      baseURL: "http://localhost",
-      secret: process.env.BETTER_AUTH_SECRET,
-    });
-    app = createApp(() => auth);
+    identity = await import("../src/identity.js");
+    makeAuth = (extra = {}) =>
+      createAuth({
+        sendEmail: fakeSendEmail,
+        baseURL: "http://localhost",
+        secret: process.env.BETTER_AUTH_SECRET ?? "",
+        ...extra,
+      });
+    makeApp = (a) => {
+      const built = createApp(() => a);
+      // A tiny /api route to exercise requireSession against this instance.
+      const api = new Hono();
+      api.get("/api/me", async (c) => c.json(await identity.requireSession(c, a)));
+      built.route("/", api);
+      return built;
+    };
+    auth = makeAuth();
+    app = makeApp(auth);
   });
 
   after(async () => {
@@ -55,11 +72,11 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
     return `10.${Math.floor(Math.random() * 200)}.${Math.floor(ipCounter / 250)}.${(ipCounter % 250) + 1}`;
   }
 
-  async function call(method: "GET" | "POST", path: string, body?: Json, bearer?: string) {
+  async function call(method: "GET" | "POST", path: string, body?: Json, bearer?: string, via = app) {
     const headers: Record<string, string> = { "x-forwarded-for": nextIp() };
     if (body !== undefined) headers["content-type"] = "application/json";
     if (bearer) headers.authorization = `Bearer ${bearer}`;
-    const res = await app.request(`http://localhost${path}`, {
+    const res = await via.request(`http://localhost${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -69,8 +86,8 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
     return { res, json };
   }
 
-  async function signInGuest() {
-    const { res, json } = await call("POST", "/auth/sign-in/anonymous", {});
+  async function signInGuest(via = app) {
+    const { res, json } = await call("POST", "/auth/sign-in/anonymous", {}, undefined, via);
     assert.equal(res.status, 200, JSON.stringify(json));
     const token = res.headers.get("set-auth-token");
     assert.ok(token, "set-auth-token header");
@@ -105,6 +122,32 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
     assert.fail(`no "${subject}" email to ${to}`);
   }
 
+  /** Runs fn with console.error silenced (expected hook-failure logs). */
+  async function quietly<T>(fn: () => Promise<T>): Promise<T> {
+    const saved = console.error;
+    console.error = () => {};
+    try {
+      return await fn();
+    } finally {
+      console.error = saved;
+    }
+  }
+
+  function fakeIdToken(claims: Json): string {
+    const b64 = (o: Json) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    return `${b64({ alg: "none" })}.${b64(claims)}.sig`;
+  }
+
+  async function insertAttempt(userId: string, date: string): Promise<string> {
+    const pid = await puzzleId(date);
+    const [row] = await q<{ id: string }>(
+      `INSERT INTO public.puzzle_attempts (user_id, puzzle_id, puzzle_date, time_seconds, completed, completed_at)
+       VALUES ($1, $2, $3, 42, true, now()) RETURNING id`,
+      [userId, pid, date],
+    );
+    return row.id;
+  }
+
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
   // --- cases ------------------------------------------------------------------
@@ -116,6 +159,8 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
     assert.equal(p.is_anonymous, true);
     assert.match(p.display_name, /^Player \d{4}$/);
     assert.equal(p.email, null);
+    const [u] = await q<{ name: string }>(`SELECT name FROM ba."user" WHERE id = $1`, [guest.id]);
+    assert.equal(u.name, p.display_name, "the auth user carries the same placeholder, not 'Anonymous'");
   });
 
   let rekeyed: { guestId: string; user: Json } | undefined;
@@ -174,6 +219,7 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
     assert.equal(afterCount, before);
     const p = await profile(rekeyed.user.id);
     assert.equal(p.is_anonymous, false);
+    assert.equal(await identity.rekeyGuest(rekeyed.guestId, { id: String(rekeyed.user.id) }), "gone");
   });
 
   test("existing_account_discards_guest", async () => {
@@ -251,6 +297,8 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
     assert.equal(claims.sub, guest.id);
     assert.equal(claims.role, "authenticated");
     assert.equal(claims.is_anonymous, true);
+    assert.equal(claims.email, null, "no placeholder email in a guest's token");
+    assert.deepEqual(Object.keys(claims).sort(), ["aud", "email", "exp", "iat", "is_anonymous", "iss", "role", "sub"]);
     assert.ok(typeof claims.exp === "number" && claims.exp - Math.floor(Date.now() / 1000) <= 15 * 60);
   });
 
@@ -264,5 +312,125 @@ describe("Better Auth HTTP", { skip: TEST_DATABASE_URL ? false : "NEON_TEST_DATA
     assert.equal(keys[0].crv, "P-256");
     assert.ok(keys[0].kid);
     assert.equal(keys[0].d, undefined, "no private key material");
+  });
+
+  test("a failed re-key fails the sign-up; signing in again with the guest re-keys", async () => {
+    let failures = 1;
+    const flaky = makeAuth({
+      identity: {
+        rekeyGuest: async (...args: Parameters<typeof identity.rekeyGuest>) => {
+          if (failures-- > 0) throw new Error("injected re-key failure");
+          return identity.rekeyGuest(...args);
+        },
+      },
+    });
+    const flakyApp = makeApp(flaky);
+    const guest = await signInGuest(flakyApp);
+    const attemptId = await insertAttempt(guest.id, "2001-01-03");
+    const email = uniqueEmail("retry");
+    const body = { name: "Rae Retry", email, password: "retry-pass" };
+
+    const first = await quietly(() => call("POST", "/auth/sign-up/email", body, guest.token, flakyApp));
+    assert.notEqual(first.res.status, 200, "the sign-up fails visibly");
+    assert.equal((await profile(guest.id))?.is_anonymous, true, "guest untouched");
+
+    const retry = await call("POST", "/auth/sign-in/email", { email, password: body.password }, guest.token, flakyApp);
+    assert.equal(retry.res.status, 200, JSON.stringify(retry.json));
+    const userId = String(retry.json?.user.id);
+    const [moved] = await q<{ user_id: string }>("SELECT user_id FROM public.puzzle_attempts WHERE id = $1", [attemptId]);
+    assert.equal(moved.user_id, userId, "guest progress re-keyed, not discarded");
+    assert.equal(await profile(guest.id), undefined);
+    assert.equal((await profile(userId)).is_anonymous, false);
+  });
+
+  test("a failed guest flip in account.create.after errors and writes nothing; requireSession repairs it", async () => {
+    const failing = makeAuth({
+      identity: {
+        recordLinkedAccount: (account) =>
+          identity.recordLinkedAccount(account, {
+            beforeCommit: async () => {
+              throw new Error("injected flip failure");
+            },
+          }),
+      },
+    });
+    const guest = await signInGuest();
+    const linkedEmail = uniqueEmail("linked");
+    const idToken = fakeIdToken({ email: linkedEmail, email_verified: true, name: "Lee Linked" });
+    const hook = failing.options.databaseHooks?.account?.create?.after as
+      | ((account: unknown, ctx: null) => Promise<void>)
+      | undefined;
+    assert.ok(hook);
+    await quietly(async () => {
+      await assert.rejects(
+        hook({ userId: guest.id, providerId: "google", idToken }, null),
+        (err: Error) => err.name === "GuestLinkError",
+      );
+    });
+    const [u1] = await q<Json>(`SELECT "isAnonymous", email FROM ba."user" WHERE id = $1`, [guest.id]);
+    assert.equal(u1.isAnonymous, true);
+    const p1 = await profile(guest.id);
+    assert.equal(p1.is_anonymous, true);
+    assert.equal(p1.email, null);
+    assert.deepEqual(p1.providers, [], "provider append rolled back too");
+
+    // Better Auth commits the account row before the hook runs: that is the
+    // half-linked state requireSession repairs.
+    await q(
+      `INSERT INTO ba.account ("accountId", "providerId", "userId", "idToken", "updatedAt")
+       VALUES ($1, 'google', $2, $3, now())`,
+      [`google-${randomUUID()}`, guest.id, idToken],
+    );
+    const me = await call("GET", "/api/me", undefined, guest.token);
+    assert.equal(me.res.status, 200, JSON.stringify(me.json));
+    assert.deepEqual(me.json, { id: guest.id, email: linkedEmail, isAnonymous: false });
+    const [u2] = await q<Json>(`SELECT "isAnonymous", email FROM ba."user" WHERE id = $1`, [guest.id]);
+    assert.deepEqual({ ...u2 }, { isAnonymous: false, email: linkedEmail });
+    const p2 = await profile(guest.id);
+    assert.equal(p2.is_anonymous, false);
+    assert.equal(p2.email, linkedEmail);
+    assert.equal(p2.display_name, "Lee Linked");
+    assert.deepEqual(p2.providers, ["google"]);
+  });
+
+  test("requireSession recreates a missing profile", async () => {
+    const email = uniqueEmail("lost");
+    const signUp = await call("POST", "/auth/sign-up/email", { name: "Lou Lost", email, password: "abcdef" });
+    assert.equal(signUp.res.status, 200);
+    const id = String(signUp.json?.user.id);
+    const token = signUp.res.headers.get("set-auth-token") ?? "";
+    await q("DELETE FROM public.profiles WHERE id = $1", [id]);
+    const me = await call("GET", "/api/me", undefined, token);
+    assert.equal(me.res.status, 200, JSON.stringify(me.json));
+    assert.deepEqual(me.json, { id, email, isAnonymous: false });
+    const p = await profile(id);
+    assert.ok(p, "profile recreated");
+    assert.equal(p.display_name, "Lou Lost");
+    assert.equal(p.email, email);
+  });
+
+  test("requireSession: guests get no email; no session is a 401", async () => {
+    const guest = await signInGuest();
+    const me = await call("GET", "/api/me", undefined, guest.token);
+    assert.deepEqual(me.json, { id: guest.id, email: null, isAnonymous: true });
+    const anon = await call("GET", "/api/me");
+    assert.equal(anon.res.status, 401);
+    assert.equal(anon.json?.code, "UNAUTHORIZED");
+  });
+
+  test("discardGuest refuses a non-anonymous profile", async () => {
+    const email = uniqueEmail("keep");
+    const signUp = await call("POST", "/auth/sign-up/email", { name: "Kim Keep", email, password: "abcdef" });
+    const id = String(signUp.json?.user.id);
+    await identity.discardGuest(id);
+    assert.ok(await profile(id), "a real account's profile is never discarded");
+  });
+
+  test("the ba schema is closed to the Data API roles", async () => {
+    const [row] = await q<Json>(
+      `SELECT has_schema_privilege('authenticated', 'ba', 'USAGE') AS authenticated,
+              has_schema_privilege('anonymous', 'ba', 'USAGE') AS anonymous`,
+    );
+    assert.deepEqual({ ...row }, { authenticated: false, anonymous: false });
   });
 });

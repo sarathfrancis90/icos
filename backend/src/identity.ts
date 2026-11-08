@@ -9,7 +9,7 @@ import { HTTPException } from "hono/http-exception";
 import type { Context } from "hono";
 import type { PoolClient } from "pg";
 import { getAuth } from "./auth.js";
-import { q, tx } from "./db.js";
+import { pool, q, tx } from "./db.js";
 import { correlationIdFrom, errorResponse } from "./shared/http.js";
 
 /** The parts of a Better Auth user these helpers read. */
@@ -35,7 +35,6 @@ export interface SessionUser {
 
 const APPLE_RELAY_DOMAIN = "privaterelay.appleid.com";
 const MAX_NAME = 30;
-const FRESH_ACCOUNT_MS = 60_000;
 
 /** Postgres initcap(): lower-case everything, upper-case each word's first letter. */
 function initcap(s: string): string {
@@ -78,55 +77,81 @@ const acceptableName = (n: number) =>
 
 const IS_PLACEHOLDER = `(display_name ~ '^Player [0-9]{4}$' OR display_name = '')`;
 
-/** The email worth storing: null for a guest's placeholder address. */
-function realEmail(user: AuthUser): string | null {
-  return user.isAnonymous ? null : (user.email ?? null);
+const ANON_EMAIL_DOMAIN = "@anonymous.placeholder.invalid";
+const PLACEHOLDER_RE = /^Player \d{4}$/;
+
+/** An email worth storing: null for a guest's placeholder address. */
+function realEmailOf(email: string | null | undefined): string | null {
+  return email && !email.toLowerCase().endsWith(ANON_EMAIL_DOMAIN) ? email : null;
 }
 
-/** Creates the user's profile row if it does not exist yet. */
+/** A name worth storing: null for Better Auth's guest defaults. */
+function realNameOf(name: string | null | undefined): string | null {
+  const trimmed = name?.trim();
+  return trimmed && trimmed !== "Anonymous" && !PLACEHOLDER_RE.test(trimmed) ? trimmed : null;
+}
+
+/** Creates the user's profile row if it does not exist yet (idempotent). */
 export async function ensureProfile(user: AuthUser): Promise<void> {
   const anonymous = Boolean(user.isAnonymous);
-  const provided = anonymous ? null : providerDisplayName(user.name, user.email);
+  const email = anonymous ? null : realEmailOf(user.email);
+  const provided = anonymous ? null : providerDisplayName(realNameOf(user.name), email);
+  // A guest keeps the "Player NNNN" its auth user was created with.
+  const placeholder = user.name && PLACEHOLDER_RE.test(user.name) ? user.name : placeholderName();
   await q(
     `INSERT INTO public.profiles (id, is_anonymous, email, email_verified, display_name)
      VALUES ($1, $2, $3, $4,
              CASE WHEN ${acceptableName(5)} THEN public.sanitize_text($5::text) ELSE $6 END)
      ON CONFLICT (id) DO NOTHING`,
-    [user.id, anonymous, realEmail(user), Boolean(user.emailVerified) && !anonymous, provided, placeholderName()],
+    [user.id, anonymous, email, Boolean(user.emailVerified) && email !== null, provided, placeholder],
   );
 }
 
 /**
- * True when `newUser` was created moments ago and owns no progress yet, i.e.
- * the guest is signing UP (keep the guest's progress) rather than signing in
- * to an existing account (the guest's progress is discarded).
+ * True when `userId` owns no progress (no attempts, group memberships or
+ * streak). Deliberately not based on how new the account is: a guest signing
+ * in to an account that never played re-keys its progress onto that account,
+ * while an account with any progress is never overwritten.
  */
-export async function isFreshAccount(newUser: AuthUser): Promise<boolean> {
-  const created = newUser.createdAt ? new Date(newUser.createdAt).getTime() : Number.NaN;
-  if (!Number.isFinite(created) || Date.now() - created > FRESH_ACCOUNT_MS) return false;
-  const [row] = await q<{ has_data: boolean }>(
+export async function isFreshAccount(userId: string, db: Queryable = pool): Promise<boolean> {
+  const { rows } = await db.query<{ has_data: boolean }>(
     `SELECT EXISTS (SELECT 1 FROM public.puzzle_attempts WHERE user_id = $1)
          OR EXISTS (SELECT 1 FROM public.group_members WHERE user_id = $1)
          OR EXISTS (SELECT 1 FROM public.streaks WHERE user_id = $1) AS has_data`,
-    [newUser.id],
+    [userId],
   );
-  return !row.has_data;
+  return !rows[0].has_data;
+}
+
+export interface RekeyOptions {
+  /** Test seam: runs inside the transaction just before COMMIT. */
+  beforeCommit?: (c: Queryable) => Promise<void>;
 }
 
 /**
  * Moves the guest's profile (and through ON UPDATE CASCADE all of its app data)
- * onto `newUser.id`, replacing the empty profile the sign-up just created.
- * Idempotent: returns false when the guest profile is already gone.
+ * onto `newUser.id`, replacing that user's profile row, when `newUser` owns no
+ * progress (isFreshAccount, checked under the guest row's lock). Keeps the
+ * replaced row's providers, ban and pending deletion.
+ * Returns "rekeyed", "has-progress" (nothing changed: the caller discards the
+ * guest) or "gone" (guest profile already moved or deleted: idempotent).
  */
-export async function rekeyGuest(guestId: string, newUser: AuthUser): Promise<boolean> {
-  if (guestId === newUser.id) return false;
+export async function rekeyGuest(
+  guestId: string,
+  newUser: AuthUser,
+  opts: RekeyOptions = {},
+): Promise<"rekeyed" | "has-progress" | "gone"> {
+  if (guestId === newUser.id) return "gone";
   return tx(async (c) => {
-    const guest = await c.query("SELECT 1 FROM public.profiles WHERE id = $1 FOR UPDATE", [guestId]);
-    if (guest.rowCount === 0) return false;
-    const fresh = await c.query<{ providers: string[] }>(
-      "DELETE FROM public.profiles WHERE id = $1 RETURNING providers",
+    const guest = await c.query("SELECT 1 FROM public.profiles WHERE id = $1 AND is_anonymous FOR UPDATE", [guestId]);
+    if (guest.rowCount === 0) return "gone";
+    if (!(await isFreshAccount(newUser.id, c))) return "has-progress";
+    const replaced = await c.query<{ providers: string[]; is_banned: boolean; deleted_at: Date | null }>(
+      "DELETE FROM public.profiles WHERE id = $1 RETURNING providers, is_banned, deleted_at",
       [newUser.id],
     );
+    const old = replaced.rows[0];
+    const email = realEmailOf(newUser.email);
     await c.query(
       `UPDATE public.profiles
           SET id = $2,
@@ -136,18 +161,23 @@ export async function rekeyGuest(guestId: string, newUser: AuthUser): Promise<bo
               providers = ARRAY(SELECT DISTINCT unnest(providers || $5::text[]) ORDER BY 1),
               display_name = CASE WHEN ${IS_PLACEHOLDER} AND ${acceptableName(6)}
                                   THEN public.sanitize_text($6::text) ELSE display_name END,
+              is_banned = is_banned OR $7,
+              deleted_at = coalesce($8, deleted_at),
               updated_at = now()
         WHERE id = $1`,
       [
         guestId,
         newUser.id,
-        newUser.email ?? null,
-        Boolean(newUser.emailVerified),
-        fresh.rows[0]?.providers ?? [],
-        providerDisplayName(newUser.name, newUser.email),
+        email,
+        Boolean(newUser.emailVerified) && email !== null,
+        old?.providers ?? [],
+        providerDisplayName(realNameOf(newUser.name), email),
+        old?.is_banned ?? false,
+        old?.deleted_at ?? null,
       ],
     );
-    return true;
+    await opts.beforeCommit?.(c);
+    return "rekeyed";
   });
 }
 
@@ -175,18 +205,39 @@ export interface LinkedAccount {
 }
 
 /**
+ * A failure while turning a guest into a real account. The account hook
+ * rethrows it so /auth/link-social (or the OAuth callback) fails visibly
+ * instead of leaving a real account flagged as a guest.
+ */
+export class GuestLinkError extends Error {
+  constructor(cause: unknown) {
+    super(`guest link failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    this.name = "GuestLinkError";
+  }
+}
+
+/**
  * After an account (credential, google, apple) is attached to a user: record
  * the provider and, when it was attached to a guest (/auth/link-social keeps
  * the guest's id), turn the guest into a real account: ba."user" and the
  * profile stop being anonymous, take the provider's email when nobody else
- * uses it, and a placeholder name becomes the provider's name.
+ * uses it, and a placeholder name becomes the provider's name. One
+ * transaction: on failure nothing of ours is written.
+ * Returns the account's email after the flip, or undefined for a non-guest.
  */
-export async function recordLinkedAccount(account: LinkedAccount): Promise<void> {
+export async function recordLinkedAccount(
+  account: LinkedAccount,
+  opts: RekeyOptions = {},
+): Promise<{ email: string | null } | undefined> {
   const claims = idTokenClaims(account.idToken);
   const claimEmail = typeof claims.email === "string" ? claims.email.toLowerCase() : null;
   const claimVerified = claims.email_verified === true || claims.email_verified === "true";
   const claimName = typeof claims.name === "string" ? claims.name : null;
-  await tx(async (c) => {
+  return tx(async (c) => {
+    const who = await c.query<{ isAnonymous: boolean | null }>(
+      `SELECT "isAnonymous" FROM ba."user" WHERE id = $1 FOR UPDATE`,
+      [account.userId],
+    );
     await c.query(
       `UPDATE public.profiles
           SET providers = CASE WHEN $2 = ANY(providers) THEN providers ELSE array_append(providers, $2) END,
@@ -194,24 +245,29 @@ export async function recordLinkedAccount(account: LinkedAccount): Promise<void>
         WHERE id = $1`,
       [account.userId, account.providerId],
     );
-    const { rows } = await c.query<{ email: string; emailVerified: boolean; name: string | null }>(
-      `UPDATE ba."user" u
-          SET "isAnonymous" = false,
-              email = CASE WHEN $2::text IS NOT NULL
-                            AND NOT EXISTS (SELECT 1 FROM ba."user" o WHERE o.email = $2 AND o.id <> u.id)
-                           THEN $2 ELSE u.email END,
-              "emailVerified" = CASE WHEN $2::text IS NOT NULL
-                                      AND NOT EXISTS (SELECT 1 FROM ba."user" o WHERE o.email = $2 AND o.id <> u.id)
-                                     THEN $3 ELSE u."emailVerified" END,
-              "updatedAt" = now()
-        WHERE u.id = $1 AND u."isAnonymous"
-        RETURNING u.email, u."emailVerified", u.name`,
-      [account.userId, claimEmail, claimVerified],
-    );
-    const user = rows[0];
-    if (!user) return; // not a guest: nothing else changes
-    const email = user.email.endsWith("@anonymous.placeholder.invalid") ? null : user.email;
-    await markProfileLinked(c, account.userId, email, email !== null && user.emailVerified, providerDisplayName(claimName, email));
+    if (!who.rows[0]?.isAnonymous) return undefined; // not a guest: nothing else changes
+    try {
+      const { rows } = await c.query<{ email: string; emailVerified: boolean }>(
+        `UPDATE ba."user" u
+            SET "isAnonymous" = false,
+                email = CASE WHEN $2::text IS NOT NULL
+                              AND NOT EXISTS (SELECT 1 FROM ba."user" o WHERE o.email = $2 AND o.id <> u.id)
+                             THEN $2 ELSE u.email END,
+                "emailVerified" = CASE WHEN $2::text IS NOT NULL
+                                        AND NOT EXISTS (SELECT 1 FROM ba."user" o WHERE o.email = $2 AND o.id <> u.id)
+                                       THEN $3 ELSE u."emailVerified" END,
+                "updatedAt" = now()
+          WHERE u.id = $1
+          RETURNING u.email, u."emailVerified"`,
+        [account.userId, claimEmail, claimVerified],
+      );
+      const email = realEmailOf(rows[0].email);
+      await markProfileLinked(c, account.userId, email, email !== null && rows[0].emailVerified, providerDisplayName(claimName, email));
+      await opts.beforeCommit?.(c);
+      return { email };
+    } catch (err) {
+      throw new GuestLinkError(err);
+    }
   });
 }
 
@@ -235,26 +291,64 @@ async function markProfileLinked(
   );
 }
 
-/** Mirrors a ba."user" update (email, verification, name) into the profile. */
+/**
+ * Mirrors a ba."user" update (email, verification, name) into the profile.
+ * Guest defaults ("Anonymous", "Player NNNN", …@anonymous.placeholder.invalid)
+ * count as no value and are never copied.
+ */
 export async function mirrorUserUpdate(user: AuthUser): Promise<void> {
   if (user.isAnonymous) return;
+  const email = realEmailOf(user.email);
   await q(
     `UPDATE public.profiles
-        SET email = $2,
-            email_verified = $3,
+        SET email = coalesce($2, email),
+            email_verified = CASE WHEN $2::text IS NULL THEN email_verified ELSE $3 END,
             is_anonymous = false,
             display_name = CASE WHEN ${IS_PLACEHOLDER} AND ${acceptableName(4)}
                                 THEN public.sanitize_text($4::text) ELSE display_name END,
             updated_at = now()
       WHERE id = $1
-        AND (email IS DISTINCT FROM $2 OR email_verified IS DISTINCT FROM $3 OR is_anonymous
+        AND (($2::text IS NOT NULL AND (email IS DISTINCT FROM $2 OR email_verified IS DISTINCT FROM $3))
+             OR is_anonymous
              OR (${IS_PLACEHOLDER} AND $4::text IS NOT NULL))`,
-    [user.id, user.email ?? null, Boolean(user.emailVerified), user.name?.trim() || null],
+    [user.id, email, Boolean(user.emailVerified) && email !== null, realNameOf(user.name)],
   );
 }
 
+/**
+ * Repairs what a failed auth hook can leave behind, for the session's user:
+ * a missing profile (user.create.after failed) is created, and a guest that
+ * already has a linked sign-in account (the anonymous plugin writes none, so
+ * any ba.account row is a real credential) is flipped to a real account.
+ * One cheap SELECT when nothing needs repair.
+ */
+export async function syncSessionUser(user: AuthUser): Promise<SessionUser> {
+  const anonymous = Boolean(user.isAnonymous);
+  const [row] = await q<{ has_profile: boolean; providerId: string | null; idToken: string | null }>(
+    `SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = $1) AS has_profile,
+            a."providerId", a."idToken"
+       FROM (SELECT 1) one
+       LEFT JOIN LATERAL (
+         SELECT "providerId", "idToken" FROM ba.account
+          WHERE "userId" = $1 AND $2
+          ORDER BY "createdAt" DESC LIMIT 1
+       ) a ON true`,
+    [user.id, anonymous],
+  );
+  if (!row.has_profile) await ensureProfile(user);
+  if (anonymous && row.providerId) {
+    const linked = await recordLinkedAccount({ userId: user.id, providerId: row.providerId, idToken: row.idToken });
+    if (linked) return { id: user.id, email: linked.email, isAnonymous: false };
+  }
+  return { id: user.id, email: anonymous ? null : realEmailOf(user.email), isAnonymous: anonymous };
+}
+
 /** The session behind an /api/* request, or a 401 in the API's error shape. */
-export async function requireSession(c: Context, auth: SessionSource = getAuth()): Promise<SessionUser> {
+export async function requireSession(
+  c: Context,
+  auth: SessionSource = getAuth(),
+  sync: (user: AuthUser) => Promise<SessionUser> = syncSessionUser,
+): Promise<SessionUser> {
   // A lookup failure (e.g. the database is down) propagates as a 500: turning
   // it into a 401 would make the app treat a healthy session as signed out.
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -262,10 +356,5 @@ export async function requireSession(c: Context, auth: SessionSource = getAuth()
     const res = errorResponse(401, "Not signed in", "UNAUTHORIZED", correlationIdFrom(c.req.raw));
     throw new HTTPException(401, { res });
   }
-  const { user } = session;
-  return {
-    id: user.id,
-    email: user.isAnonymous ? null : (user.email ?? null),
-    isAnonymous: Boolean(user.isAnonymous),
-  };
+  return sync(session.user);
 }

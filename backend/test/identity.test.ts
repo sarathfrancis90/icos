@@ -2,7 +2,13 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { Hono } from "hono";
-import { placeholderName, providerDisplayName, requireSession, type SessionSource } from "../src/identity.js";
+import {
+  placeholderName,
+  providerDisplayName,
+  requireSession,
+  type AuthUser,
+  type SessionSource,
+} from "../src/identity.js";
 
 describe("providerDisplayName", () => {
   test("uses the provider's name", () => {
@@ -42,9 +48,11 @@ describe("placeholderName", () => {
 });
 
 describe("requireSession", () => {
+  // The DB-side repair (syncSessionUser) is covered in auth_http.test.ts.
+  const echo = async (u: AuthUser) => ({ id: u.id, email: u.email ?? null, isAnonymous: Boolean(u.isAnonymous) });
   function appWith(source: SessionSource) {
     const app = new Hono();
-    app.get("/api/me", async (c) => c.json(await requireSession(c, source)));
+    app.get("/api/me", async (c) => c.json(await requireSession(c, source, echo)));
     return app;
   }
 
@@ -62,13 +70,6 @@ describe("requireSession", () => {
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), { id: "u1", email: "a@example.com", isAnonymous: false });
     assert.equal(seen?.get("authorization"), "Bearer t");
-  });
-
-  test("hides a guest's placeholder email", async () => {
-    const app = appWith({
-      api: { getSession: async () => ({ user: { id: "g1", email: "g1@anonymous.placeholder.invalid", isAnonymous: true } }) },
-    });
-    assert.deepEqual(await (await app.request("/api/me")).json(), { id: "g1", email: null, isAnonymous: true });
   });
 
   test("401 in the API error shape without a session", async () => {
