@@ -1,5 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../services/app_logger.dart';
+
 /// Persists the Better Auth session token, the short-lived Data API JWT and
 /// the last known user (so the app knows who is signed in while offline).
 abstract interface class TokenStore {
@@ -19,6 +21,11 @@ abstract interface class TokenStore {
 }
 
 /// [TokenStore] on the platform keychain / keystore.
+///
+/// Reads never throw: a keychain / keystore failure (e.g. a key invalidated
+/// by a device restore, or the keychain locked) is logged and reads as
+/// "nothing stored", so startup continues as signed out and a new guest
+/// session is created.
 class SecureTokenStore implements TokenStore {
   SecureTokenStore([FlutterSecureStorage? storage])
     : _storage =
@@ -37,8 +44,23 @@ class SecureTokenStore implements TokenStore {
   static const _kJwtExpiry = 'icos.jwt_expiry';
   static const _kUser = 'icos.user';
 
+  Future<String?> _read(String key) async {
+    try {
+      return await _storage.read(key: key);
+    } on Object catch (e, st) {
+      // Never log the value; the key name only says which slot failed.
+      AppLogger.warn(
+        'secure storage read failed',
+        error: e,
+        st: st,
+        data: {'key': key},
+      );
+      return null;
+    }
+  }
+
   @override
-  Future<String?> readSessionToken() => _storage.read(key: _kSession);
+  Future<String?> readSessionToken() => _read(_kSession);
 
   @override
   Future<void> writeSessionToken(String token) =>
@@ -52,11 +74,11 @@ class SecureTokenStore implements TokenStore {
   }
 
   @override
-  Future<String?> cachedJwt() => _storage.read(key: _kJwt);
+  Future<String?> cachedJwt() => _read(_kJwt);
 
   @override
   Future<DateTime?> jwtExpiry() async {
-    final raw = await _storage.read(key: _kJwtExpiry);
+    final raw = await _read(_kJwtExpiry);
     final ms = raw == null ? null : int.tryParse(raw);
     return ms == null
         ? null
@@ -79,7 +101,7 @@ class SecureTokenStore implements TokenStore {
   }
 
   @override
-  Future<String?> readUserJson() => _storage.read(key: _kUser);
+  Future<String?> readUserJson() => _read(_kUser);
 
   @override
   Future<void> writeUserJson(String json) =>
