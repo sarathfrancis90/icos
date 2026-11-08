@@ -20,6 +20,21 @@ export default defineConfig({
       source: "src/index.ts",
       env: {
         NODE_ENV: "production",
+        // Required secrets (deploy fails fast when unset — never coerce to "").
+        BETTER_AUTH_SECRET: { value: process.env.BETTER_AUTH_SECRET, required: true },
+        PUZZLE_SEED_SALT: { value: process.env.PUZZLE_SEED_SALT, required: true },
+        // Optional: public base URL of this function (custom domain). When unset the
+        // code derives https://<branch>-api<host suffix> from Neon's injected vars.
+        AUTH_BASE_URL: { value: process.env.AUTH_BASE_URL, required: false },
+        // Optional integrations; a provider is disabled when its vars are unset.
+        RESEND_API_KEY: { value: process.env.RESEND_API_KEY, required: false },
+        REPORT_ALERT_TO: { value: process.env.REPORT_ALERT_TO, required: false },
+        GOOGLE_WEB_CLIENT_ID: { value: process.env.GOOGLE_WEB_CLIENT_ID, required: false },
+        GOOGLE_WEB_CLIENT_SECRET: { value: process.env.GOOGLE_WEB_CLIENT_SECRET, required: false },
+        APPLE_SERVICE_ID: { value: process.env.APPLE_SERVICE_ID, required: false },
+        APPLE_TEAM_ID: { value: process.env.APPLE_TEAM_ID, required: false },
+        APPLE_KEY_ID: { value: process.env.APPLE_KEY_ID, required: false },
+        APPLE_P8_BASE64: { value: process.env.APPLE_P8_BASE64, required: false },
       },
     },
   },
