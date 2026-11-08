@@ -13,7 +13,7 @@ const kOAuthCallbackScheme = 'io.icos';
 const kOAuthCallbackUrl = 'io.icos://oauth-callback';
 
 /// Remote override for the backend hosts, so a changed Neon host can be fixed
-/// without a store release.
+/// without a store release. This host is trusted: it can route all traffic.
 const kRemoteBackendConfigUrl = 'https://icos.sarathfrancis.work/config.json';
 
 /// SharedPreferences key holding the last good remote override (raw JSON).

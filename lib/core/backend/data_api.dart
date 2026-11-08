@@ -98,10 +98,11 @@ class JwtHttpClient extends http.BaseClient {
   @override
   void close() => _inner.close();
 
-  static bool _mentionsJwt(String body) {
-    final lower = body.toLowerCase();
-    return lower.contains('jwt') || lower.contains('token');
-  }
+  /// PostgREST JWT errors: the message mentions "JWT" or the code is
+  /// `PGRST30x` (PGRST300-PGRST303).
+  static final _jwtError = RegExp(r'jwt|PGRST30\d', caseSensitive: false);
+
+  static bool _mentionsJwt(String body) => _jwtError.hasMatch(body);
 
   static void _authorize(http.BaseRequest request, String? jwt) {
     request.headers.removeWhere((k, _) => k.toLowerCase() == 'authorization');

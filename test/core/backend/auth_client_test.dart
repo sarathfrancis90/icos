@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -254,6 +255,12 @@ void main() {
       expect(store.sessionToken, 'guest-token');
     });
 
+    test('a non-platform error from the browser is an auth failure', () async {
+      final auth = client(server, web: (_, _) async => throw StateError('x'));
+      final result = await auth.webOAuth('apple');
+      expect((result as Failure).error, isA<AuthError>());
+    });
+
     test('dismissed browser is cancelled', () async {
       final auth = client(
         server,
@@ -274,6 +281,26 @@ void main() {
     expect((r as Success).data, 'tok+1');
     expect(
       AuthClient.parseOAuthCallback('io.icos://oauth-callback'),
+      isA<Failure>(),
+    );
+    // Stops at ',' (several Set-Cookie headers joined).
+    final joined = Uri.encodeComponent(
+      'better-auth.session_token=abc,better-auth.other=x',
+    );
+    expect(
+      (AuthClient.parseOAuthCallback('io.icos://oauth-callback?cookie=$joined')
+              as Success)
+          .data,
+      'abc',
+    );
+    // Malformed percent-encoding never throws.
+    final bad = Uri.encodeComponent('better-auth.session_token=%E0%A4%A');
+    expect(
+      AuthClient.parseOAuthCallback('io.icos://oauth-callback?cookie=$bad'),
+      isA<Failure>(),
+    );
+    expect(
+      AuthClient.parseOAuthCallback('io.icos://oauth-callback?cookie=%ZZ'),
       isA<Failure>(),
     );
   });
@@ -309,6 +336,76 @@ void main() {
     expect(store.sessionToken, isNull);
     await pumpEventQueue();
     expect(events, [AuthEvent.signedOut]);
+  });
+
+  test(
+    'a refresh in flight across sign-out and a new guest is discarded',
+    () async {
+      store.sessionToken = 'old-session';
+      final slowToken = Completer<http.Response>();
+      final auth = client((req) async {
+        switch (req.url.path) {
+          case '/auth/token':
+            return req.headers['authorization'] == 'Bearer old-session'
+                ? slowToken.future
+                : _json({
+                    'token': fakeJwt(
+                      now.add(const Duration(minutes: 15)),
+                      sub: 'u2',
+                    ),
+                  });
+          case '/auth/sign-out':
+            return _json({'success': true});
+          case '/auth/sign-in/anonymous':
+            return _json({
+              'token': 'new-session',
+              'user': userJson(id: 'u2', anonymous: true),
+            });
+        }
+        return http.Response('?', 404);
+      });
+
+      final stale = auth.freshJwt();
+      await pumpEventQueue();
+      await auth.signOut();
+      await auth.signInAnonymously();
+      final fresh = await auth.freshJwt();
+
+      slowToken.complete(
+        _json(
+          {'token': fakeJwt(now.add(const Duration(minutes: 15)), sub: 'u1')},
+          200,
+          {'set-auth-token': 'old-rotated'},
+        ),
+      );
+      expect(await stale, isNull);
+      expect(store.sessionToken, 'new-session');
+      expect(store.jwt, fresh);
+      expect(fresh, isNotNull);
+      final payload =
+          jsonDecode(
+                utf8.decode(
+                  base64Url.decode(base64Url.normalize(fresh!.split('.')[1])),
+                ),
+              )
+              as Map<String, dynamic>;
+      expect(payload['sub'], 'u2');
+    },
+  );
+
+  test('parallel freshJwt calls share one /auth/token request', () async {
+    store.sessionToken = 's';
+    final gate = Completer<void>();
+    final jwt = fakeJwt(now.add(const Duration(minutes: 15)));
+    final auth = client((req) async {
+      await gate.future;
+      return _json({'token': jwt});
+    });
+    final calls = List.generate(5, (_) => auth.freshJwt());
+    await pumpEventQueue();
+    gate.complete();
+    expect(await Future.wait(calls), List.filled(5, jwt));
+    expect(requests.where((r) => r.url.path == '/auth/token'), hasLength(1));
   });
 
   test('getSession null clears the session', () async {
@@ -389,5 +486,16 @@ void main() {
     });
     final noEmail = await auth.sendVerificationEmail();
     expect((noEmail as Failure).error, isA<ValidationError>());
+
+    // Guest current user + explicit email (resend after a session-less
+    // sign-up).
+    store.sessionToken = 'guest';
+    store.userJson = jsonEncode(userJson(anonymous: true));
+    await auth.restore();
+    expect(auth.currentUser?.email, isNull);
+    final sent = await auth.sendVerificationEmail(email: 'new@b.co');
+    expect(sent, isA<Success>());
+    expect(requests.last.url.path, '/auth/send-verification-email');
+    expect(jsonDecode(requests.last.body), {'email': 'new@b.co'});
   });
 }

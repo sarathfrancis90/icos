@@ -153,6 +153,45 @@ void main() {
     expect(dataRequests, hasLength(1));
   });
 
+  test(
+    'PGRST30x code triggers a refresh; a mere "token" word does not',
+    () async {
+      store
+        ..sessionToken = 's'
+        ..jwt = 'stale'
+        ..expiry = now.add(const Duration(minutes: 10));
+      final db = api(
+        (req, n) async => n == 1
+            ? http.Response(
+                jsonEncode({'code': 'PGRST301', 'message': 'expired'}),
+                400,
+              )
+            : rows(),
+      );
+      await db.from('profiles').select();
+      expect(tokenCalls, 1);
+      expect(dataRequests, hasLength(2));
+
+      dataRequests.clear();
+      tokenCalls = 0;
+      final db2 = api(
+        (req, _) async => http.Response(
+          jsonEncode({
+            'code': '22P02',
+            'message': 'invalid input syntax near token "x"',
+          }),
+          400,
+        ),
+      );
+      await expectLater(
+        db2.from('profiles').select(),
+        throwsA(isA<PostgrestException>()),
+      );
+      expect(tokenCalls, 0);
+      expect(dataRequests, hasLength(1));
+    },
+  );
+
   test('no session sends no Authorization header', () async {
     final db = api((req, _) async => rows());
     await db.from('puzzles').select();

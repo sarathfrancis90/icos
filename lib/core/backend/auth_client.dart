@@ -192,7 +192,13 @@ class AuthClient {
             AppError.auth(AppStrings.backendSignInFailed),
           );
         }
-        authorizeUrl = Uri.parse(url);
+        final parsedUrl = Uri.tryParse(url);
+        if (parsedUrl == null) {
+          return const Result.failure(
+            AppError.auth(AppStrings.backendSignInFailed),
+          );
+        }
+        authorizeUrl = parsedUrl;
     }
 
     final proxy = _config
@@ -208,6 +214,10 @@ class AuthClient {
         return const Result.failure(AppError.cancelled());
       }
       return Result.failure(AppError.auth(e.message ?? e.code));
+    } on Object {
+      return const Result.failure(
+        AppError.auth(AppStrings.backendSignInFailed),
+      );
     }
 
     final parsed = parseOAuthCallback(callback);
@@ -228,7 +238,7 @@ class AuthClient {
             );
           case Success(data: final AppUser user):
             await _store.writeSessionToken(sessionToken);
-            await _store.clearJwt();
+            await _resetJwt();
             final merged = user.copyWith(
               providers: {...user.providers, provider}.toList(),
             );
@@ -246,6 +256,17 @@ class AuthClient {
   /// Parses `io.icos://oauth-callback?cookie=<Set-Cookie>` into the session
   /// token, or `?error=...` into an [AppError.auth].
   static Result<String, AppError> parseOAuthCallback(String callbackUrl) {
+    // Never throws: malformed percent-encoding is a failed sign-in.
+    try {
+      return _parseOAuthCallback(callbackUrl);
+    } on Object {
+      return const Result.failure(
+        AppError.auth(AppStrings.backendSignInFailed),
+      );
+    }
+  }
+
+  static Result<String, AppError> _parseOAuthCallback(String callbackUrl) {
     final uri = Uri.tryParse(callbackUrl);
     if (uri == null) {
       return const Result.failure(
@@ -261,7 +282,7 @@ class AuthClient {
     if (cookie != null) {
       for (final name in _sessionCookieNames) {
         final match = RegExp(
-          '(?:^|[;,\\s])${RegExp.escape(name)}=([^;]*)',
+          '(?:^|[;,\\s])${RegExp.escape(name)}=([^;,]*)',
         ).firstMatch(cookie);
         final raw = match?.group(1)?.trim();
         if (raw != null && raw.isNotEmpty) {
@@ -306,7 +327,7 @@ class AuthClient {
           userJson,
           providers: {...?_currentUser?.providers, 'email'}.toList(),
         );
-        await _store.clearJwt();
+        await _resetJwt();
         await _setUser(user);
         _emit(AuthEvent.userUpdated);
         return Result.success(user);
@@ -360,9 +381,13 @@ class AuthClient {
         return cached;
       }
     }
-    return _jwtInFlight ??= _refreshJwt().whenComplete(() {
-      _jwtInFlight = null;
+    final inFlight = _jwtInFlight;
+    if (inFlight != null) return inFlight;
+    late final Future<String?> refresh;
+    refresh = _refreshJwt().whenComplete(() {
+      if (identical(_jwtInFlight, refresh)) _jwtInFlight = null;
     });
+    return _jwtInFlight = refresh;
   }
 
   Future<String?> _refreshJwt() async {
@@ -371,6 +396,9 @@ class AuthClient {
     final sent = await _send(
       () => _http.get(_config.authUri('token'), headers: _headers(token)),
     );
+    // A sign-out / new sign-in while the call was in flight makes this
+    // response stale: never write the old account's JWT or token back.
+    if (await _store.readSessionToken() != token) return null;
     switch (sent) {
       case Failure():
         return _usableCachedJwt();
@@ -380,7 +408,7 @@ class AuthClient {
       case Success(data: final r) when !_ok(r):
         return _usableCachedJwt();
       case Success(data: final r):
-        await _captureRotatedToken(r);
+        await _captureRotatedToken(r, sentWith: token);
         final jwt = _json(r.body)?['token'];
         if (jwt is! String || jwt.isEmpty) return _usableCachedJwt();
         await _store.writeJwt(jwt, _jwtExpiry(jwt));
@@ -448,18 +476,20 @@ class AuthClient {
   ) =>
       _postVoid('reset-password', {'newPassword': newPassword, 'token': token});
 
-  /// Sends a verification email to the current user's address.
+  /// Sends a verification email to [email], or to the current user's address
+  /// (e.g. resending after a sign-up that returned no session).
   Future<Result<void, AppError>> sendVerificationEmail({
+    String? email,
     String? callbackURL,
   }) async {
-    final email = _currentUser?.email;
-    if (email == null) {
+    final address = email ?? _currentUser?.email;
+    if (address == null || address.isEmpty) {
       return const Result.failure(
         AppError.validation(AppStrings.backendNoEmail),
       );
     }
     return _postVoid('send-verification-email', {
-      'email': email,
+      'email': address,
       'callbackURL': ?callbackURL,
     });
   }
@@ -503,7 +533,7 @@ class AuthClient {
             : (bodyToken is String && bodyToken.isNotEmpty ? bodyToken : null);
         if (token == null) return Result.success(user);
         await _store.writeSessionToken(token);
-        await _store.clearJwt();
+        await _resetJwt();
         await _setUser(user);
         _emit(AuthEvent.signedIn);
         return Result.success(user);
@@ -515,7 +545,7 @@ class AuthClient {
     String provider,
   ) async {
     await _captureRotatedToken(r);
-    await _store.clearJwt();
+    await _resetJwt();
     final token = await _store.readSessionToken();
     if (token == null) {
       return const Result.failure(AppError.auth(AppStrings.backendNotSignedIn));
@@ -651,7 +681,15 @@ class AuthClient {
     await _store.writeUserJson(jsonEncode(user.toJson()));
   }
 
+  /// Drops the cached JWT and detaches any in-flight refresh (it belongs
+  /// to the previous session; its result is discarded).
+  Future<void> _resetJwt() async {
+    _jwtInFlight = null;
+    await _store.clearJwt();
+  }
+
   Future<void> _clearLocal({required bool emit}) async {
+    _jwtInFlight = null;
     await _store.clearSessionToken();
     _currentUser = null;
     if (emit) _emit(AuthEvent.signedOut);
