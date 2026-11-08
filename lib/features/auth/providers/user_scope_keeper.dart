@@ -15,8 +15,9 @@ part 'user_scope_keeper.g.dart';
 /// one user to another every
 /// provider that caches per-player state must start over: results, stats,
 /// streak, the kept-alive game / hint / score-submitter state and practice
-/// stats. Events that keep the same id (linkIdentity, updateUser, token
-/// refresh) change nothing, so in-progress play survives linking a guest.
+/// stats. Events that keep the same id (linking a provider, the email
+/// upgrade, a session refresh) change nothing, so in-progress play survives
+/// linking a guest.
 ///
 /// Instantiated once at app start.
 @Riverpod(keepAlive: true)
@@ -27,7 +28,7 @@ class UserScopeKeeper extends _$UserScopeKeeper {
   void build() {
     _lastUserId = StorageService.activeUserId;
     ref.listen(authStateChangesProvider, (prev, next) async {
-      final id = next.valueOrNull?.session?.user.id;
+      final id = next.valueOrNull?.user?.id;
       final previous = _lastUserId;
       if (id == previous) return;
       _lastUserId = id;

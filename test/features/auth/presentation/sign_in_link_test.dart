@@ -16,14 +16,14 @@ import 'package:icos/features/groups/presentation/join_group_screen.dart';
 import 'package:icos/features/groups/presentation/widgets/account_required_card.dart';
 import 'package:icos/features/groups/providers/groups_provider.dart';
 import 'package:icos/features/profile/presentation/widgets/guest_account_card.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:icos/core/backend/app_user.dart';
 
 import '../../../helpers/storage_test_helpers.dart';
 import '../../../helpers/test_helpers.dart';
 
 class _FakeAuth extends AuthNotifier {
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 }
 
 const _signInLabel = AppStrings.signInExistingAccount;

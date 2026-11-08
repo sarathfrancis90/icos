@@ -171,6 +171,7 @@ abstract final class AppStrings {
   static const backendSignInFailed =
       'Could not complete sign-in. Please try again.';
   static const backendNoEmail = 'This account has no email address.';
+  static const profileEmailNotVerified = 'not verified';
 
   // Accessibility
   static const a11yEmptyCell = 'empty';

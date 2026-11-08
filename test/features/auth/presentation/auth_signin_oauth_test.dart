@@ -13,7 +13,7 @@ import 'package:icos/features/auth/domain/auth_outcome.dart';
 import 'package:icos/features/auth/domain/auth_strategy.dart';
 import 'package:icos/features/auth/presentation/auth_screen.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:icos/core/backend/app_user.dart';
 
 import '../../../helpers/storage_test_helpers.dart';
 import '../../../helpers/test_helpers.dart';
@@ -22,7 +22,7 @@ class _RecordingAuth extends AuthNotifier {
   static final calls = <String>[];
 
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 
   @override
   Future<AuthOutcome> signInWithGoogle() async {

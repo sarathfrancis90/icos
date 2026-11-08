@@ -261,6 +261,37 @@ void main() {
       expect((result as Failure).error, isA<AuthError>());
     });
 
+    test('onBrowserClosed runs once the sheet is gone, before the exchange '
+        'and on cancel, never when the browser never opened', () async {
+      store.sessionToken = 'guest-token';
+      final log = <String>[];
+      final auth = client(
+        (req) async {
+          if (req.url.path == '/auth/get-session') log.add('exchange');
+          return server(req);
+        },
+        web: (_, _) async {
+          log.add('browser');
+          return 'io.icos://oauth-callback?cookie=better-auth.session_token%3Dxyz';
+        },
+      );
+      await auth.webOAuth('apple', onBrowserClosed: () => log.add('closed'));
+      expect(log, ['browser', 'closed', 'exchange']);
+
+      log.clear();
+      final cancelled = client(
+        server,
+        web: (_, _) async => throw PlatformException(code: 'CANCELED'),
+      );
+      await cancelled.webOAuth('apple', onBrowserClosed: () => log.add('closed'));
+      expect(log, ['closed']);
+
+      log.clear();
+      final noStart = client((_) async => http.Response('{}', 500));
+      await noStart.webOAuth('apple', onBrowserClosed: () => log.add('closed'));
+      expect(log, isEmpty);
+    });
+
     test('dismissed browser is cancelled', () async {
       final auth = client(
         server,

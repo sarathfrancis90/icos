@@ -9,12 +9,10 @@ import 'package:icos/core/services/edge_function_client.dart';
 import 'package:icos/core/services/session_service.dart';
 import 'package:icos/core/services/storage_service.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart'
-    show authStateChangesProvider;
+    show AppUser, AuthEvent, AuthStateChange, authStateChangesProvider;
 import 'package:icos/features/auth/providers/user_scope_keeper.dart';
 import 'package:icos/features/puzzle/data/puzzle_source.dart';
 import 'package:icos/features/puzzle/providers/game_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'
-    show AuthChangeEvent, AuthState, Session, User;
 
 import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
@@ -32,26 +30,14 @@ class _SignedIn implements SessionGateway {
   Future<void> signInAnonymously() async {}
 }
 
-AuthState _event(AuthChangeEvent event, String id) => AuthState(
-      event,
-      Session(
-        accessToken: 't',
-        tokenType: 'bearer',
-        user: User(
-          id: id,
-          appMetadata: const {},
-          userMetadata: const {},
-          aud: 'authenticated',
-          createdAt: '2026-01-01T00:00:00Z',
-        ),
-      ),
-    );
+AuthStateChange _event(AuthEvent event, String id) =>
+    AuthStateChange(event, AppUser(id: id));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory dir;
-  late StreamController<AuthState> events;
+  late StreamController<AuthStateChange> events;
   late ProviderContainer container;
   const date = '2026-09-09';
   final source = PuzzleSource.daily(date);
@@ -59,7 +45,7 @@ void main() {
 
   setUp(() async {
     dir = await initTestStorage(userId: 'user-a');
-    events = StreamController<AuthState>.broadcast();
+    events = StreamController<AuthStateChange>.broadcast();
     container = ProviderContainer(
       overrides: [
         authStateChangesProvider.overrideWith((ref) => events.stream),
@@ -84,7 +70,7 @@ void main() {
     await dir.delete(recursive: true);
   });
 
-  Future<void> emit(AuthChangeEvent e, String id) async {
+  Future<void> emit(AuthEvent e, String id) async {
     events.add(_event(e, id));
     await Future<void>.delayed(const Duration(milliseconds: 20));
   }
@@ -95,36 +81,40 @@ void main() {
     notifier.handleCellTap(0, 0);
   }
 
-  test('a different user id starts fresh and nothing of A\'s lands under B',
-      () async {
-    playOneMove();
-    expect(container.read(gameNotifierProvider(source))!.path, isNotEmpty);
-    expect(StorageService.getGameState(date), isNotNull);
+  test(
+    'a different user id starts fresh and nothing of A\'s lands under B',
+    () async {
+      playOneMove();
+      expect(container.read(gameNotifierProvider(source))!.path, isNotEmpty);
+      expect(StorageService.getGameState(date), isNotNull);
 
-    await emit(AuthChangeEvent.signedIn, 'user-b');
+      await emit(AuthEvent.signedIn, 'user-b');
 
-    expect(StorageService.activeUserId, 'user-b');
-    expect(container.read(gameNotifierProvider(source)), isNull);
-    container.read(gameNotifierProvider(source).notifier).startGame(puzzle);
-    expect(container.read(gameNotifierProvider(source))!.path, isEmpty);
-    expect(StorageService.getGameState(date), isNull);
+      expect(StorageService.activeUserId, 'user-b');
+      expect(container.read(gameNotifierProvider(source)), isNull);
+      container.read(gameNotifierProvider(source).notifier).startGame(puzzle);
+      expect(container.read(gameNotifierProvider(source))!.path, isEmpty);
+      expect(StorageService.getGameState(date), isNull);
 
-    // A's progress is intact for when A signs back in.
-    await StorageService.setActiveUser('user-a');
-    expect(StorageService.getGameState(date), isNotNull);
-  });
+      // A's progress is intact for when A signs back in.
+      await StorageService.setActiveUser('user-a');
+      expect(StorageService.getGameState(date), isNotNull);
+    },
+  );
 
-  test('a link that keeps the same user id keeps the game in progress',
-      () async {
-    playOneMove();
-    final before = container.read(gameNotifierProvider(source))!;
+  test(
+    'a link that keeps the same user id keeps the game in progress',
+    () async {
+      playOneMove();
+      final before = container.read(gameNotifierProvider(source))!;
 
-    await emit(AuthChangeEvent.userUpdated, 'user-a');
+      await emit(AuthEvent.userUpdated, 'user-a');
 
-    final after = container.read(gameNotifierProvider(source));
-    expect(after, isNotNull);
-    expect(after!.path, before.path);
-  });
+      final after = container.read(gameNotifierProvider(source));
+      expect(after, isNotNull);
+      expect(after!.path, before.path);
+    },
+  );
 
   test('A to B resets before the switch I/O: a timer tick cannot save A\'s '
       'game under B', () async {
@@ -134,7 +124,7 @@ void main() {
 
     // main()'s listener switches the scope first; the keeper then runs.
     await StorageService.setActiveUser('user-b');
-    events.add(_event(AuthChangeEvent.signedIn, 'user-b'));
+    events.add(_event(AuthEvent.signedIn, 'user-b'));
     await Future<void>.delayed(const Duration(milliseconds: 20));
 
     expect(StorageService.getGameState(date), isNull);
@@ -170,7 +160,7 @@ void main() {
       final before = container.read(gameNotifierProvider(source))!;
 
       await StorageService.setActiveUser('user-a'); // main()'s listener
-      events.add(_event(AuthChangeEvent.signedIn, 'user-a'));
+      events.add(_event(AuthEvent.signedIn, 'user-a'));
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       final after = container.read(gameNotifierProvider(source));

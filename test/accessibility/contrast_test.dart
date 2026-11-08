@@ -51,7 +51,7 @@ import 'package:icos/features/puzzle/presentation/widgets/celebration_overlay.da
 import 'package:icos/features/puzzle/presentation/widgets/offline_puzzle_notice.dart';
 import 'package:icos/features/puzzle/providers/daily_puzzle_provider.dart';
 import 'package:icos/shared/widgets/offline_banner.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:icos/core/backend/app_user.dart';
 
 import '../helpers/contrast.dart';
 import '../helpers/storage_test_helpers.dart';
@@ -64,7 +64,7 @@ class _Online extends ConnectivityNotifier {
 
 class _FakeAuth extends AuthNotifier {
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 }
 
 class _Offline extends ConnectivityNotifier {

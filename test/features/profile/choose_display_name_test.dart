@@ -17,7 +17,7 @@ import 'package:icos/features/profile/domain/display_name_placeholder.dart';
 import 'package:icos/features/profile/domain/models/profile.dart';
 import 'package:icos/features/profile/presentation/widgets/choose_display_name_sheet.dart';
 import 'package:icos/features/profile/providers/profile_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:icos/core/backend/app_user.dart';
 
 import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
@@ -53,14 +53,8 @@ class _Repo extends ProfileRepository {
   }
 }
 
-User _user({Map<String, dynamic> meta = const {}, String? email}) => User(
-  id: 'u1',
-  email: email,
-  appMetadata: const {},
-  userMetadata: meta,
-  aud: 'authenticated',
-  createdAt: '2026-10-05T00:00:00Z',
-);
+AppUser _user({String? name, String? email}) =>
+    AppUser(id: 'u1', email: email, name: name);
 
 String _at(GoRouter r) =>
     r.routerDelegate.currentConfiguration.last.matchedLocation;
@@ -83,7 +77,7 @@ void main() {
   Future<(GoRouter, _Repo)> run(
     WidgetTester tester, {
     required String name,
-    User? user,
+    AppUser? user,
   }) async {
     final repo = _Repo(name);
     final router = GoRouter(
@@ -161,13 +155,13 @@ void main() {
     expect(_at(router), '/');
   });
 
-  testWidgets('Google-style metadata prefills the provider name', (
+  testWidgets('the provider name (AppUser.name) prefills the field', (
     tester,
   ) async {
     await run(
       tester,
       name: 'Player 1234',
-      user: _user(meta: {'full_name': 'Grace Hopper'}, email: 'gh@example.com'),
+      user: _user(name: 'Grace Hopper', email: 'gh@example.com'),
     );
     await finish(tester);
     expect(find.widgetWithText(TextFormField, 'Grace Hopper'), findsOneWidget);

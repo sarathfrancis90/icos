@@ -8,7 +8,7 @@ import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:icos/features/profile/data/profile_repository.dart';
 import 'package:icos/features/profile/domain/models/profile.dart';
 import 'package:icos/features/profile/providers/profile_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:icos/core/backend/app_user.dart';
 
 class _FakeRepo extends ProfileRepository {
   _FakeRepo({this.pendingDeletion = true});
@@ -47,17 +47,9 @@ class _MutableSession extends AuthSessionInfo {
 
 class _FakeAuth extends AuthNotifier {
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 
-  void signInAs(String id) => state = AsyncValue.data(
-    User(
-      id: id,
-      appMetadata: const {},
-      userMetadata: const {},
-      aud: 'authenticated',
-      createdAt: '2026-01-01T00:00:00Z',
-    ),
-  );
+  void signInAs(String id) => state = AsyncValue.data(AppUser(id: id));
 }
 
 void main() {

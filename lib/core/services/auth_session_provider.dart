@@ -1,12 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'supabase_service.dart';
+import '../backend/auth_client.dart';
+import '../backend/backend_providers.dart';
 
 part 'auth_session_provider.g.dart';
 
 /// Minimal view of the auth session used by sync / result providers.
-/// Overridable in tests so they never touch `Supabase.instance`.
+/// Overridable in tests so they never touch the network.
 abstract class AuthSessionInfo {
   const AuthSessionInfo();
 
@@ -14,19 +15,25 @@ abstract class AuthSessionInfo {
   String? get userId;
 }
 
-class SupabaseAuthSessionInfo extends AuthSessionInfo {
-  const SupabaseAuthSessionInfo();
+/// Reads [AuthClient.currentUser] on every access (never cached).
+class AuthClientSessionInfo extends AuthSessionInfo {
+  const AuthClientSessionInfo(this._client);
+
+  final AuthClient _client;
 
   @override
-  bool get hasSession => SupabaseService.auth.currentSession != null;
+  bool get hasSession => _client.currentUser != null;
 
   @override
-  String? get userId => SupabaseService.auth.currentUser?.id;
+  String? get userId => _client.currentUser?.id;
 }
 
 /// Fixed session info for tests.
 class FakeAuthSessionInfo extends AuthSessionInfo {
-  const FakeAuthSessionInfo({this.userId = 'test-user', this.hasSession = true});
+  const FakeAuthSessionInfo({
+    this.userId = 'test-user',
+    this.hasSession = true,
+  });
 
   @override
   final bool hasSession;
@@ -36,4 +43,5 @@ class FakeAuthSessionInfo extends AuthSessionInfo {
 }
 
 @Riverpod(keepAlive: true)
-AuthSessionInfo authSession(Ref ref) => const SupabaseAuthSessionInfo();
+AuthSessionInfo authSession(Ref ref) =>
+    AuthClientSessionInfo(ref.watch(authClientProvider));

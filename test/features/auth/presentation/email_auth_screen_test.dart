@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icos/features/auth/presentation/email_auth_screen.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:icos/core/backend/app_user.dart';
 
 import '../../../helpers/test_helpers.dart';
 
 class _FakeAuth extends AuthNotifier {
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 }
 
 void main() {

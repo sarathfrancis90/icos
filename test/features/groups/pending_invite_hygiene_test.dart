@@ -16,8 +16,8 @@ import 'package:icos/features/groups/domain/models/group.dart';
 import 'package:icos/features/groups/domain/pending_invite.dart';
 import 'package:icos/features/groups/presentation/join_group_screen.dart';
 import 'package:icos/features/groups/providers/groups_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'
-    show AuthChangeEvent, AuthState, Session, User;
+import 'package:icos/core/backend/app_user.dart';
+import 'package:icos/core/backend/auth_event.dart';
 
 import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
@@ -36,7 +36,7 @@ final _group = Group(
 
 class _FakeAuth extends AuthNotifier {
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 }
 
 class _RecordingGroups extends MyGroups {
@@ -52,13 +52,7 @@ class _RecordingGroups extends MyGroups {
   }
 }
 
-const _user = User(
-  id: 'u',
-  appMetadata: {},
-  userMetadata: {},
-  aud: 'authenticated',
-  createdAt: '2026-10-05T00:00:00Z',
-);
+const _user = AppUser(id: 'u', email: 'u@example.test');
 
 String _at(GoRouter r) =>
     r.routerDelegate.currentConfiguration.last.matchedLocation;
@@ -354,10 +348,7 @@ void main() {
   });
 
   group('a cold start from the auth callback', () {
-    final linked = AuthState(
-      AuthChangeEvent.userUpdated,
-      Session(accessToken: 't', tokenType: 'bearer', user: _user),
-    );
+    const linked = AuthStateChange(AuthEvent.userUpdated, _user);
 
     GoRouter newRouter(List<Object?> extras) => GoRouter(
       routes: [

@@ -166,9 +166,14 @@ class AuthClient {
 
   /// Browser OAuth (e.g. Apple on Android). With [link] the provider is
   /// attached to the current user (`link-social`) instead of signing in.
+  ///
+  /// [onBrowserClosed] runs once the browser sheet has gone (finished,
+  /// cancelled or failed), before the callback is exchanged; it is not called
+  /// when the flow fails before the browser opens.
   Future<Result<AppUser, AppError>> webOAuth(
     String provider, {
     bool link = false,
+    void Function()? onBrowserClosed,
   }) async {
     final bearer = await _store.readSessionToken();
     if (link && bearer == null) {
@@ -218,6 +223,8 @@ class AuthClient {
       return const Result.failure(
         AppError.auth(AppStrings.backendSignInFailed),
       );
+    } finally {
+      onBrowserClosed?.call();
     }
 
     final parsed = parseOAuthCallback(callback);

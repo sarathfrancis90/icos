@@ -1,7 +1,9 @@
-/// Pure decision logic for choosing the right Supabase auth call.
+/// Pure decision logic for choosing the right `AuthClient` call.
 ///
-/// Kept free of Flutter / Supabase imports so it is trivially unit-testable.
+/// Kept free of Flutter / SDK imports so it is trivially unit-testable.
 library;
+
+import '../../../core/utils/app_error.dart';
 
 enum AuthPlatform { ios, android, other }
 
@@ -17,59 +19,64 @@ enum PasswordResetFailure {
   other,
 }
 
-/// Which Supabase call to make for an OAuth button press.
+/// Which `AuthClient` call to make for an OAuth button press.
+///
+/// | platform | Google                | Apple                 |
+/// |----------|-----------------------|-----------------------|
+/// | iOS      | native ID token       | native ID token       |
+/// | Android  | native ID token       | web (`webOAuth`)      |
+/// | other    | web                   | web                   |
+///
+/// Google falls back to the web flow when its client ids are missing. A
+/// guest links (same user id, progress kept); anyone else signs in.
 enum OAuthMethod {
-  /// Anonymous user → `auth.linkIdentity(provider)` (web/PKCE flow). This is
-  /// the only way to keep the guest's data: `signInWithIdToken` would create
-  /// a brand-new user.
-  linkIdentityWeb,
+  /// Guest + native ID token → `AuthClient.linkWithIdToken`.
+  linkNativeIdToken,
 
-  /// No session or non-anonymous session, and a native SDK can produce an
-  /// ID token → `auth.signInWithIdToken(...)`.
+  /// Guest, no native SDK → `AuthClient.webOAuth(provider, link: true)`.
+  linkWeb,
+
+  /// Not a guest (or switching to an existing account) + native ID token →
+  /// `AuthClient.signInWithIdToken` (the guest bearer is sent, so the server
+  /// discards the guest).
   nativeIdToken,
 
-  /// No session or non-anonymous session, native not available →
-  /// `auth.signInWithOAuth(provider)` (web/PKCE flow).
-  webOAuth,
+  /// Not a guest, no native SDK → `AuthClient.webOAuth(provider)`.
+  webOAuth;
+
+  /// True for the guest-upgrade methods (the user id is kept).
+  bool get links => this == linkNativeIdToken || this == linkWeb;
 }
 
-/// Which Supabase call to make for an email form submission.
+/// Which `AuthClient` call to make for an email form submission.
 enum EmailMethod {
-  /// Anonymous user + "create account" → `auth.updateUser(email, password)`
-  /// which converts the guest into a permanent user.
-  updateUser,
+  /// Guest + "create account" → `AuthClient.upgradeEmail` (same user id).
+  upgradeGuest,
 
-  /// Fresh sign-up with no (or a non-anonymous) session → `auth.signUp`.
+  /// Fresh sign-up with no (or a non-anonymous) session →
+  /// `AuthClient.signUpEmail`.
   signUp,
 
-  /// Existing account → `auth.signInWithPassword`.
+  /// Existing account → `AuthClient.signInEmail`.
   signInWithPassword,
 }
 
-/// Redirect used for all web OAuth / linkIdentity flows.
-const String kAuthRedirectUri = 'io.supabase.icos://login-callback';
-
-/// Redirect for web OAuth (Google/Apple). Deliberately a different host from
-/// [kAuthRedirectUri]: on Android the flutter_web_auth_2 `CallbackActivity`
-/// owns `io.supabase.icos://oauth-callback`, while `MainActivity` keeps
-/// `login-callback` for emailed links (password recovery, confirmation). Two
-/// activities on one URL would make Android show a chooser. Must be in the
-/// Supabase redirect allowlist.
-const String kOAuthRedirectUri = 'io.supabase.icos://oauth-callback';
+/// Callback for web OAuth (Google/Apple): the flutter_web_auth_2 scheme
+/// (`kOAuthCallbackUrl` in `backend_config.dart`). On Android the package's
+/// `CallbackActivity` owns it.
+const String kOAuthRedirectUri = 'io.icos://oauth-callback';
 
 abstract final class AuthStrategy {
   /// Replaces every URL in [text] with just its host and path, so a log line
   /// never carries the authorize URL (state, PKCE challenge, redirect).
-  static String redactUrls(String text) => text.replaceAllMapped(
-    RegExp(r'[a-zA-Z][a-zA-Z0-9+.-]*://[^\s<>]+'),
-    (m) {
-      final uri = Uri.tryParse(m[0]!);
-      if (uri == null) return '<url>';
-      return '${uri.host}${uri.path}';
-    },
-  );
+  static String redactUrls(String text) =>
+      text.replaceAllMapped(RegExp(r'[a-zA-Z][a-zA-Z0-9+.-]*://[^\s<>]+'), (m) {
+        final uri = Uri.tryParse(m[0]!);
+        if (uri == null) return '<url>';
+        return '${uri.host}${uri.path}';
+      });
 
-  /// Decides how to handle an OAuth button press.
+  /// Decides how to handle an OAuth button press (see [OAuthMethod]).
   ///
   /// [hasClientIds] — for Google: whether `GOOGLE_WEB_CLIENT_ID` (and on iOS
   /// `GOOGLE_IOS_CLIENT_ID`) are configured. For Apple it is ignored: native
@@ -80,15 +87,15 @@ abstract final class AuthStrategy {
     required OAuthKind provider,
     required bool hasClientIds,
   }) {
-    if (isAnonymous) return OAuthMethod.linkIdentityWeb;
-    if (nativeAvailable(
+    final native = nativeAvailable(
       platform: platform,
       provider: provider,
       hasClientIds: hasClientIds,
-    )) {
-      return OAuthMethod.nativeIdToken;
+    );
+    if (isAnonymous) {
+      return native ? OAuthMethod.linkNativeIdToken : OAuthMethod.linkWeb;
     }
-    return OAuthMethod.webOAuth;
+    return native ? OAuthMethod.nativeIdToken : OAuthMethod.webOAuth;
   }
 
   /// Whether a native (in-app) sign-in SDK can be used.
@@ -111,7 +118,7 @@ abstract final class AuthStrategy {
     required bool isSignUp,
   }) {
     if (!isSignUp) return EmailMethod.signInWithPassword;
-    return isAnonymous ? EmailMethod.updateUser : EmailMethod.signUp;
+    return isAnonymous ? EmailMethod.upgradeGuest : EmailMethod.signUp;
   }
 
   /// Whether Google client ids are sufficient for the native SDK on
@@ -142,118 +149,97 @@ abstract final class AuthStrategy {
     };
   }
 
-  /// Recognises Supabase's "this identity/email already belongs to another
-  /// user" responses so the UI can offer to sign in to the existing account.
+  /// Recognises "this identity/email already belongs to another user"
+  /// codes and messages (Better Auth; `AuthClient` already maps them to
+  /// [AppError.conflict], this covers free text such as friendly copy).
   static bool isIdentityAlreadyExists({String? code, String? message}) {
     final c = (code ?? '').toLowerCase();
-    if (c == 'identity_already_exists' ||
-        c == 'email_exists' ||
-        c == 'user_already_exists') {
+    if (c == 'email_exists' ||
+        c.startsWith('user_already_exists') ||
+        c.contains('already_linked')) {
       return true;
     }
     final m = (message ?? '').toLowerCase();
-    return m.contains('identity is already linked') ||
+    return m.contains('already linked') ||
         m.contains('already registered') ||
         m.contains('already been registered') ||
         m.contains('email address is already') ||
         m.contains('already exists');
   }
 
-  /// Recognises the "confirm your email" outcome of a guest → email
-  /// conversion (Supabase with email confirmations enabled returns the user
-  /// with `new_email` set and no confirmed email).
-  static bool needsEmailConfirmation({
-    required String? email,
-    required String? newEmail,
-    required String? emailConfirmedAt,
-  }) {
-    if (newEmail != null && newEmail.isNotEmpty) return true;
-    if (email == null || email.isEmpty) return false;
-    return emailConfirmedAt == null || emailConfirmedAt.isEmpty;
+  /// Classifies a failed `request-password-reset`.
+  static PasswordResetFailure classifyPasswordReset(AppError error) {
+    switch (error) {
+      case NotFoundError():
+        return PasswordResetFailure.unknownEmail;
+      case RateLimitError():
+        return PasswordResetFailure.rateLimited;
+      case NetworkError():
+        return PasswordResetFailure.network;
+      case ValidationError(:final message) || AuthError(:final message):
+        final m = message.toLowerCase();
+        // Format validation already passed on the client, so a server-side
+        // "user not found" / "invalid email" answer is neutral: reporting it
+        // differently would reveal whether the account exists.
+        if (m.contains('not found') ||
+            (m.contains('email') && m.contains('invalid'))) {
+          return PasswordResetFailure.unknownEmail;
+        }
+        return PasswordResetFailure.other;
+      default:
+        return PasswordResetFailure.other;
+    }
   }
 
-  /// Classifies an error from `resetPasswordForEmail`.
-  static PasswordResetFailure classifyPasswordReset({
-    String? code,
-    String? statusCode,
-    String? message,
-  }) {
-    final c = (code ?? '').toLowerCase();
-    final m = (message ?? '').toLowerCase();
-    // The per-email send limit ("For security purposes, you can only request
-    // this after N seconds") only trips for an address that really got a mail,
-    // so reporting it differently would reveal that the account exists. It
-    // gets the same neutral confirmation. Only request/IP-wide limits are
-    // shown as "try again later".
-    //
-    // `email_address_invalid` is the mailer rejecting the address (e.g. an
-    // undeliverable domain). Format validation already passed on the client,
-    // and the server only answers this for an address that has an account,
-    // so it is neutral too.
-    if (c == 'user_not_found' ||
-        c == 'over_email_send_rate_limit' ||
-        c == 'email_address_invalid' ||
-        (m.contains('email address') && m.contains('is invalid')) ||
-        m.contains('user not found') ||
-        m.contains('unable to validate email') ||
-        m.contains('security purposes')) {
-      return PasswordResetFailure.unknownEmail;
-    }
-    if (c.contains('rate_limit') ||
-        statusCode == '429' ||
-        m.contains('rate limit') ||
-        m.contains('too many')) {
-      return PasswordResetFailure.rateLimited;
-    }
-    if (m.contains('network') ||
-        m.contains('socket') ||
-        m.contains('failed host lookup') ||
-        m.contains('clientexception')) {
-      return PasswordResetFailure.network;
-    }
-    return PasswordResetFailure.other;
-  }
-
-  /// Message carried by the failure when the recovery session behind the
-  /// "set a new password" screen is no longer valid.
+  /// Message carried by the failure when the reset token behind the "set a
+  /// new password" screen is missing, used or expired.
   static const String recoverySessionExpiredMessage =
       'recovery_session_expired';
 
-  /// True when `updateUser` failed because the session from the recovery link
-  /// has expired or is gone (so only a new link can help).
-  static bool isRecoverySessionExpired({
-    String? code,
-    String? statusCode,
-    String? message,
-  }) {
-    final c = (code ?? '').toLowerCase();
-    if (c == 'session_not_found' ||
-        c == 'session_expired' ||
-        c == 'bad_jwt' ||
-        c == 'refresh_token_not_found' ||
-        c == 'refresh_token_already_used') {
-      return true;
+  /// True when `reset-password` failed because the token from the reset
+  /// link is no longer valid (so only a new link can help).
+  static bool isRecoverySessionExpired(AppError error) {
+    final String message;
+    switch (error) {
+      case AuthError(message: final m) ||
+          ValidationError(message: final m) ||
+          NotFoundError(message: final m):
+        message = m.toLowerCase();
+      default:
+        return false;
     }
-    final m = (message ?? '').toLowerCase();
-    return statusCode == '401' ||
-        m.contains('session missing') ||
-        m.contains('session not found') ||
-        m.contains('jwt expired') ||
-        m.contains('token has expired') ||
-        m.contains('invalid jwt');
+    if (error is AuthError) return true;
+    return message.contains('invalid token') ||
+        message.contains('invalid_token') ||
+        message.contains('expired');
   }
 
-  /// Maps raw provider/Supabase errors to friendly copy.
+  /// User-facing copy for an [AppError] from `AuthClient`.
+  static String friendlyError(AppError error) => switch (error) {
+    NetworkError() => 'No internet connection. Please try again.',
+    RateLimitError() => 'Too many attempts. Please wait a moment.',
+    ConflictError() => 'An account with this email already exists.',
+    CancelledError() => error.userMessage,
+    AuthError(:final message) ||
+    ValidationError(:final message) ||
+    NotFoundError(:final message) ||
+    DatabaseError(:final message) ||
+    UnknownError(:final message) => friendlyMessage(message),
+  };
+
+  /// Maps raw provider/server errors to friendly copy.
   static String friendlyMessage(String raw) {
     final e = raw.toLowerCase();
     if (e.contains('invalid login credentials') ||
-        e.contains('invalid_credentials')) {
+        e.contains('invalid_credentials') ||
+        e.contains('invalid email or password') ||
+        e.contains('invalid_email_or_password')) {
       return 'Invalid email or password. Please try again.';
     }
     if (isIdentityAlreadyExists(message: e)) {
       return 'An account with this email already exists.';
     }
-    if (e.contains('email not confirmed')) {
+    if (e.contains('email not confirmed') || e.contains('email not verified')) {
       return 'Please check your email to confirm your account.';
     }
     if (e.contains('rate limit') || e.contains('too many')) {
@@ -263,12 +249,16 @@ abstract final class AuthStrategy {
         e.contains('same_password')) {
       return 'Choose a password you have not used before.';
     }
-    if (e.contains('password should be') || e.contains('weak password')) {
+    if (e.contains('password should be') ||
+        e.contains('weak password') ||
+        e.contains('password too short') ||
+        e.contains('password_too_short')) {
       return 'Please choose a stronger password (at least 6 characters).';
     }
     if (e.contains('network') ||
         e.contains('socket') ||
-        e.contains('failed host lookup')) {
+        e.contains('failed host lookup') ||
+        e.contains('no internet')) {
       return 'No internet connection. Please try again.';
     }
     return 'Something went wrong. Please try again.';

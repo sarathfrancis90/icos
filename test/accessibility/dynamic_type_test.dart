@@ -26,7 +26,7 @@ import 'package:icos/features/stats/presentation/stats_screen.dart';
 import 'package:icos/shared/widgets/text_scale_limit.dart';
 import 'package:icos/features/stats/providers/stats_provider.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:icos/core/backend/app_user.dart';
 
 import '../helpers/storage_test_helpers.dart';
 import '../helpers/test_helpers.dart';
@@ -117,7 +117,7 @@ class _SignedIn implements SessionGateway {
 
 class _FakeAuth extends AuthNotifier {
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 }
 
 class _FakeMyGroups extends MyGroups {

@@ -16,7 +16,6 @@ import '../../../core/services/audio_service.dart';
 import '../../../core/services/auth_session_provider.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/storage_service.dart';
-import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
 import '../../../core/utils/share_utils.dart';
@@ -37,11 +36,11 @@ FileSharer fileSharer(Ref ref) => platformFileSharer;
 
 @riverpod
 Future<UserProfile?> profile(Ref ref) async {
-  final user = SupabaseService.auth.currentUser;
-  if (user == null) return null;
+  final userId = ref.read(authSessionProvider).userId;
+  if (userId == null) return null;
 
   final repo = ref.read(profileRepositoryProvider);
-  final result = await repo.getProfile(user.id);
+  final result = await repo.getProfile(userId);
   return switch (result) {
     Success(data: final profile) => profile,
     Failure() => null,
@@ -194,14 +193,14 @@ class ProfileNotifier extends _$ProfileNotifier {
   Future<Result<UserProfile, AppError>> updateColorblindMode(
     String mode,
   ) async {
-    final user = SupabaseService.auth.currentUser;
-    if (user == null) {
+    final userId = ref.read(authSessionProvider).userId;
+    if (userId == null) {
       return const Result.failure(AppError.auth('Not authenticated'));
     }
 
     final repo = ref.read(profileRepositoryProvider);
     final result = await repo.updateProfile(
-      user.id,
+      userId,
       colorblindMode: mode,
     );
 
@@ -216,8 +215,8 @@ class ProfileNotifier extends _$ProfileNotifier {
   }
 
   Future<Result<UserProfile, AppError>> updateHaptic(bool enabled) async {
-    final user = SupabaseService.auth.currentUser;
-    if (user == null) {
+    final userId = ref.read(authSessionProvider).userId;
+    if (userId == null) {
       return const Result.failure(AppError.auth('Not authenticated'));
     }
 
@@ -226,7 +225,7 @@ class ProfileNotifier extends _$ProfileNotifier {
 
     final repo = ref.read(profileRepositoryProvider);
     final result = await repo.updateSettings(
-      user.id,
+      userId,
       hapticEnabled: enabled,
     );
 
@@ -241,8 +240,8 @@ class ProfileNotifier extends _$ProfileNotifier {
   }
 
   Future<Result<UserProfile, AppError>> updateSound(bool enabled) async {
-    final user = SupabaseService.auth.currentUser;
-    if (user == null) {
+    final userId = ref.read(authSessionProvider).userId;
+    if (userId == null) {
       return const Result.failure(AppError.auth('Not authenticated'));
     }
 
@@ -250,7 +249,7 @@ class ProfileNotifier extends _$ProfileNotifier {
 
     final repo = ref.read(profileRepositoryProvider);
     final result = await repo.updateSettings(
-      user.id,
+      userId,
       soundEnabled: enabled,
     );
 
@@ -280,12 +279,12 @@ class ProfileNotifier extends _$ProfileNotifier {
       await NotificationService.cancelStreakReminder();
     }
 
-    final user = SupabaseService.auth.currentUser;
-    if (user == null) return enabled;
+    final userId = ref.read(authSessionProvider).userId;
+    if (userId == null) return enabled;
 
     final repo = ref.read(profileRepositoryProvider);
     final result = await repo.updateSettings(
-      user.id,
+      userId,
       notificationEnabled: enabled,
     );
     switch (result) {
@@ -304,8 +303,8 @@ class ProfileNotifier extends _$ProfileNotifier {
 
   /// Requests deletion (30-day grace) then signs out.
   Future<Result<void, AppError>> deleteAccount() async {
-    final user = SupabaseService.auth.currentUser;
-    if (user == null) {
+    final userId = ref.read(authSessionProvider).userId;
+    if (userId == null) {
       return const Result.failure(AppError.auth('Not authenticated'));
     }
 
@@ -317,7 +316,7 @@ class ProfileNotifier extends _$ProfileNotifier {
       await NotificationService.cancelStreakReminder();
       // The account is gone: drop its results, game state, nonces and queued
       // submissions from this device (other users' data stays).
-      await StorageService.clearUserData(user.id);
+      await StorageService.clearUserData(userId);
       await ref.read(authNotifierProvider.notifier).signOut();
     }
     return result;
@@ -361,8 +360,8 @@ class ProfileNotifier extends _$ProfileNotifier {
   /// Downloads the user's data via the `export-data` edge function and
   /// writes it to a JSON file in the temp directory. Returns the file.
   Future<Result<File, AppError>> exportData() async {
-    final user = SupabaseService.auth.currentUser;
-    if (user == null) {
+    final userId = ref.read(authSessionProvider).userId;
+    if (userId == null) {
       return const Result.failure(AppError.auth('Not authenticated'));
     }
     final repo = ref.read(profileRepositoryProvider);

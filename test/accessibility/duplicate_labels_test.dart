@@ -10,13 +10,13 @@ import 'package:icos/features/auth/presentation/email_auth_screen.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:icos/features/groups/presentation/widgets/account_required_card.dart';
 import 'package:icos/features/puzzle/presentation/widgets/game_controls.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:icos/core/backend/app_user.dart';
 
 import '../helpers/test_helpers.dart';
 
 class _FakeAuth extends AuthNotifier {
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 }
 
 /// Labels (in the whole semantics tree) in which a line is read twice, e.g.

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
@@ -10,7 +9,6 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/app_urls.dart';
 import '../../../core/services/app_config_provider.dart';
 import '../../../core/services/storage_service.dart';
-import '../../../core/services/supabase_service.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/external_links.dart';
@@ -60,8 +58,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profileState = ref.watch(profileNotifierProvider);
-    ref.watch(authNotifierProvider);
-    final user = SupabaseService.auth.currentUser;
+    final user = ref.watch(authNotifierProvider).valueOrNull;
     final isAnonymous = user?.isAnonymous ?? true;
 
     ref.listen<bool>(deletionCancelledFlagProvider, (_, raised) {
@@ -218,13 +215,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildAccountSection(
     BuildContext context,
-    User? user,
+    AppUser? user,
     UserProfile? profile,
   ) {
-    final email = user?.email ?? 'No email';
-    final providers = user?.appMetadata['providers'];
-    final providerLabel = providers is List && providers.isNotEmpty
-        ? providers.map((p) => _providerName(p.toString())).join(', ')
+    final address = user?.email;
+    final email = address == null
+        ? 'No email'
+        : user!.emailVerified
+        ? address
+        : '$address · ${AppStrings.profileEmailNotVerified}';
+    final providers = user?.providers ?? const <String>[];
+    final providerLabel = providers.isNotEmpty
+        ? providers.map(_providerName).join(', ')
         : 'Registered';
     final memberSince = profile?.createdAt != null
         ? DateFormat.yMMMd().format(profile!.createdAt!)
@@ -584,7 +586,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _showDeleteAccountDialog(BuildContext context) async {
-    final isGuest = SupabaseService.auth.currentUser?.isAnonymous ?? true;
+    final isGuest =
+        ref.read(authNotifierProvider).valueOrNull?.isAnonymous ?? true;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

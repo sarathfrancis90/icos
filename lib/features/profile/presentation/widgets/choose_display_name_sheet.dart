@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
 
+import '../../../../core/backend/app_user.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/services/app_logger.dart';
@@ -22,7 +22,7 @@ import '../../providers/profile_provider.dart';
 Future<void> maybePromptForDisplayName(
   BuildContext context,
   WidgetRef ref,
-  User? user,
+  AppUser? user,
 ) async {
   if (user == null) return;
   // Claimed synchronously, so overlapping invocations cannot both show.
@@ -46,7 +46,7 @@ Future<void> maybePromptForDisplayName(
     if (!context.mounted) return;
     final initial = initialDisplayName(
       currentName: currentName,
-      meta: user.userMetadata,
+      meta: {'name': ?user.name},
       email: user.email,
     );
     await showModalBottomSheet<bool>(

@@ -11,34 +11,19 @@ import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:icos/features/groups/domain/pending_invite.dart';
 import 'package:icos/features/groups/presentation/join_group_screen.dart';
 import 'package:icos/features/groups/providers/groups_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
 
 class _FakeAuth extends AuthNotifier {
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 }
 
-const _member = User(
-  id: 'u',
-  appMetadata: {},
-  userMetadata: {},
-  aud: 'authenticated',
-  createdAt: '2026-10-05T00:00:00Z',
-);
-const _guest = User(
-  id: 'g',
-  appMetadata: {},
-  userMetadata: {},
-  aud: 'authenticated',
-  createdAt: '2026-10-05T00:00:00Z',
-  isAnonymous: true,
-);
+const _member = AppUser(id: 'u', email: 'u@example.test');
+const _guest = AppUser(id: 'g', isAnonymous: true);
 
-AuthState _event(AuthChangeEvent e, User user) =>
-    AuthState(e, Session(accessToken: 't', tokenType: 'bearer', user: user));
+AuthStateChange _event(AuthEvent e, AppUser user) => AuthStateChange(e, user);
 
 /// A router wired the way the app's is.
 final _routerProvider = Provider<GoRouter>((ref) {
@@ -122,8 +107,8 @@ void main() {
 
     Future<void> fire(
       WidgetTester tester,
-      AuthChangeEvent e, [
-      User user = _member,
+      AuthEvent e, [
+      AppUser user = _member,
     ]) async {
       container
           .read(authNotifierProvider.notifier)
@@ -136,12 +121,12 @@ void main() {
     ) async {
       await start(tester);
       await PendingInvite.save('ABC123');
-      await fire(tester, AuthChangeEvent.userUpdated);
+      await fire(tester, AuthEvent.userUpdated);
       expect(_at(router), '/join/ABC123');
 
       router.go('/');
       await tester.pumpAndSettle();
-      await fire(tester, AuthChangeEvent.userUpdated);
+      await fire(tester, AuthEvent.userUpdated);
       expect(_at(router), '/', reason: 'a second event must not navigate');
     });
 
@@ -153,7 +138,7 @@ void main() {
             .subtract(const Duration(minutes: 31))
             .millisecondsSinceEpoch,
       );
-      await fire(tester, AuthChangeEvent.signedIn);
+      await fire(tester, AuthEvent.signedIn);
       expect(_at(router), '/');
       expect(StorageService.pendingInviteCode, isNull);
     });
@@ -166,7 +151,7 @@ void main() {
         'not-a-code',
         DateTime.now().millisecondsSinceEpoch,
       );
-      await fire(tester, AuthChangeEvent.userUpdated);
+      await fire(tester, AuthEvent.userUpdated);
       expect(_at(router), '/');
       expect(StorageService.pendingInviteCode, isNull);
     });
@@ -176,7 +161,7 @@ void main() {
     ) async {
       await start(tester);
       await PendingInvite.save('ABC123');
-      await fire(tester, AuthChangeEvent.signedIn, _guest);
+      await fire(tester, AuthEvent.signedIn, _guest);
       expect(_at(router), '/');
       expect(StorageService.pendingInviteCode, 'ABC123');
     });

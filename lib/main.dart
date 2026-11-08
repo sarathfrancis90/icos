@@ -8,15 +8,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show AuthChangeEvent;
 
 import 'app.dart';
+import 'core/backend/auth_event.dart';
+import 'core/backend/backend_providers.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/audio_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/session_service.dart';
 import 'core/services/storage_service.dart';
-import 'core/services/supabase_service.dart';
 import 'core/theme/font_licenses.dart';
 import 'features/auth/providers/auth_provider.dart' show PasswordRecoveryLatch;
 
@@ -46,29 +46,41 @@ Future<void> main() async {
   // Initialize services
   await StorageService.initialize();
   await AnalyticsService.initialize();
-  await SupabaseService.initialize();
+
+  // Backend hosts first: every backend provider reads them synchronously.
+  final container = ProviderContainer();
+  await container.read(backendConfigProvider.future);
+  final auth = container.read(authClientProvider);
+  await auth.restore();
 
   // Per-user local data follows the signed-in user. Registered before anything
   // else listens so the scope is already switched when providers react.
-  await StorageService.setActiveUser(SupabaseService.auth.currentUser?.id);
-  SupabaseService.auth.onAuthStateChange.listen(
-    (state) {
-      if (state.event == AuthChangeEvent.passwordRecovery) {
-        PasswordRecoveryLatch.arrivedBeforeStart = true;
-      }
-      unawaited(StorageService.setActiveUser(state.session?.user.id));
-    },
-    onError: (Object _) {},
-  );
+  await StorageService.setActiveUser(auth.currentUser?.id);
+  auth.events.listen((event) {
+    if (event == AuthEvent.passwordRecovery) {
+      PasswordRecoveryLatch.arrivedBeforeStart = true;
+    }
+    unawaited(StorageService.setActiveUser(auth.currentUser?.id));
+  });
 
   // Guest session if there is none. Startup waits at most 5 s; the attempt
   // keeps going in the background and is retried on reconnect, on resume and
-  // before the sync queue runs (see SessionKeeper).
-  await SessionEnsurer.instance.ensureSession().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => false,
-      );
-  await StorageService.setActiveUser(SupabaseService.auth.currentUser?.id);
+  // before the sync queue runs (see SessionKeeper). A restored session is
+  // checked with the server in the background; a dead one is signed out and
+  // replaced by a new guest.
+  final restored = auth.currentUser != null;
+  await container
+      .read(sessionEnsurerProvider)
+      .ensureSession()
+      .timeout(const Duration(seconds: 5), onTimeout: () => false);
+  if (restored) {
+    unawaited(
+      auth.getSession().then(
+        (_) => container.read(sessionEnsurerProvider).ensureSession(),
+      ),
+    );
+  }
+  await StorageService.setActiveUser(auth.currentUser?.id);
 
   // Notifications (local reminders + optional FCM); never throws.
   await NotificationService.initialize();
@@ -79,8 +91,6 @@ Future<void> main() async {
   FlutterNativeSplash.remove();
 
   runApp(
-    const ProviderScope(
-      child: IcosApp(),
-    ),
+    UncontrolledProviderScope(container: container, child: const IcosApp()),
   );
 }

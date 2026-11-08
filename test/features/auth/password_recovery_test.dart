@@ -13,8 +13,6 @@ import 'package:icos/features/auth/presentation/new_password_screen.dart';
 import 'package:icos/features/auth/presentation/widgets/forgot_password_dialog.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:icos/core/services/storage_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'
-    show AuthChangeEvent, AuthState, Session, User;
 
 import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
@@ -26,7 +24,7 @@ class _FakeAuth extends AuthNotifier {
   static final updateCalls = <String>[];
 
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 
   @override
   Future<Result<void, AppError>> sendPasswordReset(String email) async {
@@ -59,20 +57,19 @@ void main() {
 
   group('classifyPasswordReset', () {
     test('a server-side "email invalid" answer is neutral, not an error', () {
-      // The mailer rejects an undeliverable domain only for a registered
-      // account (unknown ones get a 200), so surfacing it would both scare
-      // the user and reveal that the account exists.
+      // Format validation already passed on the client, so surfacing it
+      // would both scare the user and reveal whether the account exists.
       expect(
         AuthStrategy.classifyPasswordReset(
-          code: 'email_address_invalid',
-          statusCode: '400',
-          message: 'Email address "qa@example.com" is invalid',
+          const AppError.validation(
+            'Email address "qa@example.com" is invalid',
+          ),
         ),
         PasswordResetFailure.unknownEmail,
       );
       expect(
         AuthStrategy.classifyPasswordReset(
-          message: 'Email address "qa@example.com" is invalid',
+          const AppError.validation('Invalid email'),
         ),
         PasswordResetFailure.unknownEmail,
       );
@@ -80,47 +77,35 @@ void main() {
 
     test('unknown email is neutral; rate limit and network are reported', () {
       expect(
-        AuthStrategy.classifyPasswordReset(code: 'user_not_found'),
-        PasswordResetFailure.unknownEmail,
-      );
-      expect(
-        AuthStrategy.classifyPasswordReset(message: 'User not found'),
-        PasswordResetFailure.unknownEmail,
-      );
-      // Per-email limit: neutral, or asking twice reveals the account.
-      expect(
-        AuthStrategy.classifyPasswordReset(code: 'over_email_send_rate_limit'),
+        AuthStrategy.classifyPasswordReset(
+          const AppError.notFound('User not found'),
+        ),
         PasswordResetFailure.unknownEmail,
       );
       expect(
         AuthStrategy.classifyPasswordReset(
-          statusCode: '429',
-          message:
-              'For security purposes, you can only request this after 43 seconds.',
+          const AppError.validation('User not found'),
         ),
         PasswordResetFailure.unknownEmail,
       );
-      // Request / IP-wide limit: genuinely retry later.
       expect(
-        AuthStrategy.classifyPasswordReset(code: 'over_request_rate_limit'),
+        AuthStrategy.classifyPasswordReset(
+          const AppError.rateLimit('Too many requests'),
+        ),
         PasswordResetFailure.rateLimited,
       );
       expect(
         AuthStrategy.classifyPasswordReset(
-          message: 'Request rate limit reached',
+          const AppError.network('Failed host lookup'),
         ),
-        PasswordResetFailure.rateLimited,
-      );
-      expect(
-        AuthStrategy.classifyPasswordReset(statusCode: '429'),
-        PasswordResetFailure.rateLimited,
-      );
-      expect(
-        AuthStrategy.classifyPasswordReset(message: 'Failed host lookup'),
         PasswordResetFailure.network,
       );
       expect(
-        AuthStrategy.classifyPasswordReset(message: 'boom'),
+        AuthStrategy.classifyPasswordReset(const AppError.unknown('boom')),
+        PasswordResetFailure.other,
+      );
+      expect(
+        AuthStrategy.classifyPasswordReset(const AppError.auth('boom')),
         PasswordResetFailure.other,
       );
     });
@@ -228,7 +213,7 @@ void main() {
     testWidgets('passwordRecovery event routes to the new-password screen', (
       tester,
     ) async {
-      final events = StreamController<AuthState>.broadcast();
+      final events = StreamController<AuthStateChange>.broadcast();
       addTearDown(events.close);
       final container = ProviderContainer(
         overrides: [
@@ -269,7 +254,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('HOME'), findsOneWidget);
 
-      events.add(const AuthState(AuthChangeEvent.passwordRecovery, null));
+      events.add(const AuthStateChange(AuthEvent.passwordRecovery));
       await tester.pumpAndSettle();
       expect(find.text('Set a new password'), findsWidgets);
       expect(container.read(passwordRecoveryPendingProvider), isTrue);
@@ -337,7 +322,7 @@ class _Harness {
 
 _Harness _recoveryHarness(
   List<Override> overrides, {
-  Stream<AuthState>? events,
+  Stream<AuthStateChange>? events,
 }) {
   final container = ProviderContainer(
     overrides: [
@@ -381,7 +366,7 @@ void _recoveryTests() {
 
     Future<_Harness> pump(
       WidgetTester tester, {
-      Stream<AuthState>? events,
+      Stream<AuthStateChange>? events,
     }) async {
       final h = _recoveryHarness(overrides, events: events);
       h.container.read(passwordRecoveryPendingProvider.notifier);
@@ -398,10 +383,10 @@ void _recoveryTests() {
     testWidgets('Not now leaves the password unchanged and goes home', (
       tester,
     ) async {
-      final events = StreamController<AuthState>.broadcast();
+      final events = StreamController<AuthStateChange>.broadcast();
       addTearDown(events.close);
       final h = await pump(tester, events: events.stream);
-      events.add(const AuthState(AuthChangeEvent.passwordRecovery, null));
+      events.add(const AuthStateChange(AuthEvent.passwordRecovery));
       await tester.pumpAndSettle();
       expect(find.text('Not now'), findsOneWidget);
       expect(
@@ -448,32 +433,22 @@ void _recoveryTests() {
           'x': 1,
         }, userId: 'g1');
       });
-      final events = StreamController<AuthState>.broadcast();
+      final events = StreamController<AuthStateChange>.broadcast();
       addTearDown(events.close);
       final h = await pump(tester, events: events.stream);
-      User user(String id, {bool anon = false}) => User(
-        id: id,
-        appMetadata: const {},
-        userMetadata: const {},
-        aud: 'authenticated',
-        createdAt: '2026-01-01T00:00:00Z',
-        isAnonymous: anon,
-      );
       events.add(
-        AuthState(
-          AuthChangeEvent.signedIn,
-          Session(
-            accessToken: 'a',
-            tokenType: 'bearer',
-            user: user('g1', anon: true),
-          ),
+        AuthStateChange(
+          AuthEvent.signedIn,
+          const AppUser(id: 'g1', isAnonymous: true),
         ),
       );
       await tester.pump();
+      // The reset link opens the app while the guest is still signed in;
+      // signing in to the account afterwards replaces the guest.
       events.add(
-        AuthState(
-          AuthChangeEvent.passwordRecovery,
-          Session(accessToken: 'b', tokenType: 'bearer', user: user('u1')),
+        AuthStateChange(
+          AuthEvent.passwordRecovery,
+          const AppUser(id: 'g1', isAnonymous: true),
         ),
       );
       await tester.pumpAndSettle();
@@ -490,18 +465,59 @@ void _recoveryTests() {
 
     test('recovery-session-expired classification', () {
       expect(
-        AuthStrategy.isRecoverySessionExpired(code: 'session_not_found'),
-        isTrue,
-      );
-      expect(AuthStrategy.isRecoverySessionExpired(statusCode: '401'), isTrue);
-      expect(
-        AuthStrategy.isRecoverySessionExpired(message: 'Auth session missing!'),
+        AuthStrategy.isRecoverySessionExpired(
+          const AppError.validation('Invalid token'),
+        ),
         isTrue,
       );
       expect(
-        AuthStrategy.isRecoverySessionExpired(message: 'weak password'),
+        AuthStrategy.isRecoverySessionExpired(
+          const AppError.auth('Unauthorized'),
+        ),
+        isTrue,
+      );
+      expect(
+        AuthStrategy.isRecoverySessionExpired(
+          const AppError.validation('Token expired'),
+        ),
+        isTrue,
+      );
+      expect(
+        AuthStrategy.isRecoverySessionExpired(
+          const AppError.validation('Password too short'),
+        ),
+        isFalse,
+      );
+      expect(
+        AuthStrategy.isRecoverySessionExpired(
+          const AppError.network('offline'),
+        ),
         isFalse,
       );
     });
+
+    test(
+      'a reset link token is kept for the new password and cleared after',
+      () {
+        final h = _recoveryHarness(overrides);
+        final pending = h.container.read(
+          passwordRecoveryPendingProvider.notifier,
+        );
+        PasswordRecoveryLatch.arrive('early-token');
+        // A link that arrived before the providers existed.
+        final late = _recoveryHarness(overrides);
+        expect(late.container.read(passwordRecoveryPendingProvider), isTrue);
+        expect(
+          late.container.read(passwordRecoveryPendingProvider.notifier).token,
+          'early-token',
+        );
+        pending.start('t-1');
+        expect(h.container.read(passwordRecoveryPendingProvider), isTrue);
+        expect(pending.token, 't-1');
+        pending.clear();
+        expect(pending.token, isNull);
+        expect(PasswordRecoveryLatch.token, isNull);
+      },
+    );
   });
 }

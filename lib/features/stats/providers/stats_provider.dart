@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/services/auth_session_provider.dart';
 import '../../../core/services/storage_service.dart';
-import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/result.dart';
@@ -18,7 +18,7 @@ StatsRepository statsRepository(Ref ref) {
 
 @riverpod
 Future<Streak> streak(Ref ref) async {
-  final userId = SupabaseService.auth.currentUser?.id;
+  final userId = ref.read(authSessionProvider).userId;
   if (userId == null) {
     return const Streak(
       userId: '',
@@ -38,7 +38,7 @@ Future<Streak> streak(Ref ref) async {
 
 @riverpod
 Future<List<SolveHistory>> solveHistory(Ref ref) async {
-  final userId = SupabaseService.auth.currentUser?.id;
+  final userId = ref.read(authSessionProvider).userId;
   if (userId == null) return [];
   return loadSolveHistory(ref.read(statsRepositoryProvider), userId);
 }
@@ -50,7 +50,7 @@ Future<List<SolveHistory>> solveHistory(Ref ref) async {
 /// shows its error + retry state.
 @riverpod
 Future<StatsOverview> statsOverview(Ref ref) async {
-  final userId = SupabaseService.auth.currentUser?.id;
+  final userId = ref.read(authSessionProvider).userId;
   if (userId == null) {
     return const StatsOverview(
       currentStreak: 0,

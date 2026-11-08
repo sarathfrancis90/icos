@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/backend/backend_providers.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/app_error.dart';
 import '../../../core/utils/result.dart';
@@ -37,7 +38,7 @@ class GroupsSession {
 GroupsSession groupsSession(Ref ref) {
   // Re-evaluate whenever the auth state changes (guest → account link).
   final user = ref.watch(authNotifierProvider).valueOrNull ??
-      SupabaseService.auth.currentUser;
+      ref.read(authClientProvider).currentUser;
   if (user == null) return const GroupsSession.signedOut();
   return GroupsSession(userId: user.id, isAnonymous: user.isAnonymous);
 }

@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icos/core/services/connectivity_service.dart';
 import 'package:icos/core/services/session_service.dart';
+import 'package:icos/core/utils/app_error.dart';
+import 'package:icos/core/utils/result.dart';
 import 'package:icos/features/auth/domain/auth_outcome.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart'
-    show authStateChangesProvider;
+    show AuthEvent, AuthStateChange, authStateChangesProvider;
 import 'package:icos/features/auth/providers/session_keeper.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'
-    show AuthChangeEvent, AuthState;
+
+import '../../helpers/fake_auth_client.dart';
 
 class _FakeGateway implements SessionGateway {
   _FakeGateway({this.hasSession = false});
@@ -99,11 +101,11 @@ void main() {
   group('SessionKeeper', () {
     late _FakeGateway gateway;
     late ProviderContainer container;
-    late StreamController<AuthState> authEvents;
+    late StreamController<AuthStateChange> authEvents;
 
     setUp(() {
       gateway = _FakeGateway()..failWith = StateError('offline');
-      authEvents = StreamController<AuthState>.broadcast();
+      authEvents = StreamController<AuthStateChange>.broadcast();
       container = ProviderContainer(
         overrides: [
           sessionEnsurerProvider.overrideWithValue(
@@ -155,11 +157,58 @@ void main() {
         ..hasSession = true;
       container.read(sessionKeeperProvider);
 
-      gateway.hasSession = false; // refresh token revoked, SDK signs out
-      authEvents.add(const AuthState(AuthChangeEvent.signedOut, null));
+      gateway.hasSession = false; // session revoked, the client signs out
+      authEvents.add(const AuthStateChange(AuthEvent.signedOut));
       await Future<void>.delayed(const Duration(milliseconds: 10));
 
       expect(gateway.hasSession, isTrue);
+    });
+  });
+
+  group('AuthClientSessionGateway', () {
+    test('no stored session: signs in anonymously', () async {
+      final client = FakeAuthClient();
+      addTearDown(client.close);
+      final ensurer = SessionEnsurer(gateway: AuthClientSessionGateway(client));
+      expect(await ensurer.ensureSession(), isTrue);
+      expect(client.calls, ['getSession', 'signInAnonymously']);
+      expect(client.currentUser?.isAnonymous, isTrue);
+    });
+
+    test('a known user is a session: no network at all', () async {
+      final client = FakeAuthClient(user: memberUser());
+      addTearDown(client.close);
+      final ensurer = SessionEnsurer(gateway: AuthClientSessionGateway(client));
+      expect(await ensurer.ensureSession(), isTrue);
+      expect(client.calls, isEmpty);
+    });
+
+    test('a stored session the server still knows is kept', () async {
+      final client = FakeAuthClient()
+        ..getSessionResult = Result.success(memberUser());
+      addTearDown(client.close);
+      final ensurer = SessionEnsurer(gateway: AuthClientSessionGateway(client));
+      expect(await ensurer.ensureSession(), isTrue);
+      expect(client.calls, ['getSession']);
+    });
+
+    test('a failed check never replaces the stored session', () async {
+      final client = FakeAuthClient()
+        ..getSessionResult = const Result.failure(AppError.network('offline'));
+      addTearDown(client.close);
+      final ensurer = SessionEnsurer(gateway: AuthClientSessionGateway(client));
+      expect(await ensurer.ensureSession(), isFalse);
+      expect(client.calls, ['getSession']);
+    });
+
+    test('a failed anonymous sign-in reports no session', () async {
+      final client = FakeAuthClient()
+        ..signInAnonymouslyResult = const Result.failure(
+          AppError.network('offline'),
+        );
+      addTearDown(client.close);
+      final ensurer = SessionEnsurer(gateway: AuthClientSessionGateway(client));
+      expect(await ensurer.ensureSession(), isFalse);
     });
   });
 

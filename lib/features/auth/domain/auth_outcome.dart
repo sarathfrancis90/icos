@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import '../../../core/backend/app_user.dart';
 
 import 'auth_strategy.dart';
 
@@ -17,7 +17,7 @@ class AuthSuccess extends AuthOutcome {
     this.accountLinked = false,
   });
 
-  final User? user;
+  final AppUser? user;
 
   /// True when a guest was converted or a brand-new account was created.
   final bool isNewAccount;
@@ -27,8 +27,8 @@ class AuthSuccess extends AuthOutcome {
   final bool accountLinked;
 }
 
-/// Supabase requires the user to confirm the new email before the account
-/// becomes usable with that email.
+/// The account was created but has no session yet: the user must confirm
+/// the email first (the server returned no session token).
 class AuthEmailConfirmationRequired extends AuthOutcome {
   const AuthEmailConfirmationRequired({
     required this.email,
@@ -37,8 +37,7 @@ class AuthEmailConfirmationRequired extends AuthOutcome {
 
   final String email;
 
-  /// True when produced by a fresh `signUp` (resend uses `OtpType.signup`);
-  /// false for a guest upgrade via `updateUser` (`OtpType.emailChange`).
+  /// True when produced by a fresh sign-up; false for a guest upgrade.
   final bool fromSignUp;
 }
 

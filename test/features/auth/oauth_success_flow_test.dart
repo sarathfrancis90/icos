@@ -4,83 +4,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:icos/features/auth/data/oauth_web_gateway.dart';
+import 'package:icos/core/backend/auth_event.dart';
+import 'package:icos/core/services/storage_service.dart';
 import 'package:icos/features/auth/domain/auth_strategy.dart';
 import 'package:icos/features/auth/presentation/widgets/auth_outcome_handler.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
 import 'package:icos/features/groups/domain/pending_invite.dart';
-import 'package:icos/core/services/storage_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../helpers/auth_test_harness.dart';
+import '../../helpers/fake_auth_client.dart';
 import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
 
 // A web sign-in that has finished must read as finished: one message, and the
 // auth screen is left, exactly like the native paths.
 
-const _guest = User(
-  id: 'g',
-  appMetadata: {},
-  userMetadata: {},
-  aud: 'authenticated',
-  createdAt: '2026-10-05T00:00:00Z',
-  isAnonymous: true,
-);
-const _member = User(
-  id: 'u',
-  appMetadata: {},
-  userMetadata: {},
-  aud: 'authenticated',
-  createdAt: '2026-10-05T00:00:00Z',
-);
+AppUser? _current;
 
-User? _current;
-AuthChangeEvent _event = AuthChangeEvent.signedIn;
-int _completed = 0;
+/// The event the exchange emits again a tick after the call returned, as a
+/// real stream may (the worst case for a duplicate announcement).
+AuthEvent _lateEvent = AuthEvent.signedIn;
 final flowMessages = <String>[];
 
-class _Gateway extends OAuthWebGateway {
-  @override
-  Future<Uri> authorizeUrl(
-    OAuthProvider provider, {
-    required bool link,
-    required String redirectTo,
-  }) async => Uri.parse('https://example.test/authorize');
-
-  @override
-  Future<Uri> authenticate(Uri url) async =>
-      Uri.parse('io.supabase.icos://oauth-callback?code=abc');
-
-  @override
-  Future<void> completeSession(Uri callback) async {
-    _completed++;
-    _current = _member;
-    // What the SDK does: the exchange emits an auth event. Delivered a tick
-    // later, as a real stream would.
-    final container = _container;
-    Future<void>.delayed(
-      Duration.zero,
-      () => container
-          .read(authNotifierProvider.notifier)
-          .handleAuthEvent(
-            AuthState(
-              _event,
-              Session(accessToken: 't', tokenType: 'bearer', user: _member),
-            ),
-          ),
-    );
-  }
-}
-
 late ProviderContainer _container;
-
-class _FakeAuth extends AuthNotifier {
-  @override
-  User? get currentUser => _current;
-
-  @override
-  AsyncValue<User?> build() => AsyncValue.data(_current);
-}
+late FakeAuthClient _client;
 
 void main() {
   setUpTestEnvironment();
@@ -91,20 +38,23 @@ void main() {
     // These tests are about the continuation, not the name prompt.
     await StorageService.setDisplayNamePromptShown('g');
     await StorageService.setDisplayNamePromptShown('u');
-    _completed = 0;
-    OAuthWebGateway.current = _Gateway();
     AuthNotifier.platformOverride = AuthPlatform.ios;
   });
   tearDown(() async {
-    OAuthWebGateway.current = const OAuthWebGateway();
     AuthNotifier.platformOverride = null;
     await dir.delete(recursive: true);
   });
 
   Future<GoRouter> pump(WidgetTester tester) async {
-    _container = ProviderContainer(
-      overrides: [authNotifierProvider.overrideWith(_FakeAuth.new)],
-    );
+    _client = FakeAuthClient(user: _current);
+    addTearDown(_client.close);
+    var echoed = false;
+    _client.events.listen((e) {
+      if (e == AuthEvent.signedOut || echoed) return;
+      echoed = true;
+      Future<void>.delayed(Duration.zero, () => _client.emit(_lateEvent));
+    });
+    _container = ProviderContainer(overrides: authClientOverrides(_client));
     addTearDown(_container.dispose);
     _container.listen(authNotifierProvider, (_, _) {});
     // Anything the auth event handler itself would announce (the old
@@ -161,14 +111,14 @@ void main() {
       r.routerDelegate.currentConfiguration.last.matchedLocation;
 
   testWidgets('guest: "Account linked" once, then home', (tester) async {
-    _current = _guest;
-    _event = AuthChangeEvent.userUpdated; // worst case: the old duplicate
+    _current = guestUser();
+    _lateEvent = AuthEvent.userUpdated; // worst case: the old duplicate
     final router = await pump(tester);
 
     await tester.tap(find.text('go'));
     await tester.pumpAndSettle();
 
-    expect(_completed, 1);
+    expect(_client.calls, hasLength(1));
     expect(flowMessages, isEmpty, reason: 'no second announcement');
     expect(
       find.text('Account linked. Your progress is saved.'),
@@ -180,13 +130,13 @@ void main() {
 
   testWidgets('signed-out: "Signed in." once, then home', (tester) async {
     _current = null;
-    _event = AuthChangeEvent.signedIn;
+    _lateEvent = AuthEvent.signedIn;
     final router = await pump(tester);
 
     await tester.tap(find.text('go'));
     await tester.pumpAndSettle();
 
-    expect(_completed, 1);
+    expect(_client.calls, hasLength(1));
     expect(flowMessages, isEmpty, reason: 'no second announcement');
     expect(find.text('Signed in.'), findsOneWidget);
     expect(at(router), '/');
@@ -195,8 +145,8 @@ void main() {
   testWidgets('guest with a pending invite lands on the invite', (
     tester,
   ) async {
-    _current = _guest;
-    _event = AuthChangeEvent.signedIn;
+    _current = guestUser();
+    _lateEvent = AuthEvent.signedIn;
     await PendingInvite.save('ABC123');
     final router = await pump(tester);
 

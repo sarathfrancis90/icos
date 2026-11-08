@@ -12,23 +12,17 @@ import 'package:icos/core/services/storage_service.dart';
 import 'package:icos/features/groups/domain/pending_invite.dart';
 import 'package:icos/features/groups/presentation/join_group_screen.dart';
 import 'package:icos/features/groups/providers/groups_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:icos/core/backend/app_user.dart';
 
 import '../../helpers/storage_test_helpers.dart';
 import '../../helpers/test_helpers.dart';
 
 class _FakeAuth extends AuthNotifier {
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 }
 
-const _user = User(
-  id: 'u',
-  appMetadata: {},
-  userMetadata: {},
-  aud: 'authenticated',
-  createdAt: '2026-10-05T00:00:00Z',
-);
+const _user = AppUser(id: 'u', email: 'u@example.test');
 
 String _at(GoRouter r) =>
     r.routerDelegate.currentConfiguration.last.matchedLocation;

@@ -1,25 +1,56 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:icos/core/backend/backend_config.dart';
+import 'package:icos/core/utils/app_error.dart';
 import 'package:icos/features/auth/domain/auth_strategy.dart';
 
 void main() {
   group('AuthStrategy.forOAuth', () {
-    test('anonymous users always link (web flow) regardless of platform', () {
+    test('anonymous users always link (same user id) on every platform', () {
       for (final platform in AuthPlatform.values) {
         for (final provider in OAuthKind.values) {
           for (final hasIds in [true, false]) {
+            final method = AuthStrategy.forOAuth(
+              isAnonymous: true,
+              platform: platform,
+              provider: provider,
+              hasClientIds: hasIds,
+            );
+            expect(method.links, isTrue, reason: '$platform/$provider/$hasIds');
+            final native = AuthStrategy.nativeAvailable(
+              platform: platform,
+              provider: provider,
+              hasClientIds: hasIds,
+            );
             expect(
-              AuthStrategy.forOAuth(
-                isAnonymous: true,
-                platform: platform,
-                provider: provider,
-                hasClientIds: hasIds,
-              ),
-              OAuthMethod.linkIdentityWeb,
+              method,
+              native ? OAuthMethod.linkNativeIdToken : OAuthMethod.linkWeb,
               reason: '$platform/$provider/ids=$hasIds',
             );
           }
         }
       }
+    });
+
+    test('the provider table: native everywhere but Apple on Android', () {
+      OAuthMethod guest(AuthPlatform p, OAuthKind k) => AuthStrategy.forOAuth(
+        isAnonymous: true,
+        platform: p,
+        provider: k,
+        hasClientIds: true,
+      );
+      expect(
+        guest(AuthPlatform.ios, OAuthKind.google),
+        OAuthMethod.linkNativeIdToken,
+      );
+      expect(
+        guest(AuthPlatform.ios, OAuthKind.apple),
+        OAuthMethod.linkNativeIdToken,
+      );
+      expect(
+        guest(AuthPlatform.android, OAuthKind.google),
+        OAuthMethod.linkNativeIdToken,
+      );
+      expect(guest(AuthPlatform.android, OAuthKind.apple), OAuthMethod.linkWeb);
     });
 
     test('non-anonymous Google uses native id-token when ids configured', () {
@@ -99,10 +130,10 @@ void main() {
   });
 
   group('AuthStrategy.forEmail', () {
-    test('guest creating an account converts via updateUser', () {
+    test('guest creating an account is upgraded in place', () {
       expect(
         AuthStrategy.forEmail(isAnonymous: true, isSignUp: true),
-        EmailMethod.updateUser,
+        EmailMethod.upgradeGuest,
       );
     });
 
@@ -193,7 +224,7 @@ void main() {
           provider: OAuthKind.apple,
           hasClientIds: true,
         ),
-        OAuthMethod.linkIdentityWeb,
+        OAuthMethod.linkWeb,
       );
     });
 
@@ -222,15 +253,19 @@ void main() {
   group('AuthStrategy.isIdentityAlreadyExists', () {
     test('recognises codes', () {
       expect(
-        AuthStrategy.isIdentityAlreadyExists(code: 'identity_already_exists'),
+        AuthStrategy.isIdentityAlreadyExists(
+          code: 'ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER',
+        ),
         isTrue,
       );
       expect(
-        AuthStrategy.isIdentityAlreadyExists(code: 'email_exists'),
+        AuthStrategy.isIdentityAlreadyExists(code: 'EMAIL_EXISTS'),
         isTrue,
       );
       expect(
-        AuthStrategy.isIdentityAlreadyExists(code: 'user_already_exists'),
+        AuthStrategy.isIdentityAlreadyExists(
+          code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL',
+        ),
         isTrue,
       );
       expect(
@@ -242,7 +277,7 @@ void main() {
     test('recognises messages', () {
       expect(
         AuthStrategy.isIdentityAlreadyExists(
-          message: 'Identity is already linked to another user',
+          message: 'Account already linked to a different user',
         ),
         isTrue,
       );
@@ -266,52 +301,6 @@ void main() {
     });
   });
 
-  group('AuthStrategy.needsEmailConfirmation', () {
-    test('pending new_email requires confirmation', () {
-      expect(
-        AuthStrategy.needsEmailConfirmation(
-          email: null,
-          newEmail: 'a@b.c',
-          emailConfirmedAt: null,
-        ),
-        isTrue,
-      );
-    });
-
-    test('email set but not confirmed requires confirmation', () {
-      expect(
-        AuthStrategy.needsEmailConfirmation(
-          email: 'a@b.c',
-          newEmail: null,
-          emailConfirmedAt: null,
-        ),
-        isTrue,
-      );
-    });
-
-    test('confirmed email does not', () {
-      expect(
-        AuthStrategy.needsEmailConfirmation(
-          email: 'a@b.c',
-          newEmail: null,
-          emailConfirmedAt: '2026-01-01T00:00:00Z',
-        ),
-        isFalse,
-      );
-    });
-
-    test('no email at all does not', () {
-      expect(
-        AuthStrategy.needsEmailConfirmation(
-          email: null,
-          newEmail: null,
-          emailConfirmedAt: null,
-        ),
-        isFalse,
-      );
-    });
-  });
-
   group('AuthStrategy.friendlyMessage', () {
     test('maps known errors', () {
       expect(
@@ -323,8 +312,16 @@ void main() {
         'An account with this email already exists.',
       );
       expect(
-        AuthStrategy.friendlyMessage('Email not confirmed'),
+        AuthStrategy.friendlyMessage('Email not verified'),
         'Please check your email to confirm your account.',
+      );
+      expect(
+        AuthStrategy.friendlyMessage('Invalid email or password'),
+        'Invalid email or password. Please try again.',
+      );
+      expect(
+        AuthStrategy.friendlyMessage('Password too short'),
+        'Please choose a stronger password (at least 6 characters).',
       );
       expect(
         AuthStrategy.friendlyMessage('Rate limit exceeded'),
@@ -336,6 +333,27 @@ void main() {
       );
     });
 
+    test('friendlyError maps AppError variants', () {
+      expect(
+        AuthStrategy.friendlyError(const AppError.network('x')),
+        'No internet connection. Please try again.',
+      );
+      expect(
+        AuthStrategy.friendlyError(const AppError.conflict('x')),
+        'An account with this email already exists.',
+      );
+      expect(
+        AuthStrategy.friendlyError(const AppError.rateLimit('x')),
+        'Too many attempts. Please wait a moment.',
+      );
+      expect(
+        AuthStrategy.friendlyError(
+          const AppError.auth('boom https://x.test/a?state=SECRET'),
+        ),
+        'Something went wrong. Please try again.',
+      );
+    });
+
     test('falls back to generic copy', () {
       expect(
         AuthStrategy.friendlyMessage('weird'),
@@ -344,26 +362,18 @@ void main() {
     });
   });
 
-  test('redirect uri matches the registered scheme', () {
-    expect(kAuthRedirectUri, 'io.supabase.icos://login-callback');
-  });
-
-  test('web OAuth redirect shares the scheme but not the host', () {
-    // Android: CallbackActivity owns oauth-callback, MainActivity owns
-    // login-callback (emailed links); one URL on two activities = chooser.
-    expect(kOAuthRedirectUri, 'io.supabase.icos://oauth-callback');
-    expect(Uri.parse(kOAuthRedirectUri).scheme,
-        Uri.parse(kAuthRedirectUri).scheme);
-    expect(Uri.parse(kOAuthRedirectUri).host,
-        isNot(Uri.parse(kAuthRedirectUri).host));
+  test('web OAuth redirect is the AuthClient callback (io.icos)', () {
+    expect(kOAuthRedirectUri, 'io.icos://oauth-callback');
+    expect(kOAuthRedirectUri, kOAuthCallbackUrl);
+    expect(Uri.parse(kOAuthRedirectUri).scheme, kOAuthCallbackScheme);
   });
 
   test('redactUrls keeps host and path only', () {
     final out = AuthStrategy.redactUrls(
-      'failed https://abc.supabase.co/auth/v1/authorize?provider=google'
+      'failed https://fn.example.test/auth/sign-in/social?provider=google'
       '&code_challenge=SECRET&state=XYZ now',
     );
-    expect(out, 'failed abc.supabase.co/auth/v1/authorize now');
+    expect(out, 'failed fn.example.test/auth/sign-in/social now');
     expect(out, isNot(contains('SECRET')));
   });
 }

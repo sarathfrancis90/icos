@@ -4,28 +4,45 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../features/auth/domain/auth_outcome.dart';
+import '../backend/auth_client.dart';
+import '../backend/backend_providers.dart';
+import '../utils/result.dart';
 import 'app_logger.dart';
-import 'supabase_service.dart';
 
 part 'session_service.g.dart';
 
-/// The two things [SessionEnsurer] needs from the auth SDK. A seam so tests
-/// never touch `Supabase.instance`.
+/// The two things [SessionEnsurer] needs from the auth client. A seam so
+/// tests never touch the network.
 abstract class SessionGateway {
   bool get hasSession;
 
+  /// Creates a guest session (throws on failure).
   Future<void> signInAnonymously();
 }
 
-class SupabaseSessionGateway implements SessionGateway {
-  const SupabaseSessionGateway();
+class AuthClientSessionGateway implements SessionGateway {
+  const AuthClientSessionGateway(this._client);
+
+  final AuthClient _client;
 
   @override
-  bool get hasSession => SupabaseService.auth.currentSession != null;
+  bool get hasSession => _client.currentUser != null;
 
+  /// Asks the server about the stored session first (it may only lack the
+  /// cached user), and signs in anonymously only when there is none. A
+  /// failed check keeps the stored session rather than replacing it.
   @override
   Future<void> signInAnonymously() async {
-    await SupabaseService.auth.signInAnonymously();
+    final session = await _client.getSession();
+    switch (session) {
+      case Failure(:final error):
+        throw error;
+      case Success(data: _?):
+        return;
+      case Success():
+        final created = await _client.signInAnonymously();
+        if (created case Failure(:final error)) throw error;
+    }
   }
 }
 
@@ -37,13 +54,9 @@ class SupabaseSessionGateway implements SessionGateway {
 /// now goes through [ensureSession].
 class SessionEnsurer {
   SessionEnsurer({
-    SessionGateway? gateway,
+    required SessionGateway gateway,
     this.signInTimeout = const Duration(seconds: 15),
-  }) : _gateway = gateway ?? const SupabaseSessionGateway();
-
-  /// Shared by `main()` and the providers so there is one in-flight attempt
-  /// per process.
-  static final SessionEnsurer instance = SessionEnsurer();
+  }) : _gateway = gateway;
 
   final SessionGateway _gateway;
 
@@ -78,15 +91,20 @@ class SessionEnsurer {
   }
 }
 
+/// Shared by `main()` and the providers so there is one in-flight attempt
+/// per process.
 @Riverpod(keepAlive: true)
-SessionEnsurer sessionEnsurer(Ref ref) => SessionEnsurer.instance;
+SessionEnsurer sessionEnsurer(Ref ref) => SessionEnsurer(
+  gateway: AuthClientSessionGateway(ref.watch(authClientProvider)),
+);
 
 /// Runs [providerFlow] (an OAuth flow for an account that already exists) and
 /// then makes sure a session is still there.
 ///
-/// The guest session is deliberately *not* signed out beforehand: the SDK
-/// flows replace it once the provider returns a session, so cancelling the
-/// sheet or closing the browser leaves the guest untouched. [ensureSession]
+/// The guest session is deliberately *not* signed out beforehand: the
+/// `AuthClient` flows send the guest bearer and replace the session only once
+/// the provider returns one, so cancelling the sheet or closing the browser
+/// leaves the guest untouched. [ensureSession]
 /// afterwards is the safety net for any path that lost the session anyway.
 Future<AuthOutcome> switchToExistingAccount({
   required SessionEnsurer ensurer,

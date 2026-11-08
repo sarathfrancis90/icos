@@ -7,7 +7,7 @@ import 'package:icos/core/constants/app_strings.dart';
 import 'package:icos/features/auth/domain/auth_strategy.dart';
 import 'package:icos/features/auth/presentation/auth_screen.dart';
 import 'package:icos/features/auth/providers/auth_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show User;
+import 'package:icos/core/backend/app_user.dart';
 
 import '../../../helpers/test_helpers.dart';
 
@@ -15,7 +15,7 @@ import '../../../helpers/test_helpers.dart';
 /// uninitialised Supabase instance.
 class _FakeAuth extends AuthNotifier {
   @override
-  AsyncValue<User?> build() => const AsyncValue.data(null);
+  AsyncValue<AppUser?> build() => const AsyncValue.data(null);
 }
 
 void main() {
