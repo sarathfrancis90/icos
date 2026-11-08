@@ -33,16 +33,19 @@ async function main(): Promise<number> {
   const { closePool } = await import("../src/db.js");
   let created = 0;
   let existing = 0;
-  for (let i = 0; i < days; i++) {
-    const date = addDays(from, i);
-    const started = Date.now();
-    const result = await generateForDate(date);
-    if (result === "created") created++;
-    else existing++;
-    console.log(`${date} ${result} (${Date.now() - started} ms)`);
+  try {
+    for (let i = 0; i < days; i++) {
+      const date = addDays(from, i);
+      const started = Date.now();
+      const result = await generateForDate(date);
+      if (result === "created") created++;
+      else existing++;
+      console.log(`${date} ${result} (${Date.now() - started} ms)`);
+    }
+    console.log(`done: created ${created}, existing ${existing}`);
+  } finally {
+    await closePool();
   }
-  console.log(`done: created ${created}, existing ${existing}`);
-  await closePool();
   return 0;
 }
 
