@@ -9,6 +9,24 @@
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { setupApi, SilentLogger, SKIP, type ApiHarness } from "./helpers/api.js";
+
+/** Counts statements sent through the shared pool while `fn` runs. */
+async function countQueries(fn: () => Promise<void>): Promise<number> {
+  const { getPool } = await import("../src/db.js");
+  const pool = getPool();
+  const original = pool.query;
+  let n = 0;
+  pool.query = ((...args: unknown[]) => {
+    n++;
+    return (original as (...a: unknown[]) => unknown).apply(pool, args);
+  }) as typeof pool.query;
+  try {
+    await fn();
+  } finally {
+    pool.query = original;
+  }
+  return n;
+}
 import { addDays, utcToday } from "../src/shared/http.js";
 
 describe("puzzle routes", { skip: SKIP }, () => {
@@ -102,6 +120,23 @@ describe("puzzle routes", { skip: SKIP }, () => {
         "walls",
         "waypoints",
       ]);
+    });
+
+    test("a second GET for the same date within 60 s is served from memory (no query)", async () => {
+      const { publicPuzzleCache } = await import("../src/routes/puzzle.js");
+      publicPuzzleCache.clear();
+      const date = addDays(utcToday(), -25);
+      await stubPuzzle(date);
+      const first = await countQueries(async () => {
+        assert.equal((await h.call("GET", `/api/puzzle/${date}`)).res.status, 200);
+      });
+      assert.equal(first, 1);
+      const second = await countQueries(async () => {
+        const { res, json } = await h.call("GET", `/api/puzzle/${date}`);
+        assert.equal(res.status, 200);
+        assert.equal(json?.puzzle.puzzle_date, date);
+      });
+      assert.equal(second, 0);
     });
 
     test("404 PUZZLE_NOT_FOUND for an in-window date without a puzzle (not cached)", async () => {

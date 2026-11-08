@@ -6,6 +6,24 @@ import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { setupApi, SKIP, type ApiHarness } from "./helpers/api.js";
 
+/** Counts statements sent through the shared pool while `fn` runs. */
+async function countQueries(fn: () => Promise<void>): Promise<number> {
+  const { getPool } = await import("../src/db.js");
+  const pool = getPool();
+  const original = pool.query;
+  let n = 0;
+  pool.query = ((...args: unknown[]) => {
+    n++;
+    return (original as (...a: unknown[]) => unknown).apply(pool, args);
+  }) as typeof pool.query;
+  try {
+    await fn();
+  } finally {
+    pool.query = original;
+  }
+  return n;
+}
+
 describe("config route", { skip: SKIP }, () => {
   let h: ApiHarness;
 
@@ -31,6 +49,21 @@ describe("config route", { skip: SKIP }, () => {
         },
       },
     });
+  });
+
+  test("a second call within 60 s is served from memory (no query)", async () => {
+    const { configCache } = await import("../src/routes/config.js");
+    configCache.clear();
+    const first = await countQueries(async () => {
+      assert.equal((await h.call("GET", "/api/config")).res.status, 200);
+    });
+    assert.equal(first, 1);
+    const second = await countQueries(async () => {
+      const { res, json } = await h.call("GET", "/api/config");
+      assert.equal(res.status, 200);
+      assert.equal(json?.config.latest_version, "1.1.0");
+    });
+    assert.equal(second, 0);
   });
 
   test("405 for POST", async () => {

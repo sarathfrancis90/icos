@@ -5,10 +5,14 @@
 // 200 { config: { min_supported_version, latest_version, maintenance_mode, store_urls, ... } }
 import { Hono } from "hono";
 import { q } from "../db.js";
+import { PUBLIC_READ_TTL_MS, TtlCache } from "../shared/ttl_cache.js";
 import { type ApiDeps, methodNotAllowed, requestCtx } from "./common.js";
 
 /** Public, cacheable for 5 minutes (CDN and client). */
 export const PUBLIC_CACHE = { "Cache-Control": "public, max-age=300" };
+
+/** app_config as served, kept in memory for 60 s so polling clients do not hit Postgres. */
+export const configCache = new TtlCache<Record<string, unknown>>(PUBLIC_READ_TTL_MS, 1);
 
 export function configRoutes(deps: ApiDeps): Hono {
   const app = new Hono();
@@ -16,8 +20,12 @@ export function configRoutes(deps: ApiDeps): Hono {
   app.all("/config", async (c) => {
     const r = requestCtx(c, deps, "config");
     if (c.req.method !== "GET") return methodNotAllowed(r);
-    const rows = await q<{ key: string; value: unknown }>("SELECT key, value FROM public.app_config ORDER BY key");
-    const config = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+    let config = configCache.get("config");
+    if (config === undefined) {
+      const rows = await q<{ key: string; value: unknown }>("SELECT key, value FROM public.app_config ORDER BY key");
+      config = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+      configCache.set("config", config);
+    }
     return r.ok({ config }, 200, PUBLIC_CACHE);
   });
 

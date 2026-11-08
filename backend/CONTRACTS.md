@@ -53,10 +53,12 @@ callback `io.icos://oauth-callback?cookie=…`), `get-session`, `token`
 ### `GET /api/config`
 No auth. 200 `{config: {min_supported_version, latest_version, maintenance_mode, store_urls, ...}}`
 (the `app_config` rows as one object, so the force-update / maintenance gate works
-before a session exists).
+before a session exists). Each Function instance serves it from memory for 60 s, so an
+`app_config` change can take up to a minute to show.
 
 ### `GET /api/puzzle/:date`
-No auth. 200 `{puzzle}` (public columns, cacheable 5 min).
+No auth. 200 `{puzzle}` (public columns, cacheable 5 min; found puzzles are also kept in
+the Function's memory for 60 s per date, misses are not).
 Errors: 400 `INVALID_DATE|DATE_OUT_OF_RANGE` (outside the archive window), 404 `PUZZLE_NOT_FOUND`.
 
 ### `POST /api/daily-puzzle`

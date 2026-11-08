@@ -26,12 +26,16 @@ import {
   utcToday,
 } from "../shared/http.js";
 import { generatePuzzle, seedFor, weekdayDifficulty } from "../shared/puzzle_core.js";
+import { PUBLIC_READ_TTL_MS, TtlCache } from "../shared/ttl_cache.js";
 import { PUBLIC_CACHE } from "./config.js";
 import { activeUser, type ApiDeps, methodNotAllowed, pgError, requestCtx, touchLastActive } from "./common.js";
 
 const NODE_BUDGET = 2_000_000;
 const SEED_VERSION = 3;
 const FIRST_DATE = "2026-01-01";
+
+/** Public puzzle rows by date, kept in memory for 60 s (found puzzles only). */
+export const publicPuzzleCache = new TtlCache<PublicPuzzleRow>(PUBLIC_READ_TTL_MS);
 
 export interface PublicPuzzleRow {
   id: string;
@@ -158,8 +162,12 @@ export function puzzleRoutes(deps: ApiDeps): Hono {
     if (!isWithinArchiveWindow(date, utcToday())) {
       return r.fail(400, "date is outside the playable window", "DATE_OUT_OF_RANGE");
     }
-    const puzzle = await fetchPublic(date);
-    if (!puzzle) return r.fail(404, "No puzzle for that date", "PUZZLE_NOT_FOUND");
+    let puzzle = publicPuzzleCache.get(date) ?? null;
+    if (puzzle === null) {
+      puzzle = await fetchPublic(date);
+      if (!puzzle) return r.fail(404, "No puzzle for that date", "PUZZLE_NOT_FOUND");
+      publicPuzzleCache.set(date, puzzle);
+    }
     return r.ok({ puzzle }, 200, PUBLIC_CACHE);
   });
 
