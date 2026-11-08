@@ -43,6 +43,27 @@ neon logs query --source function --service-name neon-function/api --since 1h
 neon checkout dev                # switch the linked branch (pulls its env)
 ```
 
+## Data API facts (verified on dev, 2026-11-08)
+
+- Every request needs a bearer JWT: a call without one gets **400** "missing authentication
+  credentials", and an invalid or expired token also gets **400** (not 401). The app therefore
+  always sends the session JWT, and the unauthenticated needs (app_config gate, today's puzzle
+  before the guest session exists) use the public Function routes `GET /api/config` and
+  `GET /api/puzzle/:date`.
+- With a guest JWT: RLS returns only the caller's own `profiles` row; `Prefer: count=exact`
+  yields `Content-Range` (206); RPCs return PostgREST's `{code, message, hint}` shape with the
+  SQL HINT codes the app maps (42501 → 403); embeds such as `group_members?select=id,profiles(display_name,avatar_url)` parse.
+- Changing the JWKS URL needs `neon data-api delete` + `create` (`update` has no JWKS flag).
+- The Function URL differs per branch, so the Data API is managed per branch with the CLI, not in `neon.ts`.
+- A forged `X-Neon-Trigger-Invocation-Id` header is stripped by Neon: `/cron/*` returns 401.
+
+## Scripts
+
+```bash
+npm run seed:puzzles -- --url <unpooled url> --from 2026-11-01 --days 46   # needs PUZZLE_SEED_SALT
+npm run smoke -- --api https://<function host>/ [--date YYYY-MM-DD]          # needs PUZZLE_SEED_SALT
+```
+
 ## Notes
 
 - Custom domains: `neon config plan` accepts `customDomains: ["api.icos.sarathfrancis.work"]`

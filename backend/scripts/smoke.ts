@@ -58,7 +58,7 @@ async function main(): Promise<number> {
   });
   step("submit-score repeat → 409", again.status === 409, `status ${again.status}`);
 
-  const out = await fetch(`${api}auth/sign-out`, { method: "POST", headers: auth });
+  const out = await fetch(`${api}auth/sign-out`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: "{}" });
   step("sign-out", out.status === 200, `status ${out.status}`);
   return 0;
 }
