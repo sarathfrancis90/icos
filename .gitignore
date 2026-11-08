@@ -94,3 +94,9 @@ __pycache__/
 # Maestro screenshot output from flows that use relative paths
 /08_profile/
 /14_colorblind/
+backend/node_modules/
+backend/.env.neon
+backend/.neon
+backend/.env
+backend/.env.local
+backend/dist/
