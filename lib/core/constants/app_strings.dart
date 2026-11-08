@@ -231,6 +231,7 @@ abstract final class AppStrings {
   static const freshStartTitle = 'Icos has moved to a new home';
   static const freshStartBody =
       'Progress and groups start fresh in this version; your streak begins '
-      'again today.';
+      'again today. If you had an account, create it again to keep playing '
+      'with your groups.';
   static const ok = 'OK';
 }

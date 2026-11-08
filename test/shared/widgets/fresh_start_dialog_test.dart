@@ -29,7 +29,8 @@ void main() {
     expect(
       find.text(
         'Progress and groups start fresh in this version; your streak '
-        'begins again today.',
+        'begins again today. If you had an account, create it again to keep '
+        'playing with your groups.',
       ),
       findsOneWidget,
     );
